@@ -1,0 +1,6 @@
+export { HeroSection } from './HeroSection'
+export { CategoryShortcutSection } from './CategoryShortcutSection'
+export { BestSection } from './BestSection'
+export { NewSection } from './NewSection'
+export { LiveSection } from './LiveSection'
+export { BenefitSection } from './BenefitSection'

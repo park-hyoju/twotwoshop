@@ -1,1 +1,8 @@
-// 페이지 컴포넌트 배럴 export
+export { Home } from './Home'
+export {
+  ProductsAllPage,
+  ProductsNewPage,
+  ProductsBestPage,
+  ProductsSalePage,
+} from './products/ProductsPages'
+export { LivePage, CartPage, LoginPage, NoticesPage } from './ServicePages'

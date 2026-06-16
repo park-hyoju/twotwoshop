@@ -1,1 +1,9 @@
-// API 및 외부 서비스 연동 배럴 export
+export {
+  getAllProducts,
+  getBestProducts,
+  getNewProducts,
+  getProductBySlug,
+  getProductsByCategory,
+  getProductsByGender,
+  getSaleProducts,
+} from './products'
