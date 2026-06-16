@@ -2,8 +2,10 @@ export {
   getAllProducts,
   getBestProducts,
   getNewProducts,
+  getProductById,
   getProductBySlug,
-  getProductsByCategory,
+  getProductsByDetailCategory,
+  getProductsByDisplayCategory,
   getProductsByGender,
   getSaleProducts,
-} from './products'
+} from './productService'

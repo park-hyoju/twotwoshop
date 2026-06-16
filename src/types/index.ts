@@ -1,6 +1,6 @@
-export type {
-  Product,
-  ProductCategory,
-  ProductGender,
-  ProductStatus,
-} from './product'
+export type { AddToCartResult, CartItem, CartSyncNoticeType } from './cart'
+export type { Product } from './product'
+export type { Gender } from './gender'
+export type { ProductStatus } from './status'
+export type { DisplayCategory } from './displayCategory'
+export type { DetailCategory } from './detailCategory'

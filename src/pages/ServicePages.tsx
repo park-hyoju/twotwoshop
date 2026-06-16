@@ -9,11 +9,7 @@ export function LivePage() {
   )
 }
 
-export function CartPage() {
-  return (
-    <PlaceholderPage title="장바구니" description="담아두신 상품을 확인하세요." />
-  )
-}
+export { CartPage } from './cart/CartPage'
 
 export function LoginPage() {
   return (

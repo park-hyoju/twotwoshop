@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { NAV_ITEMS } from '../../data/navigation'
+import { useCart } from '../../hooks/useCart'
 import { ROUTES } from '../../lib/routes'
 import type { NavItem } from '../../types/navigation'
 
@@ -112,9 +113,10 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 
 interface HeaderActionsProps {
   onSearchClick: () => void
+  cartCount: number
 }
 
-function HeaderActions({ onSearchClick }: HeaderActionsProps) {
+function HeaderActions({ onSearchClick, cartCount }: HeaderActionsProps) {
   return (
     <div className="flex items-center gap-1 sm:gap-2">
       <button
@@ -127,10 +129,15 @@ function HeaderActions({ onSearchClick }: HeaderActionsProps) {
       </button>
       <Link
         to={ROUTES.cart}
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100"
-        aria-label="장바구니"
+        className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100"
+        aria-label={`장바구니${cartCount > 0 ? `, ${cartCount}개 상품` : ''}`}
       >
         <CartIcon />
+        {cartCount > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+            {cartCount > 99 ? '99+' : cartCount}
+          </span>
+        )}
       </Link>
       <Link
         to={ROUTES.login}
@@ -280,6 +287,8 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const { getCartCount } = useCart()
+  const cartCount = getCartCount()
   const desktopSearchRef = useRef<HTMLInputElement>(null)
   const mobileSearchRef = useRef<HTMLInputElement>(null)
 
@@ -319,7 +328,7 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-1">
-            <HeaderActions onSearchClick={handleSearchClick} />
+            <HeaderActions onSearchClick={handleSearchClick} cartCount={cartCount} />
             <button
               type="button"
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100 lg:hidden"

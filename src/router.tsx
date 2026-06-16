@@ -8,6 +8,8 @@ import {
   MenShoesPage,
   MenTopsPage,
 } from './pages/men/MenPages'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { ProductDetailPage } from './pages/products/ProductDetailPage'
 import {
   ProductsAllPage,
   ProductsBestPage,
@@ -30,10 +32,16 @@ export const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       { index: true, element: <Home /> },
-      { path: 'products', element: <ProductsAllPage /> },
-      { path: 'products/new', element: <ProductsNewPage /> },
-      { path: 'products/best', element: <ProductsBestPage /> },
-      { path: 'products/sale', element: <ProductsSalePage /> },
+      {
+        path: 'products',
+        children: [
+          { index: true, element: <ProductsAllPage /> },
+          { path: 'new', element: <ProductsNewPage /> },
+          { path: 'best', element: <ProductsBestPage /> },
+          { path: 'sale', element: <ProductsSalePage /> },
+          { path: ':slug', element: <ProductDetailPage /> },
+        ],
+      },
       { path: 'women', element: <WomenPage /> },
       { path: 'women/tops', element: <WomenTopsPage /> },
       { path: 'women/bottoms', element: <WomenBottomsPage /> },
@@ -49,6 +57,8 @@ export const router = createBrowserRouter([
       { path: 'cart', element: <CartPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'notices', element: <NoticesPage /> },
+      { path: '404', element: <NotFoundPage /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

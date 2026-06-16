@@ -1,26 +1,29 @@
-export type ProductStatus = 'active' | 'soldout' | 'hidden'
-
-export type ProductGender = 'women' | 'men' | 'common'
-
-export type ProductCategory = 'top' | 'bottom' | 'dress' | 'shoes' | 'misc'
+import type { DetailCategory } from './detailCategory'
+import type { DisplayCategory } from './displayCategory'
+import type { Gender } from './gender'
+import type { ProductStatus } from './status'
 
 export interface Product {
   id: string
   slug: string
   name: string
+  shortDescription: string
   description: string
   price: number
   originalPrice: number
   discountRate: number
-  imageUrl: string
-  imageAlt: string
-  category: ProductCategory
-  gender: ProductGender
+  thumbnail: string
+  images: string[]
+  gender: Gender
+  displayCategory: DisplayCategory
+  detailCategory: DetailCategory
   tags: string[]
   isNew: boolean
   isBest: boolean
   isSale: boolean
   stock: number
-  status: ProductStatus
+  soldOut: boolean
   createdAt: string
+  updatedAt: string
+  status: ProductStatus
 }

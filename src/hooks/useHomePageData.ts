@@ -3,7 +3,7 @@ import {
   getBestProducts,
   getNewProducts,
   getSaleProducts,
-} from '../services/products'
+} from '../services/productService'
 
 export function useHomePageData() {
   return {
