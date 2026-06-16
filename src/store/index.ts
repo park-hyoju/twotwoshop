@@ -12,7 +12,9 @@ export {
   updateQuantity,
 } from './cartStore'
 export {
-  CART_SYNC_MESSAGES,
-  getSyncNoticeMessages,
-  syncCartItems,
-} from './cartSync'
+  canSubmitOrder,
+  createOrder,
+  generateOrderNumber,
+  hasCheckoutFormErrors,
+  validateCheckoutForm,
+} from './orderStore'

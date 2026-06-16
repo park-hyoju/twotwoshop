@@ -17,6 +17,8 @@ import {
   ProductsSalePage,
 } from './pages/products/ProductsPages'
 import { CartPage, LivePage, LoginPage, NoticesPage } from './pages/ServicePages'
+import { CheckoutPage } from './pages/checkout/CheckoutPage'
+import { OrderCompletePage } from './pages/order/OrderCompletePage'
 import {
   WomenBottomsPage,
   WomenDressesPage,
@@ -55,6 +57,8 @@ export const router = createBrowserRouter([
       { path: 'men/misc', element: <MenMiscPage /> },
       { path: 'live', element: <LivePage /> },
       { path: 'cart', element: <CartPage /> },
+      { path: 'checkout', element: <CheckoutPage /> },
+      { path: 'order-complete', element: <OrderCompletePage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'notices', element: <NoticesPage /> },
       { path: '404', element: <NotFoundPage /> },

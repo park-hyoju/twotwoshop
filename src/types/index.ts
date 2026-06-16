@@ -1,4 +1,5 @@
 export type { AddToCartResult, CartItem, CartSyncNoticeType } from './cart'
+export type { CheckoutFormData, CheckoutFormErrors, Order, OrderItem, ShippingInfo } from './order'
 export type { Product } from './product'
 export type { Gender } from './gender'
 export type { ProductStatus } from './status'

@@ -18,6 +18,8 @@ export const ROUTES = {
   menMisc: '/men/misc',
   live: '/live',
   cart: '/cart',
+  checkout: '/checkout',
+  orderComplete: '/order-complete',
   login: '/login',
   notices: '/notices',
 } as const

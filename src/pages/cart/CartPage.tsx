@@ -74,6 +74,7 @@ export function CartPage() {
             itemCount={itemCount}
             totalQuantity={totalQuantity}
             hasSoldOutItems={soldOutIncluded}
+            canCheckout={itemCount > 0 && !soldOutIncluded}
           />
         </div>
       )}

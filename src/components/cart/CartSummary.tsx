@@ -7,6 +7,7 @@ interface CartSummaryProps {
   itemCount: number
   totalQuantity: number
   hasSoldOutItems: boolean
+  canCheckout: boolean
 }
 
 export function CartSummary({
@@ -14,6 +15,7 @@ export function CartSummary({
   itemCount,
   totalQuantity,
   hasSoldOutItems,
+  canCheckout,
 }: CartSummaryProps) {
   return (
     <aside className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 sm:p-6">
@@ -39,13 +41,22 @@ export function CartSummary({
         </p>
       )}
 
-      <button
-        type="button"
-        disabled
-        className="mt-6 min-h-14 w-full rounded-xl bg-neutral-300 py-4 text-lg font-semibold text-neutral-500 disabled:cursor-not-allowed"
-      >
-        주문하기 (준비 중)
-      </button>
+      {canCheckout ? (
+        <Link
+          to={ROUTES.checkout}
+          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-xl bg-neutral-900 py-4 text-lg font-semibold text-white transition-colors hover:bg-neutral-700"
+        >
+          주문하기
+        </Link>
+      ) : (
+        <button
+          type="button"
+          disabled
+          className="mt-6 min-h-14 w-full rounded-xl bg-neutral-300 py-4 text-lg font-semibold text-neutral-500 disabled:cursor-not-allowed"
+        >
+          주문하기
+        </button>
+      )}
 
       <Link
         to={ROUTES.products}
