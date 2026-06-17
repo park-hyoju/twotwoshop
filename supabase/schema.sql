@@ -79,6 +79,8 @@ comment on column public.products.display_order is
 comment on column public.products.status is
   'active=노출, hidden=비노출, soldout=품절 표시. 고객 SELECT는 active만 허용(RLS).';
 
+drop trigger if exists products_set_updated_at on public.products;
+
 create trigger products_set_updated_at
   before update on public.products
   for each row
@@ -129,9 +131,7 @@ create table if not exists public.orders (
   total_amount integer not null check (total_amount >= 0),
   status text not null default 'pending'
     check (status in ('pending', 'confirmed', 'paid', 'shipped', 'completed', 'cancelled')),
-  created_at timestamptz not null default now(),
-  constraint orders_total_amount_check
-    check (total_amount = subtotal + shipping_fee)
+  created_at timestamptz not null default now()
 );
 
 comment on table public.orders is
@@ -162,9 +162,7 @@ create table if not exists public.order_items (
   quantity integer not null check (quantity > 0),
   unit_price integer not null check (unit_price >= 0),
   total_price integer not null check (total_price >= 0),
-  created_at timestamptz not null default now(),
-  constraint order_items_total_price_check
-    check (total_price = unit_price * quantity)
+  created_at timestamptz not null default now()
 );
 
 comment on table public.order_items is
@@ -175,6 +173,41 @@ comment on column public.order_items.product_slug is
 
 comment on column public.order_items.unit_price is
   '주문 당시 단가(원). 클라이언트 가격을 신뢰하지 말고 서버에서 재검증 후 저장합니다.';
+
+-- -----------------------------------------------------------------------------
+-- Named CHECK constraints (idempotent)
+-- CREATE TABLE IF NOT EXISTS 는 테이블이 이미 있으면 본문을 건너뛰므로,
+-- 명명된 제약은 별도로 존재 여부를 확인한 뒤 추가합니다.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'orders_total_amount_check'
+      and conrelid = 'public.orders'::regclass
+  ) then
+    alter table public.orders
+      add constraint orders_total_amount_check
+      check (total_amount = subtotal + shipping_fee);
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'order_items_total_price_check'
+      and conrelid = 'public.order_items'::regclass
+  ) then
+    alter table public.order_items
+      add constraint order_items_total_price_check
+      check (total_price = unit_price * quantity);
+  end if;
+end;
+$$;
 
 -- =============================================================================
 -- Indexes
@@ -219,6 +252,8 @@ alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 
 -- products: active 상품만 공개 조회
+drop policy if exists "products_select_active_anon" on public.products;
+
 create policy "products_select_active_anon"
   on public.products
   for select
@@ -226,6 +261,8 @@ create policy "products_select_active_anon"
   using (status = 'active');
 
 -- customers: 비회원 주문 시 insert만 허용
+drop policy if exists "customers_insert_anon" on public.customers;
+
 create policy "customers_insert_anon"
   on public.customers
   for insert
@@ -233,6 +270,8 @@ create policy "customers_insert_anon"
   with check (true);
 
 -- orders: 비회원 주문 접수 insert만 허용
+drop policy if exists "orders_insert_anon" on public.orders;
+
 create policy "orders_insert_anon"
   on public.orders
   for insert
@@ -240,6 +279,8 @@ create policy "orders_insert_anon"
   with check (true);
 
 -- order_items: 주문 상품 insert만 허용
+drop policy if exists "order_items_insert_anon" on public.order_items;
+
 create policy "order_items_insert_anon"
   on public.order_items
   for insert
