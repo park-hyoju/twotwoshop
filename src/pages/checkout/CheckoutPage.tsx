@@ -29,6 +29,7 @@ export function CheckoutPage() {
   const [form, setForm] = useState<CheckoutFormData>(initialForm)
   const [fieldErrors, setFieldErrors] = useState<CheckoutFormErrors>({})
   const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const isSubmittingRef = useRef(false)
 
   useEffect(() => {
@@ -64,7 +65,11 @@ export function CheckoutPage() {
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return
+    }
+
     const errors = validateCheckoutForm(form)
 
     if (hasCheckoutFormErrors(errors)) {
@@ -83,10 +88,18 @@ export function CheckoutPage() {
     }
 
     const order = createOrder(orderableItems, form)
-    orderRepository.saveOrder(order)
     isSubmittingRef.current = true
-    navigate(ROUTES.orderComplete, { state: { order } })
-    clearCart()
+    setIsSubmitting(true)
+
+    try {
+      await orderRepository.saveOrder(order)
+      navigate(ROUTES.orderComplete, { state: { order } })
+      clearCart()
+    } catch {
+      isSubmittingRef.current = false
+      setIsSubmitting(false)
+      setSubmitError('주문 접수 중 문제가 발생했습니다. 다시 시도해주세요.')
+    }
   }
 
   return (
@@ -116,6 +129,7 @@ export function CheckoutPage() {
           form={form}
           fieldErrors={fieldErrors}
           submitError={submitError}
+          isSubmitting={isSubmitting}
           onChange={handleChange}
           onSubmit={handleSubmit}
         />

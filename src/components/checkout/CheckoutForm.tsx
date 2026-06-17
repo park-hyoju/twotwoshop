@@ -4,8 +4,9 @@ interface CheckoutFormProps {
   form: CheckoutFormData
   fieldErrors: CheckoutFormErrors
   submitError: string
+  isSubmitting?: boolean
   onChange: (field: keyof CheckoutFormData, value: string) => void
-  onSubmit: () => void
+  onSubmit: () => void | Promise<void>
 }
 
 const labelClassName = 'mb-2 block text-base font-semibold text-neutral-800 sm:text-lg'
@@ -32,6 +33,7 @@ export function CheckoutForm({
   form,
   fieldErrors,
   submitError,
+  isSubmitting = false,
   onChange,
   onSubmit,
 }: CheckoutFormProps) {
@@ -40,7 +42,7 @@ export function CheckoutForm({
       className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6"
       onSubmit={(event) => {
         event.preventDefault()
-        onSubmit()
+        void onSubmit()
       }}
     >
       <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">배송 정보</h2>
@@ -150,9 +152,10 @@ export function CheckoutForm({
 
       <button
         type="submit"
-        className="mt-6 min-h-14 w-full rounded-xl bg-neutral-900 py-4 text-lg font-semibold text-white transition-colors hover:bg-neutral-700"
+        disabled={isSubmitting}
+        className="mt-6 min-h-14 w-full rounded-xl bg-neutral-900 py-4 text-lg font-semibold text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-400"
       >
-        주문 접수하기
+        {isSubmitting ? '주문 접수 중...' : '주문 접수하기'}
       </button>
     </form>
   )
