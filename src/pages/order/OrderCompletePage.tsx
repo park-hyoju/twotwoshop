@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatPrice } from '../../lib/formatPrice'
-import { isValidOrder, loadLatestOrder } from '../../lib/orderStorage'
+import { isValidOrder } from '../../lib/orderStorage'
+import { orderRepository } from '../../services/orderRepository'
 import { ROUTES } from '../../lib/routes'
 import type { Order } from '../../types/order'
 
@@ -12,7 +13,7 @@ function resolveOrder(state: unknown): Order | null {
     return stateOrder
   }
 
-  return loadLatestOrder()
+  return orderRepository.getLatestOrder()
 }
 
 export function OrderCompletePage() {

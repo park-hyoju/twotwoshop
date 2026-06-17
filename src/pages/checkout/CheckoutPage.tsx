@@ -4,7 +4,7 @@ import { CheckoutForm, CheckoutOrderSummary } from '../../components/checkout'
 import { useCart } from '../../hooks/useCart'
 import { isCartItemAvailable } from '../../lib/cartItem'
 import { SHIPPING_FEE } from '../../lib/orderConstants'
-import { saveLatestOrder } from '../../lib/orderStorage'
+import { orderRepository } from '../../services/orderRepository'
 import { ROUTES } from '../../lib/routes'
 import {
   canSubmitOrder,
@@ -83,7 +83,7 @@ export function CheckoutPage() {
     }
 
     const order = createOrder(orderableItems, form)
-    saveLatestOrder(order)
+    orderRepository.saveOrder(order)
     isSubmittingRef.current = true
     navigate(ROUTES.orderComplete, { state: { order } })
     clearCart()
