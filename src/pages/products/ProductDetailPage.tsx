@@ -1,18 +1,26 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ProductDetailView } from '../../components/product/ProductDetailView'
+import { ProductLoadingMessage } from '../../components/product/ProductLoadingMessage'
+import { useProductBySlug } from '../../hooks/useProductBySlug'
 import { ROUTES } from '../../lib/routes'
-import { getProductBySlug } from '../../services/productService'
 
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>()
+  const { product, isLoading, notFound } = useProductBySlug(slug)
 
   if (!slug) {
     return <Navigate to={ROUTES.notFound} replace />
   }
 
-  const product = getProductBySlug(slug)
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <ProductLoadingMessage />
+      </div>
+    )
+  }
 
-  if (!product) {
+  if (notFound || !product) {
     return <Navigate to={ROUTES.notFound} replace />
   }
 

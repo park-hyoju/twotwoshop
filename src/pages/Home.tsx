@@ -14,6 +14,7 @@ export function Home() {
     categoryShortcuts,
     bestProducts,
     newProducts,
+    isLoadingProducts,
     liveBanner,
     benefits,
   } = useHomePageData()
@@ -22,8 +23,8 @@ export function Home() {
     <>
       <HeroSection banner={heroBanner} />
       <CategoryShortcutSection categories={categoryShortcuts} />
-      <BestSection products={bestProducts} />
-      <NewSection products={newProducts} />
+      <BestSection products={bestProducts} isLoading={isLoadingProducts} />
+      <NewSection products={newProducts} isLoading={isLoadingProducts} />
       <LiveSection banner={liveBanner} />
       <BenefitSection benefits={benefits} />
     </>

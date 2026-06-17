@@ -1,3 +1,12 @@
+/**
+ * Static product data layer (sync).
+ *
+ * - Reads from `src/data/products.ts` only.
+ * - Used as fallback when Supabase is unavailable (`productRepository`).
+ * - Cart sync (`cartSync`) still resolves products by id here — not migrated in v0.8 Step 4.
+ *
+ * For storefront UI, prefer `productRepository` (async, Supabase + fallback to this module).
+ */
 import { PRODUCTS } from '../data/products'
 import type { DetailCategory } from '../types/detailCategory'
 import type { DisplayCategory } from '../types/displayCategory'
