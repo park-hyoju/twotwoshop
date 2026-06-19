@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ADD_TO_CART_MESSAGES } from '../../lib/cartMessages'
 import { useCart } from '../../hooks/useCart'
 import { formatPrice } from '../../lib/formatPrice'
+import { ROUTES } from '../../lib/routes'
 import type { Product } from '../../types/product'
 
 interface ProductDetailViewProps {
@@ -9,6 +11,7 @@ interface ProductDetailViewProps {
 }
 
 export function ProductDetailView({ product }: ProductDetailViewProps) {
+  const navigate = useNavigate()
   const { addToCart } = useCart()
   const [cartMessage, setCartMessage] = useState('')
   const isSoldOut = product.stock === 0
@@ -21,6 +24,17 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
     if (result === 'success') {
       window.setTimeout(() => setCartMessage(''), 2500)
     }
+  }
+
+  const handleBuyNow = () => {
+    const result = addToCart(product)
+
+    if (result === 'success') {
+      navigate(ROUTES.cart)
+      return
+    }
+
+    setCartMessage(ADD_TO_CART_MESSAGES[result])
   }
 
   return (
@@ -98,6 +112,7 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
             <button
               type="button"
               disabled={isSoldOut}
+              onClick={handleBuyNow}
               className="min-h-14 w-full rounded-xl border border-neutral-300 bg-white py-4 text-lg font-semibold text-neutral-800 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-400"
             >
               구매하기

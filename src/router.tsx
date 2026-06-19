@@ -1,5 +1,16 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { AdminLayout } from './layouts/AdminLayout'
 import { MainLayout } from './layouts/MainLayout'
+import {
+  AdminChatPage,
+  AdminCustomersPage,
+  AdminDashboardPage,
+  AdminLivePage,
+  AdminLoginPage,
+  AdminOrdersPage,
+  AdminProductsPage,
+  AdminSettingsPage,
+} from './pages/admin'
 import { Home } from './pages/Home'
 import {
   MenBottomsPage,
@@ -29,6 +40,23 @@ import {
 } from './pages/women/WomenPages'
 
 export const router = createBrowserRouter([
+  {
+    path: '/admin/login',
+    element: <AdminLoginPage />,
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <AdminDashboardPage /> },
+      { path: 'orders', element: <AdminOrdersPage /> },
+      { path: 'products', element: <AdminProductsPage /> },
+      { path: 'customers', element: <AdminCustomersPage /> },
+      { path: 'live', element: <AdminLivePage /> },
+      { path: 'chat', element: <AdminChatPage /> },
+      { path: 'settings', element: <AdminSettingsPage /> },
+    ],
+  },
   {
     path: '/',
     element: <MainLayout />,

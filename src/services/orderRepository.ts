@@ -17,36 +17,51 @@ export interface OrderRepository {
   clearLatestOrder(): void
 }
 
+function logSupabaseError(step: string, error: unknown): void {
+  if (error && typeof error === 'object' && 'message' in error) {
+    console.warn(`[orderRepository] ${step} failed:`, error)
+    return
+  }
+
+  console.warn(`[orderRepository] ${step} failed:`, error)
+}
+
 async function saveOrderToSupabase(order: Order): Promise<void> {
   if (!supabase) {
     throw new Error('Supabase client is not configured')
   }
 
-  const { data: customer, error: customerError } = await supabase
-    .from('customers')
-    .insert(mapOrderToCustomerInsert(order))
-    .select('id')
-    .single()
+  // Client-generated UUIDs avoid INSERT...RETURNING, which would require
+  // SELECT RLS policies on customers/orders (not granted to anon by design).
+  const customerId = crypto.randomUUID()
+  const orderId = crypto.randomUUID()
 
-  if (customerError || !customer) {
-    throw customerError ?? new Error('Failed to insert customer')
+  const { error: customerError } = await supabase.from('customers').insert({
+    id: customerId,
+    ...mapOrderToCustomerInsert(order),
+  })
+
+  if (customerError) {
+    logSupabaseError('customers insert', customerError)
+    throw customerError
   }
 
-  const { data: savedOrder, error: orderError } = await supabase
-    .from('orders')
-    .insert(mapOrderToOrderInsert(order, customer.id))
-    .select('id')
-    .single()
+  const { error: orderError } = await supabase.from('orders').insert({
+    id: orderId,
+    ...mapOrderToOrderInsert(order, customerId),
+  })
 
-  if (orderError || !savedOrder) {
-    throw orderError ?? new Error('Failed to insert order')
+  if (orderError) {
+    logSupabaseError('orders insert', orderError)
+    throw orderError
   }
 
   const { error: itemsError } = await supabase
     .from('order_items')
-    .insert(mapOrderItemsToInsert(order, savedOrder.id))
+    .insert(mapOrderItemsToInsert(order, orderId))
 
   if (itemsError) {
+    logSupabaseError('order_items insert', itemsError)
     throw itemsError
   }
 }

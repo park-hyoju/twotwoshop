@@ -1,0 +1,8 @@
+export { AdminChatPage } from './AdminChatPage'
+export { AdminCustomersPage } from './AdminCustomersPage'
+export { AdminDashboardPage } from './AdminDashboardPage'
+export { AdminLivePage } from './AdminLivePage'
+export { AdminLoginPage } from './AdminLoginPage'
+export { AdminOrdersPage } from './AdminOrdersPage'
+export { AdminProductsPage } from './AdminProductsPage'
+export { AdminSettingsPage } from './AdminSettingsPage'

@@ -251,6 +251,13 @@ alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 
+-- Guest Checkout INSERT용 API 역할 권한
+grant usage on schema public to anon, authenticated;
+
+grant insert on table public.customers to anon, authenticated;
+grant insert on table public.orders to anon, authenticated;
+grant insert on table public.order_items to anon, authenticated;
+
 -- products: active 상품만 공개 조회
 drop policy if exists "products_select_active_anon" on public.products;
 
