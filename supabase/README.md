@@ -179,6 +179,41 @@ customers (1) ──< (N) orders (1) ──< (N) order_items
 
 > **보안 참고:** v0.9.1은 Admin Auth 미구현 상태이므로 anon에 SELECT/UPDATE를 임시 허용합니다. v0.9.2+ Admin 로그인 도입 후 authenticated role 정책으로 교체하세요.
 
+### 2-3. `admin-products-rls.sql` (Admin 상품 관리 v0.9.2)
+
+관리자 상품 목록 조회·등록·수정·삭제가 필요하면 이 파일을 실행하세요.
+
+1. SQL Editor → **New query**
+2. `admin-products-rls.sql` 전체 붙여넣기 → **Run**
+3. `products_select_admin`, `products_insert_admin`, `products_update_admin`, `products_delete_admin` 정책 확인
+
+> **보안 참고:** v0.9.2는 Admin Auth 미구현 상태이므로 anon에 products CRUD를 임시 허용합니다. Admin 로그인 도입 후 authenticated role 정책으로 교체하세요.
+
+### 2-4. `migrations/product-detail-v093.sql` (Admin 상품 상세 v0.9.3)
+
+상품 상세 관리(브랜드, SKU, 사이즈 가이드, SEO 등)가 필요하면 이 파일을 실행하세요.
+
+1. SQL Editor → **New query**
+2. `migrations/product-detail-v093.sql` 전체 붙여넣기 → **Run**
+3. `products` 테이블에 `brand`, `sku`, `size_guide`, `product_info` 등 컬럼 추가 확인
+
+### 2-5. `fix-product-detail-save-rls.sql` (상품 상세 저장 미반영 시)
+
+**증상:** Admin 상품 상세 에디터에서 저장해도 DB에 반영되지 않고, 에러 없이 닫힘
+
+**원인:** `products` 테이블에 anon `UPDATE` 권한/RLS 정책이 없어 Supabase가 **0 rows updated**로 처리함
+
+1. SQL Editor → **New query**
+2. `fix-product-detail-save-rls.sql` (또는 `admin-products-rls.sql`) 전체 붙여넣기 → **Run**
+3. `products_update_admin` 정책 확인
+
+```sql
+-- 적용 확인
+select policyname, cmd
+from pg_policies
+where tablename = 'products' and policyname like '%admin%';
+```
+
 ### 3. `products` 테이블 데이터 확인
 
 1. **Table Editor** → `products` 테이블 선택
