@@ -1,0 +1,16 @@
+-- =============================================================================
+-- TWOTWOSHOP: Admin Auth setup guide (v0.9.4)
+-- =============================================================================
+-- 이 파일은 SQL이 아닙니다. Supabase Dashboard에서 관리자 계정을 만드는 방법입니다.
+--
+-- 1. Supabase Dashboard → Authentication → Users → Add user
+-- 2. Email / Password 입력 후 "Auto Confirm User" 체크
+-- 3. 생성된 계정으로 /admin/login 에서 로그인
+--
+-- 세션 유지: Supabase JS 클라이언트가 localStorage에 세션을 자동 저장합니다.
+-- 로그아웃: 관리자 사이드바 "로그아웃" 버튼 → supabase.auth.signOut()
+--
+-- 보안 참고 (v0.9.4):
+-- - 현재는 Supabase Auth에 등록된 계정이면 관리자 페이지 접근 가능
+-- - v0.10+ 에서 app_metadata.role = 'admin' 검증 또는 RLS authenticated 정책 전환 권장
+-- =============================================================================

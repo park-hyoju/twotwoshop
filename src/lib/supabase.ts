@@ -12,7 +12,13 @@ export const isSupabaseConfigured =
 let supabaseClient: SupabaseClient | null = null
 
 if (isSupabaseConfigured) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
 }
 
 export const supabase = supabaseClient

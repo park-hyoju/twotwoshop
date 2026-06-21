@@ -214,6 +214,17 @@ from pg_policies
 where tablename = 'products' and policyname like '%admin%';
 ```
 
+### 2-6. Admin Auth 계정 생성 (v0.9.4)
+
+관리자 로그인(`/admin/login`)은 Supabase Auth `signInWithPassword`를 사용합니다.
+
+1. Supabase Dashboard → **Authentication** → **Users** → **Add user**
+2. Email / Password 입력, **Auto Confirm User** 체크
+3. 앱 `/admin/login`에서 해당 계정으로 로그인
+4. 성공 시 `/admin/dashboard`로 이동, 세션은 localStorage에 자동 유지
+
+> **보안 참고:** v0.9.4는 Auth에 등록된 계정이면 관리자 접근이 가능합니다. 운영 전 `app_metadata.role = 'admin'` 검증 및 RLS `authenticated` 정책 전환을 권장합니다. 자세한 내용은 `admin-auth-setup.sql` 주석을 참고하세요.
+
 ### 3. `products` 테이블 데이터 확인
 
 1. **Table Editor** → `products` 테이블 선택

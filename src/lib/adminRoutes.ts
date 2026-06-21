@@ -1,6 +1,6 @@
 export const ADMIN_ROUTES = {
   login: '/admin/login',
-  dashboard: '/admin',
+  dashboard: '/admin/dashboard',
   orders: '/admin/orders',
   products: '/admin/products',
   customers: '/admin/customers',

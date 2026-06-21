@@ -1,4 +1,6 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
+import { AdminAuthGate } from './components/admin/AdminAuthGate'
+import { AdminGuestOnly } from './components/admin/AdminGuestOnly'
 import { AdminLayout } from './layouts/AdminLayout'
 import { MainLayout } from './layouts/MainLayout'
 import {
@@ -42,19 +44,26 @@ import {
 export const router = createBrowserRouter([
   {
     path: '/admin/login',
-    element: <AdminLoginPage />,
+    element: <AdminGuestOnly />,
+    children: [{ index: true, element: <AdminLoginPage /> }],
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <AdminAuthGate />,
     children: [
-      { index: true, element: <AdminDashboardPage /> },
-      { path: 'orders', element: <AdminOrdersPage /> },
-      { path: 'products', element: <AdminProductsPage /> },
-      { path: 'customers', element: <AdminCustomersPage /> },
-      { path: 'live', element: <AdminLivePage /> },
-      { path: 'chat', element: <AdminChatPage /> },
-      { path: 'settings', element: <AdminSettingsPage /> },
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <Navigate to="dashboard" replace /> },
+          { path: 'dashboard', element: <AdminDashboardPage /> },
+          { path: 'orders', element: <AdminOrdersPage /> },
+          { path: 'products', element: <AdminProductsPage /> },
+          { path: 'customers', element: <AdminCustomersPage /> },
+          { path: 'live', element: <AdminLivePage /> },
+          { path: 'chat', element: <AdminChatPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+        ],
+      },
     ],
   },
   {

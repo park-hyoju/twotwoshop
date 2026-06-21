@@ -1,22 +1,121 @@
-import { Link } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+  getAdminAuthErrorMessage,
+  useAdminAuth,
+} from '../../contexts/AdminAuthProvider'
 import { ADMIN_ROUTES } from '../../lib/adminRoutes'
+import { isSupabaseConfigured } from '../../lib/supabase'
 import { ROUTES } from '../../lib/routes'
 
+function getRedirectPath(from: unknown): string {
+  if (
+    typeof from === 'string' &&
+    from.startsWith('/admin') &&
+    from !== ADMIN_ROUTES.login
+  ) {
+    return from
+  }
+
+  return ADMIN_ROUTES.dashboard
+}
+
 export function AdminLoginPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { signIn } = useAdminAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const redirectPath = getRedirectPath(
+    typeof location.state === 'object' && location.state !== null && 'from' in location.state
+      ? location.state.from
+      : undefined,
+  )
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setErrorMessage(null)
+    setIsSubmitting(true)
+
+    try {
+      await signIn(email.trim(), password)
+      navigate(redirectPath, { replace: true })
+    } catch (error) {
+      setErrorMessage(getAdminAuthErrorMessage(error))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-100 px-4">
       <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
         <p className="text-sm font-medium text-neutral-500">TWOTWOSHOP</p>
         <h1 className="mt-1 text-2xl font-bold text-neutral-900">관리자 로그인</h1>
-        <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-base text-neutral-700">
-          관리자 로그인 준비 중입니다.
-        </p>
-        <Link
-          to={ADMIN_ROUTES.dashboard}
-          className="mt-6 block w-full rounded-xl bg-neutral-900 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-neutral-700"
-        >
-          관리자 홈으로 이동
-        </Link>
+
+        {!isSupabaseConfigured && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            Supabase 환경변수가 설정되지 않았습니다. `.env.local`을 확인해주세요.
+          </p>
+        )}
+
+        <form onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="admin-email" className="block text-sm font-medium text-neutral-700">
+              이메일
+            </label>
+            <input
+              id="admin-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={isSubmitting || !isSupabaseConfigured}
+              placeholder="you@example.com"
+              className="mt-1.5 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 disabled:bg-neutral-50"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-neutral-700">
+              비밀번호
+            </label>
+            <input
+              id="admin-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={isSubmitting || !isSupabaseConfigured}
+              className="mt-1.5 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 disabled:bg-neutral-50"
+              required
+            />
+          </div>
+
+          {errorMessage && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {errorMessage}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting || !isSupabaseConfigured}
+            className="w-full rounded-xl bg-neutral-900 py-3 text-base font-semibold text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSubmitting ? '로그인 중...' : '로그인'}
+          </button>
+        </form>
       </div>
 
       <Link
