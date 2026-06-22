@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import type { AdminOrderSearchFilters } from '../../../types/adminOrder'
+import { ORDER_STATUS_FILTER_OPTIONS } from '../../../lib/adminOrderStatus'
 
 interface AdminOrdersSearchProps {
   filters: AdminOrderSearchFilters
@@ -8,8 +9,9 @@ interface AdminOrdersSearchProps {
   onReset: () => void
 }
 
+const labelClassName = 'mb-1 block text-xs font-medium text-neutral-600 sm:text-sm'
 const inputClassName =
-  'w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 sm:text-base'
+  'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500'
 
 export function AdminOrdersSearch({
   filters,
@@ -25,11 +27,11 @@ export function AdminOrdersSearch({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5"
+      className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4"
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end">
         <div>
-          <label htmlFor="admin-order-number" className="mb-2 block text-sm font-medium text-neutral-700">
+          <label htmlFor="admin-order-number" className={labelClassName}>
             주문번호
           </label>
           <input
@@ -37,13 +39,13 @@ export function AdminOrdersSearch({
             type="search"
             value={filters.orderNumber}
             onChange={(event) => onChange('orderNumber', event.target.value)}
-            placeholder="TT-2026..."
+            placeholder="TT-20260622-642377"
             className={inputClassName}
           />
         </div>
 
         <div>
-          <label htmlFor="admin-customer-name" className="mb-2 block text-sm font-medium text-neutral-700">
+          <label htmlFor="admin-customer-name" className={labelClassName}>
             주문자
           </label>
           <input
@@ -57,7 +59,7 @@ export function AdminOrdersSearch({
         </div>
 
         <div>
-          <label htmlFor="admin-customer-phone" className="mb-2 block text-sm font-medium text-neutral-700">
+          <label htmlFor="admin-customer-phone" className={labelClassName}>
             연락처
           </label>
           <input
@@ -69,22 +71,40 @@ export function AdminOrdersSearch({
             className={inputClassName}
           />
         </div>
-      </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="submit"
-          className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 sm:text-base"
-        >
-          검색
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-lg border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 sm:text-base"
-        >
-          초기화
-        </button>
+        <div>
+          <label htmlFor="admin-order-status" className={labelClassName}>
+            상태
+          </label>
+          <select
+            id="admin-order-status"
+            value={filters.status}
+            onChange={(event) => onChange('status', event.target.value)}
+            className={inputClassName}
+          >
+            {ORDER_STATUS_FILTER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex gap-2 lg:justify-end">
+          <button
+            type="submit"
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 lg:flex-none"
+          >
+            검색
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 lg:flex-none"
+          >
+            초기화
+          </button>
+        </div>
       </div>
     </form>
   )

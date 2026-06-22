@@ -1,33 +1,42 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type {
+  AdminOrderItemRow,
   AdminOrderRow,
   AdminOrdersQueryParams,
   AdminOrdersQueryResult,
-  DbOrderStatus,
 } from '../types/adminOrder'
 
-const ORDER_SELECT = `
+const ORDER_HEADER_SELECT = `
   id,
   order_number,
   customer_name,
   customer_phone,
   total_amount,
   status,
-  created_at,
-  order_items (
-    id,
-    product_name,
-    quantity,
-    unit_price,
-    total_price
-  )
+  created_at
 `
 
-function normalizeOrderRow(row: AdminOrderRow): AdminOrderRow {
-  return {
-    ...row,
-    order_items: Array.isArray(row.order_items) ? row.order_items : [],
-  }
+const ORDER_ITEM_SELECT = `
+  id,
+  order_id,
+  product_name,
+  quantity,
+  unit_price,
+  total_price
+`
+
+interface OrderHeaderRow {
+  id: string
+  order_number: string
+  customer_name: string
+  customer_phone: string
+  total_amount: number
+  status: AdminOrderRow['status']
+  created_at: string
+}
+
+interface OrderItemDbRow extends AdminOrderItemRow {
+  order_id: string
 }
 
 export class AdminOrderRepositoryError extends Error {
@@ -43,9 +52,51 @@ export class AdminOrderRepositoryError extends Error {
 function assertSupabaseReady(): void {
   if (!isSupabaseConfigured || !supabase) {
     throw new AdminOrderRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
+      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
     )
   }
+}
+
+function logAdminOrdersDebug(message: string, payload?: unknown): void {
+  if (import.meta.env.DEV) {
+    console.warn(`[adminOrderRepository] ${message}`, payload ?? '')
+  }
+}
+
+function groupOrderItemsByOrderId(items: OrderItemDbRow[]): Map<string, AdminOrderItemRow[]> {
+  const map = new Map<string, AdminOrderItemRow[]>()
+
+  for (const item of items) {
+    const current = map.get(item.order_id) ?? []
+    current.push({
+      id: item.id,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+    })
+    map.set(item.order_id, current)
+  }
+
+  return map
+}
+
+async function fetchOrderItemsByOrderIds(orderIds: string[]): Promise<Map<string, AdminOrderItemRow[]>> {
+  if (orderIds.length === 0) {
+    return new Map()
+  }
+
+  const { data, error } = await supabase!
+    .from('order_items')
+    .select(ORDER_ITEM_SELECT)
+    .in('order_id', orderIds)
+
+  if (error) {
+    logAdminOrdersDebug('order_items select failed (orders will still be shown)', error)
+    return new Map()
+  }
+
+  return groupOrderItemsByOrderId((data ?? []) as OrderItemDbRow[])
 }
 
 export async function fetchAdminOrders(
@@ -59,7 +110,7 @@ export async function fetchAdminOrders(
 
   let query = supabase!
     .from('orders')
-    .select(ORDER_SELECT, { count: 'exact' })
+    .select(ORDER_HEADER_SELECT, { count: 'exact' })
     .order('created_at', { ascending: false })
 
   const orderNumber = filters.orderNumber.trim()
@@ -78,24 +129,50 @@ export async function fetchAdminOrders(
     query = query.ilike('customer_phone', `%${phone}%`)
   }
 
+  if (filters.status !== 'all') {
+    query = query.eq('status', filters.status)
+  }
+
+  logAdminOrdersDebug('fetchAdminOrders request', {
+    page,
+    pageSize,
+    filters,
+    range: { from, to },
+  })
+
   const { data, error, count } = await query.range(from, to)
 
+  logAdminOrdersDebug('orders select result', {
+    rowCount: data?.length ?? 0,
+    totalCount: count ?? 0,
+    error: error?.message ?? null,
+  })
+
   if (error) {
+    console.warn('[adminOrderRepository] orders select failed:', error)
     throw new AdminOrderRepositoryError(
-      '주문 목록을 불러오지 못했습니다. Supabase RLS 정책(admin-orders-rls.sql) 적용 여부를 확인해주세요.',
+      '주문 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
       error,
     )
   }
 
+  const orderHeaders = (data ?? []) as OrderHeaderRow[]
+  const itemsByOrderId = await fetchOrderItemsByOrderIds(orderHeaders.map((order) => order.id))
+
+  const orders: AdminOrderRow[] = orderHeaders.map((order) => ({
+    ...order,
+    order_items: itemsByOrderId.get(order.id) ?? [],
+  }))
+
   return {
-    orders: (data ?? []).map((row) => normalizeOrderRow(row as AdminOrderRow)),
+    orders,
     totalCount: count ?? 0,
   }
 }
 
 export async function updateAdminOrderStatus(
   orderId: string,
-  status: DbOrderStatus,
+  status: AdminOrderRow['status'],
 ): Promise<void> {
   assertSupabaseReady()
 

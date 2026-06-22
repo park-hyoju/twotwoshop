@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AdminOrdersPagination } from '../../components/admin/orders/AdminOrdersPagination'
 import {
   AdminProductFormModal,
@@ -20,9 +21,16 @@ import type {
   AdminProductFormInput,
   AdminProductRow,
   AdminProductSearchFilters,
+  AdminProductStatusFilter,
 } from '../../types/adminProduct'
 
 const PAGE_SIZE = 20
+
+const PRODUCT_STATUS_VALUES: AdminProductStatusFilter[] = ['all', 'active', 'soldout', 'hidden']
+
+function isProductStatusFilter(value: string): value is AdminProductStatusFilter {
+  return PRODUCT_STATUS_VALUES.includes(value as AdminProductStatusFilter)
+}
 
 const EMPTY_FILTERS: AdminProductSearchFilters = {
   name: '',
@@ -39,6 +47,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function AdminProductsPage() {
+  const [searchParams] = useSearchParams()
   const [products, setProducts] = useState<AdminProductRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -80,6 +89,23 @@ export function AdminProductsPage() {
   useEffect(() => {
     void loadProducts()
   }, [loadProducts])
+
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+
+    if (!statusParam || !isProductStatusFilter(statusParam) || statusParam === 'all') {
+      return
+    }
+
+    const statusFilters: AdminProductSearchFilters = {
+      ...EMPTY_FILTERS,
+      status: statusParam,
+    }
+
+    setDraftFilters(statusFilters)
+    setAppliedFilters(statusFilters)
+    setPage(1)
+  }, [searchParams])
 
   function handleFilterChange(field: keyof AdminProductSearchFilters, value: string) {
     setDraftFilters((current) => ({

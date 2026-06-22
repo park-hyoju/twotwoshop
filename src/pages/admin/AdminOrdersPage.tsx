@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AdminOrdersList,
   AdminOrdersPagination,
   AdminOrdersSearch,
 } from '../../components/admin/orders'
 import {
+  createEmptyAdminOrderFilters,
+  parseAdminOrderFiltersFromSearchParams,
+} from '../../lib/adminOrderFilters'
+import {
   AdminOrderRepositoryError,
   fetchAdminOrders,
   updateAdminOrderStatus,
 } from '../../services/adminOrderRepository'
 import type { AdminOrderRow, AdminOrderSearchFilters, DbOrderStatus } from '../../types/adminOrder'
+import { getOrderStatusLabel } from '../../lib/adminOrderStatus'
 
 const PAGE_SIZE = 20
-
-const EMPTY_FILTERS: AdminOrderSearchFilters = {
-  orderNumber: '',
-  customerName: '',
-  phone: '',
-}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof AdminOrderRepositoryError) {
@@ -28,11 +28,16 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function AdminOrdersPage() {
+  const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
-  const [draftFilters, setDraftFilters] = useState<AdminOrderSearchFilters>(EMPTY_FILTERS)
-  const [appliedFilters, setAppliedFilters] = useState<AdminOrderSearchFilters>(EMPTY_FILTERS)
+  const [draftFilters, setDraftFilters] = useState<AdminOrderSearchFilters>(() =>
+    parseAdminOrderFiltersFromSearchParams(searchParams),
+  )
+  const [appliedFilters, setAppliedFilters] = useState<AdminOrderSearchFilters>(() =>
+    parseAdminOrderFiltersFromSearchParams(searchParams),
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusErrorMessage, setStatusErrorMessage] = useState<string | null>(null)
@@ -64,6 +69,13 @@ export function AdminOrdersPage() {
     void loadOrders()
   }, [loadOrders])
 
+  useEffect(() => {
+    const nextFilters = parseAdminOrderFiltersFromSearchParams(searchParams)
+    setDraftFilters(nextFilters)
+    setAppliedFilters(nextFilters)
+    setPage(1)
+  }, [searchParams])
+
   function handleFilterChange(field: keyof AdminOrderSearchFilters, value: string) {
     setDraftFilters((current) => ({
       ...current,
@@ -77,8 +89,9 @@ export function AdminOrdersPage() {
   }
 
   function handleReset() {
-    setDraftFilters(EMPTY_FILTERS)
-    setAppliedFilters(EMPTY_FILTERS)
+    const emptyFilters = createEmptyAdminOrderFilters()
+    setDraftFilters(emptyFilters)
+    setAppliedFilters(emptyFilters)
     setPage(1)
   }
 
@@ -154,7 +167,18 @@ export function AdminOrdersPage() {
 
         {!isLoading && !errorMessage && orders.length === 0 && (
           <div className="rounded-xl border border-neutral-200 bg-white px-6 py-12 text-center">
-            <p className="text-base text-neutral-600 sm:text-lg">등록된 주문이 없습니다.</p>
+            <p className="text-base font-medium text-neutral-700 sm:text-lg">
+              아직 접수된 주문이 없습니다.
+            </p>
+            <p className="mt-2 text-sm text-neutral-500 sm:text-base">
+              주문이 들어오면 이곳에서 바로 확인할 수 있습니다.
+            </p>
+            {appliedFilters.status !== 'all' && (
+              <p className="mt-3 text-sm text-neutral-500">
+                현재 &apos;{getOrderStatusLabel(appliedFilters.status)}&apos; 상태 필터가 적용되어
+                있습니다. 초기화 후 다시 확인해주세요.
+              </p>
+            )}
           </div>
         )}
 
@@ -164,6 +188,11 @@ export function AdminOrdersPage() {
               orders={orders}
               updatingOrderId={updatingOrderId}
               onStatusChange={(orderId, status) => void handleStatusChange(orderId, status)}
+              onOrderClick={(order) => {
+                if (import.meta.env.DEV) {
+                  console.info('[AdminOrdersPage] order row clicked (detail modal TBD):', order.id)
+                }
+              }}
             />
             <AdminOrdersPagination
               page={page}

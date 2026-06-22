@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { buildDailyActivityList } from '../lib/adminDashboardCalendar'
 import type { DbOrderStatus } from '../types/adminOrder'
 import type {
   AdminDashboardData,
@@ -39,7 +40,7 @@ export class AdminDashboardRepositoryError extends Error {
 function assertSupabaseReady(): void {
   if (!isSupabaseConfigured || !supabase) {
     throw new AdminDashboardRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
+      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
     )
   }
 }
@@ -133,6 +134,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       todayOrderCount,
       totalOrderCount,
       pendingOrderCount,
+      shippingReadyCount,
       orderAmountResult,
       productStatusResult,
       recentOrdersResult,
@@ -140,6 +142,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       fetchOrderCount({ from: todayStart, to: tomorrowStart }),
       fetchOrderCount(),
       fetchOrderCount({ status: 'pending' }),
+      fetchOrderCount({ status: 'confirmed' }),
       supabase!.from('orders').select('total_amount, created_at, status'),
       supabase!.from('products').select('status'),
       supabase!
@@ -199,15 +202,22 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       orderStats: {
         todayOrderCount,
         totalOrderCount,
+      },
+      taskStats: {
         pendingOrderCount,
+        shippingReadyCount,
+        soldOutProductCount: productStats.soldOutCount,
+        unansweredInquiryCount: null,
       },
       revenueStats: buildRevenueStats(orderAmountRows),
       productStats,
       recentOrders,
+      dailyActivity: buildDailyActivityList(orderAmountRows),
     }
   } catch (error) {
+    console.warn('[adminDashboardRepository] fetch failed:', error)
     throw new AdminDashboardRepositoryError(
-      '대시보드 데이터를 불러오지 못했습니다. Supabase RLS 정책(admin-orders-rls.sql, admin-products-rls.sql) 적용 여부를 확인해주세요.',
+      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
       error,
     )
   }

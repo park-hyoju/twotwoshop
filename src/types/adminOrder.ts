@@ -29,7 +29,10 @@ export interface AdminOrderSearchFilters {
   orderNumber: string
   customerName: string
   phone: string
+  status: AdminOrderStatusFilter
 }
+
+export type AdminOrderStatusFilter = 'all' | DbOrderStatus
 
 export interface AdminOrdersQueryParams {
   page: number

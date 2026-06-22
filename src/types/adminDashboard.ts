@@ -1,5 +1,11 @@
 import type { DbOrderStatus } from './adminOrder'
 
+export interface AdminDashboardDayActivity {
+  dateKey: string
+  revenue: number
+  orderCount: number
+}
+
 export interface AdminDashboardRecentOrder {
   id: string
   order_number: string
@@ -12,7 +18,13 @@ export interface AdminDashboardRecentOrder {
 export interface AdminDashboardOrderStats {
   todayOrderCount: number
   totalOrderCount: number
+}
+
+export interface AdminDashboardTaskStats {
   pendingOrderCount: number
+  shippingReadyCount: number
+  soldOutProductCount: number
+  unansweredInquiryCount: number | null
 }
 
 export interface AdminDashboardRevenueStats {
@@ -30,7 +42,9 @@ export interface AdminDashboardProductStats {
 
 export interface AdminDashboardData {
   orderStats: AdminDashboardOrderStats
+  taskStats: AdminDashboardTaskStats
   revenueStats: AdminDashboardRevenueStats
   productStats: AdminDashboardProductStats
   recentOrders: AdminDashboardRecentOrder[]
+  dailyActivity: AdminDashboardDayActivity[]
 }

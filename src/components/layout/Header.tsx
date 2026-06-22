@@ -1,10 +1,53 @@
-import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { NAV_ITEMS } from '../../data/navigation'
 import { useCart } from '../../hooks/useCart'
+import { buildProductSearchUrl, normalizeProductSearchQuery } from '../../lib/productSearch'
 import { ROUTES } from '../../lib/routes'
 import type { NavItem } from '../../types/navigation'
 
+interface HeaderSearchFormProps {
+  inputRef?: RefObject<HTMLInputElement | null>
+  value: string
+  onChange: (value: string) => void
+  onSubmit: (query: string) => void
+  className?: string
+}
+
+function HeaderSearchForm({
+  inputRef,
+  value,
+  onChange,
+  onSubmit,
+  className = '',
+}: HeaderSearchFormProps) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onSubmit(value)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={`flex items-center gap-2 ${className}`}>
+      <input
+        ref={inputRef}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="상품을 검색하세요"
+        aria-label="상품 검색"
+        enterKeyHint="search"
+        className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 outline-none focus:border-neutral-400"
+      />
+      <button
+        type="submit"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-700 transition-colors hover:bg-neutral-100"
+        aria-label="검색"
+      >
+        <SearchIcon />
+      </button>
+    </form>
+  )
+}
 function SearchIcon() {
   return (
     <svg
@@ -285,12 +328,33 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
 }
 
 export function Header() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const { getCartCount } = useCart()
   const cartCount = getCartCount()
   const desktopSearchRef = useRef<HTMLInputElement>(null)
   const mobileSearchRef = useRef<HTMLInputElement>(null)
+  const urlSearchQuery = normalizeProductSearchQuery(searchParams.get('search') ?? '')
+
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery)
+  }, [urlSearchQuery])
+
+  function handleSearchSubmit(query: string) {
+    const normalized = normalizeProductSearchQuery(query)
+
+    if (!normalized) {
+      navigate(ROUTES.products)
+      return
+    }
+
+    navigate(buildProductSearchUrl(normalized))
+    setIsSearchVisible(false)
+    setIsMenuOpen(false)
+  }
 
   const handleSearchClick = () => {
     setIsSearchVisible(true)
@@ -317,13 +381,12 @@ export function Header() {
           </Link>
 
           <div className="hidden flex-1 justify-center px-4 md:flex">
-            <input
-              ref={desktopSearchRef}
-              type="search"
-              readOnly
-              placeholder="검색 기능 준비 중입니다."
-              aria-label="상품 검색"
-              className="w-full max-w-md rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-700 outline-none focus:border-neutral-400"
+            <HeaderSearchForm
+              inputRef={desktopSearchRef}
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onSubmit={handleSearchSubmit}
+              className="w-full max-w-md"
             />
           </div>
 
@@ -343,13 +406,11 @@ export function Header() {
 
         {isSearchVisible && (
           <div className="pb-3 md:hidden">
-            <input
-              ref={mobileSearchRef}
-              type="search"
-              readOnly
-              placeholder="검색 기능 준비 중입니다."
-              aria-label="상품 검색"
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-700 outline-none focus:border-neutral-400"
+            <HeaderSearchForm
+              inputRef={mobileSearchRef}
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onSubmit={handleSearchSubmit}
             />
           </div>
         )}

@@ -38,3 +38,8 @@ export function getOrderStatusBadgeClassName(status: DbOrderStatus): string {
 export function isDbOrderStatus(value: string): value is DbOrderStatus {
   return ORDER_STATUS_OPTIONS.some((option) => option.value === value)
 }
+
+export const ORDER_STATUS_FILTER_OPTIONS: Array<{
+  value: 'all' | DbOrderStatus
+  label: string
+}> = [{ value: 'all', label: '전체' }, ...ORDER_STATUS_OPTIONS]
