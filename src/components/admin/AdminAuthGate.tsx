@@ -4,7 +4,7 @@ import { ADMIN_ROUTES } from '../../lib/adminRoutes'
 import { AdminAuthLoading } from './AdminAuthLoading'
 
 export function AdminAuthGate() {
-  const { isLoading, isAuthenticated } = useAdminAuth()
+  const { isLoading, isAuthenticated, unauthorizedMessage } = useAdminAuth()
   const location = useLocation()
 
   if (isLoading) {
@@ -12,7 +12,16 @@ export function AdminAuthGate() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={ADMIN_ROUTES.login} state={{ from: location.pathname }} replace />
+    return (
+      <Navigate
+        to={ADMIN_ROUTES.login}
+        state={{
+          from: location.pathname,
+          message: unauthorizedMessage ?? undefined,
+        }}
+        replace
+      />
+    )
   }
 
   return <Outlet />

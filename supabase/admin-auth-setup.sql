@@ -11,6 +11,7 @@
 -- 로그아웃: 관리자 사이드바 "로그아웃" 버튼 → supabase.auth.signOut()
 --
 -- 보안 참고 (v0.9.4):
--- - 현재는 Supabase Auth에 등록된 계정이면 관리자 페이지 접근 가능
+-- - 허용 관리자 이메일: admin@twotwoshop.com (로그인 화면 아이디: admin)
+-- - 다른 Supabase Auth 계정은 로그인되어도 /admin 접근 불가 (자동 로그아웃)
 -- - v0.10+ 에서 app_metadata.role = 'admin' 검증 또는 RLS authenticated 정책 전환 권장
 -- =============================================================================

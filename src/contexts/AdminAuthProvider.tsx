@@ -8,9 +8,11 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
+import { ADMIN_UNAUTHORIZED_MESSAGE, isAllowedAdminEmail } from '../lib/adminAuthConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import {
   AdminAuthError,
+  ensureAllowedAdminSession,
   getAdminSession,
   signInAdmin,
   signOutAdmin,
@@ -21,8 +23,10 @@ interface AdminAuthContextValue {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  unauthorizedMessage: string | null
+  signIn: (loginId: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  clearUnauthorizedMessage: () => void
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
@@ -30,6 +34,11 @@ const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured)
+  const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null)
+
+  const clearUnauthorizedMessage = useCallback(() => {
+    setUnauthorizedMessage(null)
+  }, [])
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -41,9 +50,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
     async function loadSession() {
       try {
-        const currentSession = await getAdminSession()
+        const { session: currentSession, unauthorized } = await getAdminSession()
         if (!cancelled) {
           setSession(currentSession)
+          setUnauthorizedMessage(unauthorized ? ADMIN_UNAUTHORIZED_MESSAGE : null)
         }
       } catch {
         if (!cancelled) {
@@ -61,10 +71,20 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!cancelled) {
-        setSession(nextSession)
-        setIsLoading(false)
+      if (cancelled) {
+        return
       }
+
+      void (async () => {
+        const { session: validatedSession, unauthorized } =
+          await ensureAllowedAdminSession(nextSession)
+
+        if (!cancelled) {
+          setSession(validatedSession)
+          setUnauthorizedMessage(unauthorized ? ADMIN_UNAUTHORIZED_MESSAGE : null)
+          setIsLoading(false)
+        }
+      })()
     })
 
     return () => {
@@ -73,14 +93,16 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const nextSession = await signInAdmin(email, password)
+  const signIn = useCallback(async (loginId: string, password: string) => {
+    const nextSession = await signInAdmin(loginId, password)
     setSession(nextSession)
+    setUnauthorizedMessage(null)
   }, [])
 
   const signOut = useCallback(async () => {
     await signOutAdmin()
     setSession(null)
+    setUnauthorizedMessage(null)
   }, [])
 
   const value = useMemo<AdminAuthContextValue>(
@@ -88,11 +110,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       isLoading,
-      isAuthenticated: Boolean(session),
+      isAuthenticated: Boolean(session && isAllowedAdminEmail(session.user.email)),
+      unauthorizedMessage,
       signIn,
       signOut,
+      clearUnauthorizedMessage,
     }),
-    [session, isLoading, signIn, signOut],
+    [session, isLoading, unauthorizedMessage, signIn, signOut, clearUnauthorizedMessage],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>

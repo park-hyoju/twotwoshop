@@ -1,3 +1,9 @@
+import {
+  ADMIN_INVALID_CREDENTIALS_MESSAGE,
+  ADMIN_UNAUTHORIZED_MESSAGE,
+  isAllowedAdminEmail,
+  resolveAdminLoginId,
+} from '../lib/adminAuthConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { Session, User } from '@supabase/supabase-js'
 
@@ -21,7 +27,7 @@ function assertSupabaseReady(): void {
 
 function mapAuthErrorMessage(message: string): string {
   if (message.includes('Invalid login credentials')) {
-    return '이메일 또는 비밀번호가 올바르지 않습니다.'
+    return ADMIN_INVALID_CREDENTIALS_MESSAGE
   }
 
   if (message.includes('Email not confirmed')) {
@@ -31,9 +37,35 @@ function mapAuthErrorMessage(message: string): string {
   return message
 }
 
-export async function getAdminSession(): Promise<Session | null> {
+async function rejectUnauthorizedSession(): Promise<void> {
+  if (!supabase) {
+    return
+  }
+
+  await supabase.auth.signOut()
+}
+
+export async function ensureAllowedAdminSession(
+  session: Session | null,
+): Promise<{ session: Session | null; unauthorized: boolean }> {
+  if (!session) {
+    return { session: null, unauthorized: false }
+  }
+
+  if (isAllowedAdminEmail(session.user.email)) {
+    return { session, unauthorized: false }
+  }
+
+  await rejectUnauthorizedSession()
+  return { session: null, unauthorized: true }
+}
+
+export async function getAdminSession(): Promise<{
+  session: Session | null
+  unauthorized: boolean
+}> {
   if (!isSupabaseConfigured || !supabase) {
-    return null
+    return { session: null, unauthorized: false }
   }
 
   const { data, error } = await supabase.auth.getSession()
@@ -42,20 +74,22 @@ export async function getAdminSession(): Promise<Session | null> {
     throw new AdminAuthError('로그인 상태를 확인하지 못했습니다.', error)
   }
 
-  return data.session
+  return ensureAllowedAdminSession(data.session)
 }
 
-export async function signInAdmin(email: string, password: string): Promise<Session> {
+export async function signInAdmin(loginId: string, password: string): Promise<Session> {
   assertSupabaseReady()
 
-  const trimmedEmail = email.trim()
+  const trimmedLoginId = loginId.trim()
 
-  if (!trimmedEmail || !password) {
-    throw new AdminAuthError('이메일과 비밀번호를 입력해주세요.')
+  if (!trimmedLoginId || !password) {
+    throw new AdminAuthError('아이디와 비밀번호를 입력해주세요.')
   }
 
+  const email = resolveAdminLoginId(trimmedLoginId)
+
   const { data, error } = await supabase!.auth.signInWithPassword({
-    email: trimmedEmail,
+    email,
     password,
   })
 
@@ -67,7 +101,17 @@ export async function signInAdmin(email: string, password: string): Promise<Sess
     throw new AdminAuthError('로그인에 실패했습니다.')
   }
 
-  return data.session
+  const { session, unauthorized } = await ensureAllowedAdminSession(data.session)
+
+  if (unauthorized) {
+    throw new AdminAuthError(ADMIN_UNAUTHORIZED_MESSAGE)
+  }
+
+  if (!session) {
+    throw new AdminAuthError('로그인에 실패했습니다.')
+  }
+
+  return session
 }
 
 export async function signOutAdmin(): Promise<void> {
