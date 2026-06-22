@@ -1,6 +1,12 @@
 import type { DetailCategory } from './detailCategory'
 import type { DisplayCategory } from './displayCategory'
 import type { Gender } from './gender'
+import type {
+  ProductInfoFields,
+  ProductReturnInfo,
+  ProductShippingInfo,
+  ProductSizeGuide,
+} from './productDetail'
 import type { ProductStatus } from './status'
 
 export interface Product {
@@ -26,4 +32,8 @@ export interface Product {
   createdAt: string
   updatedAt: string
   status: ProductStatus
+  sizeGuide: ProductSizeGuide
+  productInfo: ProductInfoFields
+  shippingInfo: ProductShippingInfo
+  returnInfo: ProductReturnInfo
 }

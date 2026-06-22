@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { formatPrice } from '../../lib/formatPrice'
 import { getProductDetailPath } from '../../lib/productPaths'
 import type { Product } from '../../types/product'
+import { ProductImage } from './ProductImage'
 
 interface ProductCardProps {
   product: Product
@@ -15,10 +16,17 @@ export function ProductCard({ product }: ProductCardProps) {
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
       <Link
         to={detailPath}
-        className="relative flex aspect-square items-center justify-center bg-neutral-200 text-base text-neutral-500 transition-colors hover:bg-neutral-300"
+        className="relative block aspect-square overflow-hidden bg-neutral-100"
         aria-label={`${product.name} 상품 상세 보기`}
       >
-        상품 이미지
+        <ProductImage
+          src={product.thumbnail}
+          alt={product.name}
+          slug={product.slug}
+          className={`h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02] ${
+            isSoldOut ? 'opacity-70' : ''
+          }`}
+        />
         {isSoldOut && (
           <span className="absolute left-3 top-3 rounded-md bg-neutral-800 px-2.5 py-1 text-sm font-semibold text-white">
             품절

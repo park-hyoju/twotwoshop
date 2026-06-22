@@ -1,5 +1,5 @@
 import type { AdminProductDetailForm, AdminProductInfoFields } from '../../../../types/adminProductDetail'
-import { adminInputClassName, adminLabelClassName, adminSectionClassName } from './adminFormStyles'
+import { adminInputClassName, adminLabelClassName } from './adminFormStyles'
 
 interface ProductInfoTabProps {
   form: AdminProductDetailForm
@@ -27,7 +27,7 @@ export function ProductInfoTab({ form, onChange }: ProductInfoTabProps) {
   }
 
   return (
-    <div className={`${adminSectionClassName} grid gap-4 md:grid-cols-2`}>
+    <div className="grid gap-6 md:grid-cols-2">
       {PRODUCT_INFO_FIELDS.map((field) => (
         <div key={field.key}>
           <label htmlFor={`product-info-${field.key}`} className={adminLabelClassName}>

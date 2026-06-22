@@ -1,14 +1,26 @@
 import type { Product } from '../types/product'
+import {
+  EMPTY_PRODUCT_INFO,
+  EMPTY_PRODUCT_RETURN_INFO,
+  EMPTY_PRODUCT_SHIPPING_INFO,
+  EMPTY_PRODUCT_SIZE_GUIDE,
+} from '../types/productDetail'
 
 function placeholderImage(slug: string): string {
   return `/images/placeholder/${slug}.jpg`
 }
 
 function createProduct(
-  product: Omit<Product, 'images' | 'thumbnail'> & {
-    thumbnail?: string
-    images?: string[]
-  },
+  product: Omit<
+    Product,
+    'thumbnail' | 'images' | 'sizeGuide' | 'productInfo' | 'shippingInfo' | 'returnInfo'
+  > &
+    Partial<
+      Pick<
+        Product,
+        'thumbnail' | 'images' | 'sizeGuide' | 'productInfo' | 'shippingInfo' | 'returnInfo'
+      >
+    >,
 ): Product {
   const thumbnail = product.thumbnail ?? placeholderImage(product.slug)
   const images = product.images ?? [thumbnail]
@@ -17,6 +29,10 @@ function createProduct(
     ...product,
     thumbnail,
     images,
+    sizeGuide: product.sizeGuide ?? { ...EMPTY_PRODUCT_SIZE_GUIDE, rows: [] },
+    productInfo: product.productInfo ?? { ...EMPTY_PRODUCT_INFO },
+    shippingInfo: product.shippingInfo ?? { ...EMPTY_PRODUCT_SHIPPING_INFO },
+    returnInfo: product.returnInfo ?? { ...EMPTY_PRODUCT_RETURN_INFO },
   }
 }
 

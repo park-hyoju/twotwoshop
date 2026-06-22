@@ -1,20 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AdminProductDetailRepositoryError,
   fetchAdminProductDetail,
   saveAdminProductDetail,
 } from '../../../../services/adminProductDetailRepository'
-import type { AdminProductDetailForm, ProductDetailEditorTab } from '../../../../types/adminProductDetail'
+import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
 import { createEmptyProductDetailForm } from '../../../../lib/adminProductDetailDefaults'
-import { AdminProductPreview } from './AdminProductPreview'
-import { BasicInfoTab } from './BasicInfoTab'
-import { DescriptionTab } from './DescriptionTab'
-import { ImagesTab } from './ImagesTab'
-import { ProductInfoTab } from './ProductInfoTab'
-import { PRODUCT_DETAIL_TABS } from './productDetailTabs'
-import { SeoTab } from './SeoTab'
-import { ShippingTab } from './ShippingTab'
-import { SizeGuideTab } from './SizeGuideTab'
+import { ProductEditorForm } from './editor/ProductEditorForm'
+import { ProductEditorLivePreview } from './editor/ProductEditorLivePreview'
+import {
+  ProductEditorScrollNav,
+  useActiveEditorSection,
+} from './editor/ProductEditorScrollNav'
+import { serializeFormForDirtyCheck } from './editor/productEditorSections'
+import { ProductDetailSaveFab } from './ProductDetailSaveFab'
 
 interface ProductDetailEditorProps {
   productId: string
@@ -31,15 +30,22 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDetailEditorProps) {
-  const [activeTab, setActiveTab] = useState<ProductDetailEditorTab>('basic')
   const [form, setForm] = useState<AdminProductDetailForm>(() =>
     createEmptyProductDetailForm(productId),
   )
+  const [savedSnapshot, setSavedSnapshot] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null)
+  const mainScrollRef = useRef<HTMLElement>(null)
+  const { activeSection, scrollToSection } = useActiveEditorSection(!isLoading && !loadError)
+
+  const isDirty = useMemo(
+    () => savedSnapshot.length > 0 && serializeFormForDirtyCheck(form) !== savedSnapshot,
+    [form, savedSnapshot],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +58,7 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         const detail = await fetchAdminProductDetail(productId)
         if (!cancelled) {
           setForm(detail)
+          setSavedSnapshot(serializeFormForDirtyCheck(detail))
         }
       } catch (error) {
         if (!cancelled) {
@@ -86,6 +93,7 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     try {
       const savedForm = await saveAdminProductDetail(form)
       setForm(savedForm)
+      setSavedSnapshot(serializeFormForDirtyCheck(savedForm))
       const message = '저장되었습니다.'
       setSaveSuccessMessage(message)
       onSaved(message)
@@ -96,58 +104,39 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     }
   }
 
-  function renderTabContent() {
-    if (activeTab === 'preview') {
-      return <AdminProductPreview form={form} />
-    }
-
-    const tabProps = { form, onChange: updateForm }
-
-    switch (activeTab) {
-      case 'basic':
-        return <BasicInfoTab {...tabProps} />
-      case 'images':
-        return <ImagesTab {...tabProps} />
-      case 'description':
-        return <DescriptionTab {...tabProps} />
-      case 'size':
-        return <SizeGuideTab {...tabProps} />
-      case 'info':
-        return <ProductInfoTab {...tabProps} />
-      case 'shipping':
-        return <ShippingTab {...tabProps} />
-      case 'seo':
-        return <SeoTab {...tabProps} />
-      default:
-        return null
-    }
-  }
+  const isSaveDisabled = isLoading || isSaving || Boolean(loadError)
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-100">
-      <header className="border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-50">
+      <header className="shrink-0 border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-neutral-500">상품 상세 관리</p>
+            <p className="text-sm font-medium text-neutral-500">📦 상품 등록</p>
             <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">
-              {form.name || '상품 상세 수정'}
+              {form.name || '상품 수정'}
             </h2>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isDirty && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800">
+                <span aria-hidden>●</span>
+                저장되지 않은 변경사항
+              </span>
+            )}
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+              className="h-12 rounded-2xl border border-neutral-200 px-5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
             >
               닫기
             </button>
             <button
               type="button"
               onClick={() => void handleSave()}
-              disabled={isLoading || isSaving || Boolean(loadError)}
-              className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-50"
+              disabled={isSaveDisabled}
+              className="h-12 rounded-2xl bg-neutral-900 px-6 text-sm font-bold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
             >
               {isSaving ? '저장 중...' : '저장'}
             </button>
@@ -155,63 +144,69 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         </div>
       </header>
 
-      <div className="border-b border-neutral-200 bg-white px-4 sm:px-6">
-        <div className="flex gap-2 overflow-x-auto py-3">
-          {PRODUCT_DETAIL_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
+      <div className="flex min-h-0 flex-1">
+        {!isLoading && !loadError && (
+          <ProductEditorScrollNav
+            form={form}
+            activeSection={activeSection}
+            onSectionClick={scrollToSection}
+          />
+        )}
+
+        <main ref={mainScrollRef} className="min-h-0 flex-1 overflow-y-auto p-4 pb-28 sm:p-6 lg:pb-6">
+          {isLoading && (
+            <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-16 text-center shadow-sm">
+              <p className="text-base text-neutral-600">상품 정보를 불러오는 중입니다...</p>
+            </div>
+          )}
+
+          {!isLoading && loadError && (
+            <div
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-red-50 px-6 py-10 text-center"
             >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+              <p className="text-base font-medium text-red-700">{loadError}</p>
+            </div>
+          )}
 
-      <main className="flex-1 overflow-auto p-4 sm:p-6">
-        {isLoading && (
-          <div className="rounded-xl border border-neutral-200 bg-white px-6 py-12 text-center">
-            <p className="text-base text-neutral-600">상품 상세를 불러오는 중입니다...</p>
-          </div>
-        )}
+          {!isLoading && !loadError && (
+            <div className="mx-auto max-w-3xl">
+              {saveSuccessMessage && (
+                <p
+                  role="status"
+                  className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+                >
+                  {saveSuccessMessage}
+                </p>
+              )}
+              {saveError && (
+                <p
+                  role="alert"
+                  className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                  {saveError}
+                </p>
+              )}
 
-        {!isLoading && loadError && (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center"
-          >
-            <p className="text-base font-medium text-red-700">{loadError}</p>
-          </div>
-        )}
+              <ProductEditorForm form={form} onChange={updateForm} />
+            </div>
+          )}
+        </main>
 
         {!isLoading && !loadError && (
-          <>
-            {saveSuccessMessage && (
-              <p
-                role="status"
-                className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
-              >
-                {saveSuccessMessage}
-              </p>
-            )}
-            {saveError && (
-              <p
-                role="alert"
-                className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              >
-                {saveError}
-              </p>
-            )}
-            {renderTabContent()}
-          </>
+          <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-neutral-200 bg-neutral-50 xl:block">
+            <ProductEditorLivePreview form={form} />
+          </aside>
         )}
-      </main>
+      </div>
+
+      {!isLoading && !loadError && (
+        <ProductDetailSaveFab
+          disabled={isSaveDisabled}
+          isSaving={isSaving}
+          onSave={() => void handleSave()}
+        />
+      )}
     </div>
   )
 }

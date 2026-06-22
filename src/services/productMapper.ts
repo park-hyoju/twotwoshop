@@ -4,6 +4,13 @@ import type { Gender } from '../types/gender'
 import type { Product } from '../types/product'
 import type { ProductStatus } from '../types/status'
 import { PRODUCTS } from '../data/products'
+import { resolveProductImages, resolveProductThumbnail } from '../lib/productImages'
+import {
+  parseProductInfoFields,
+  parseProductReturnInfo,
+  parseProductShippingInfo,
+  parseProductSizeGuide,
+} from '../lib/productDetailContent'
 
 /** Cart sync(v0.8 Step 4)는 static id 기준이므로 slug가 같으면 기존 id를 유지합니다. */
 const staticProductIdBySlug = new Map(
@@ -34,10 +41,10 @@ export interface ProductRow {
   status: string
   created_at: string
   updated_at: string
-}
-
-function placeholderImage(slug: string): string {
-  return `/images/placeholder/${slug}.jpg`
+  size_guide?: unknown
+  product_info?: unknown
+  shipping_info?: unknown
+  return_info?: unknown
 }
 
 function asGender(value: string | null | undefined): Gender {
@@ -83,9 +90,8 @@ function asProductStatus(value: string | null | undefined): ProductStatus {
 }
 
 export function mapProductRowToProduct(row: ProductRow): Product {
-  const thumbnail = row.thumbnail ?? placeholderImage(row.slug)
-  const images =
-    row.images && row.images.length > 0 ? row.images : [thumbnail]
+  const thumbnail = resolveProductThumbnail(row.thumbnail, row.slug)
+  const images = resolveProductImages(row.images, row.thumbnail, row.slug)
   const status = asProductStatus(row.status)
   const stock = row.stock ?? 0
 
@@ -112,6 +118,10 @@ export function mapProductRowToProduct(row: ProductRow): Product {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     status,
+    sizeGuide: parseProductSizeGuide(row.size_guide),
+    productInfo: parseProductInfoFields(row.product_info),
+    shippingInfo: parseProductShippingInfo(row.shipping_info),
+    returnInfo: parseProductReturnInfo(row.return_info),
   }
 }
 

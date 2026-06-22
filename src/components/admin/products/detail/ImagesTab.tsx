@@ -1,6 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
-import { adminInputClassName, adminLabelClassName, adminSectionClassName } from './adminFormStyles'
+import {
+  deleteProductImageByUrl,
+  ProductImageUploadError,
+  uploadProductImage,
+} from '../../../../services/adminProductImageUploadService'
+import { isPlaceholderProductImage } from '../../../../lib/productImageStorage'
+import { adminCardClassName, adminPageStackClassName } from './adminFormStyles'
+import { ProductImageGalleryItem } from './images/ProductImageGalleryItem'
+import { ProductImageUploadZone } from './images/ProductImageUploadZone'
+import { UploadProgressBar } from './images/UploadProgressBar'
 
 interface ImagesTabProps {
   form: AdminProductDetailForm
@@ -10,162 +19,256 @@ interface ImagesTabProps {
   ) => void
 }
 
-function ImagePreview({ src, alt }: { src: string; alt: string }) {
-  if (!src) {
-    return (
-      <div className="flex h-32 items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-500">
-        미리보기 없음
-      </div>
-    )
+interface UploadTask {
+  id: string
+  label: string
+  progress: number
+}
+
+function getUploadErrorMessage(error: unknown): string {
+  if (error instanceof ProductImageUploadError) {
+    return error.message
   }
 
-  return (
-    <img src={src} alt={alt} className="h-32 w-full rounded-lg object-cover" />
-  )
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return '사진 업로드 중 문제가 생겼어요. 다시 시도해 주세요.'
+}
+
+function collectPhotos(form: AdminProductDetailForm): string[] {
+  const photos: string[] = []
+  const thumbnail = form.thumbnail?.trim()
+
+  if (thumbnail && !isPlaceholderProductImage(thumbnail)) {
+    photos.push(thumbnail)
+  }
+
+  for (const image of form.images) {
+    const url = image?.trim()
+    if (url && !isPlaceholderProductImage(url) && !photos.includes(url)) {
+      photos.push(url)
+    }
+  }
+
+  return photos
+}
+
+function applyPhotos(
+  photos: string[],
+  onChange: ImagesTabProps['onChange'],
+) {
+  onChange('thumbnail', photos[0] ?? '')
+  onChange('images', photos.slice(1))
 }
 
 export function ImagesTab({ form, onChange }: ImagesTabProps) {
-  const [newImageUrl, setNewImageUrl] = useState('')
+  const replaceRef = useRef<HTMLInputElement>(null)
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [replaceIndex, setReplaceIndex] = useState<number | null>(null)
 
-  function applyPlaceholderThumbnail() {
-    if (!form.slug.trim()) {
-      return
-    }
+  const isUploading = uploadTasks.length > 0
+  const photos = collectPhotos(form)
+  const hasPhotos = photos.length > 0
 
-    onChange('thumbnail', `/images/placeholder/${form.slug.trim()}.jpg`)
+  function markUploadPreparing() {
+    setUploadError(null)
+    setUploadSuccessMessage(null)
   }
 
-  function addDetailImage() {
-    const url = newImageUrl.trim()
-    if (!url) {
-      return
-    }
-
-    onChange('images', [...form.images, url])
-    setNewImageUrl('')
+  function markUploadRejected(message: string) {
+    setUploadError(message)
   }
 
-  function removeDetailImage(index: number) {
-    onChange(
-      'images',
-      form.images.filter((_, imageIndex) => imageIndex !== index),
+  function updateTaskProgress(taskId: string, progress: number) {
+    setUploadTasks((current) =>
+      current.map((task) => (task.id === taskId ? { ...task, progress } : task)),
     )
   }
 
-  function moveDetailImage(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction
-    if (nextIndex < 0 || nextIndex >= form.images.length) {
+  function removeTask(taskId: string) {
+    setUploadTasks((current) => current.filter((task) => task.id !== taskId))
+  }
+
+  async function runUpload(
+    file: File,
+    role: 'thumbnail' | 'detail',
+    onComplete: (publicUrl: string) => void | Promise<void>,
+  ) {
+    const taskId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setUploadTasks((current) => [...current, { id: taskId, label: file.name, progress: 0 }])
+    setUploadError(null)
+    setUploadSuccessMessage(null)
+
+    try {
+      const publicUrl = await uploadProductImage(form.id, file, role, (progress) => {
+        updateTaskProgress(taskId, progress)
+      })
+      await onComplete(publicUrl)
+      setUploadSuccessMessage('사진이 추가됐어요. 저장 버튼을 눌러 반영해 주세요.')
+    } catch (error) {
+      setUploadError(getUploadErrorMessage(error))
+    } finally {
+      removeTask(taskId)
+    }
+  }
+
+  async function handleUpload(files: File[]) {
+    let nextPhotos = [...photos]
+
+    for (const file of files) {
+      const role = nextPhotos.length === 0 ? 'thumbnail' : 'detail'
+      await runUpload(file, role, (publicUrl) => {
+        nextPhotos = [...nextPhotos, publicUrl]
+        applyPhotos(nextPhotos, onChange)
+      })
+    }
+  }
+
+  async function handleReplace(files: FileList | null) {
+    if (!files || files.length === 0 || replaceIndex === null) {
       return
     }
 
-    const nextImages = [...form.images]
-    const [moved] = nextImages.splice(index, 1)
-    nextImages.splice(nextIndex, 0, moved)
-    onChange('images', nextImages)
+    const file = files[0]
+    const targetIndex = replaceIndex
+    const previousUrl = photos[targetIndex]
+    const role = targetIndex === 0 ? 'thumbnail' : 'detail'
+
+    await runUpload(file, role, async (publicUrl) => {
+      const nextPhotos = [...photos]
+      nextPhotos[targetIndex] = publicUrl
+      applyPhotos(nextPhotos, onChange)
+
+      if (previousUrl && previousUrl !== publicUrl) {
+        await deleteProductImageByUrl(previousUrl)
+      }
+    })
+
+    setReplaceIndex(null)
+  }
+
+  async function removePhoto(index: number) {
+    const previousUrl = photos[index]
+    const nextPhotos = photos.filter((_, photoIndex) => photoIndex !== index)
+    applyPhotos(nextPhotos, onChange)
+    setUploadSuccessMessage('사진이 삭제됐어요.')
+
+    if (previousUrl && !isPlaceholderProductImage(previousUrl)) {
+      await deleteProductImageByUrl(previousUrl)
+    }
+  }
+
+  function reorderPhotos(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) {
+      return
+    }
+
+    const nextPhotos = [...photos]
+    const [moved] = nextPhotos.splice(fromIndex, 1)
+    nextPhotos.splice(toIndex, 0, moved)
+    applyPhotos(nextPhotos, onChange)
   }
 
   return (
-    <div className="space-y-6">
-      <section className={adminSectionClassName}>
-        <h3 className="text-lg font-semibold text-neutral-900">대표 이미지</h3>
-        <p className="mt-1 text-sm text-neutral-500">
-          Storage 연동 전까지 URL 또는 placeholder 경로를 입력하세요.
+    <div className={adminPageStackClassName}>
+      {uploadSuccessMessage && (
+        <p
+          role="status"
+          className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+        >
+          {uploadSuccessMessage}
+        </p>
+      )}
+
+      {uploadError && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {uploadError}
+        </p>
+      )}
+
+      {uploadTasks.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4">
+          <p className="text-sm font-medium text-neutral-700">업로드 중...</p>
+          {uploadTasks.map((task) => (
+            <UploadProgressBar key={task.id} label={task.label} progress={task.progress} />
+          ))}
+        </div>
+      )}
+
+      <section className={adminCardClassName}>
+        <p className="mb-1 text-sm text-neutral-500">
+          첫 번째 사진이 대표 사진으로 자동 설정돼요.
         </p>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-[12rem_1fr]">
-          <ImagePreview src={form.thumbnail} alt="대표 이미지" />
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="detail-thumbnail" className={adminLabelClassName}>
-                이미지 URL
-              </label>
-              <input
-                id="detail-thumbnail"
-                value={form.thumbnail}
-                onChange={(event) => onChange('thumbnail', event.target.value)}
-                placeholder="/images/placeholder/product-slug.jpg"
-                className={adminInputClassName}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={applyPlaceholderThumbnail}
-                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-              >
-                placeholder 적용
-              </button>
-              <button
-                type="button"
-                onClick={() => onChange('thumbnail', '')}
-                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-              >
-                삭제
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+        <input
+          ref={replaceRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+          className="absolute h-0 w-0 opacity-0"
+          disabled={isUploading}
+          onChange={(event) => {
+            void handleReplace(event.target.files)
+            event.target.value = ''
+          }}
+        />
 
-      <section className={adminSectionClassName}>
-        <h3 className="text-lg font-semibold text-neutral-900">상세 이미지</h3>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <input
-            value={newImageUrl}
-            onChange={(event) => setNewImageUrl(event.target.value)}
-            placeholder="상세 이미지 URL"
-            className={adminInputClassName}
-          />
-          <button
-            type="button"
-            onClick={addDetailImage}
-            className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
-          >
-            추가
-          </button>
-        </div>
-
-        {form.images.length === 0 ? (
-          <p className="mt-4 text-sm text-neutral-500">등록된 상세 이미지가 없습니다.</p>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {form.images.map((image, index) => (
-              <div
+        {hasPhotos && (
+          <div className="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+            {photos.map((image, index) => (
+              <ProductImageGalleryItem
                 key={`${image}-${index}`}
-                className="grid gap-4 rounded-lg border border-neutral-200 p-4 md:grid-cols-[10rem_1fr_auto]"
-              >
-                <ImagePreview src={image} alt={`상세 이미지 ${index + 1}`} />
-                <p className="break-all text-sm text-neutral-700">{image}</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => moveDetailImage(index, -1)}
-                    disabled={index === 0}
-                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveDetailImage(index, 1)}
-                    disabled={index === form.images.length - 1}
-                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeDetailImage(index)}
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700"
-                  >
-                    삭제
-                  </button>
-                </div>
-              </div>
+                imageUrl={image}
+                index={index}
+                isPrimary={index === 0}
+                isDragging={dragIndex === index}
+                isDropTarget={dropIndex === index && dragIndex !== index}
+                disabled={isUploading}
+                onDragStart={(itemIndex) => setDragIndex(itemIndex)}
+                onDragOver={(itemIndex) => setDropIndex(itemIndex)}
+                onDrop={(itemIndex) => {
+                  if (dragIndex !== null) {
+                    reorderPhotos(dragIndex, itemIndex)
+                  }
+                  setDragIndex(null)
+                  setDropIndex(null)
+                }}
+                onDragEnd={() => {
+                  setDragIndex(null)
+                  setDropIndex(null)
+                }}
+                onSetPrimary={(itemIndex) => {
+                  if (itemIndex === 0) {
+                    return
+                  }
+                  reorderPhotos(itemIndex, 0)
+                  setUploadSuccessMessage('대표 사진으로 바꿨어요.')
+                }}
+                onReplace={(itemIndex) => {
+                  setReplaceIndex(itemIndex)
+                  replaceRef.current?.click()
+                }}
+                onDelete={(itemIndex) => void removePhoto(itemIndex)}
+              />
             ))}
           </div>
         )}
+
+        <ProductImageUploadZone
+          title={hasPhotos ? '사진 추가' : '사진 올리기'}
+          description="클릭하거나 끌어다 놓으세요 · 여러 장 가능"
+          multiple
+          compact={hasPhotos}
+          disabled={isUploading}
+          onPrepare={markUploadPreparing}
+          onReject={markUploadRejected}
+          onFilesSelected={(files) => void handleUpload(files)}
+        />
       </section>
     </div>
   )

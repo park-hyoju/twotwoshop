@@ -1,4 +1,5 @@
 export { ProductCard } from './ProductCard'
 export { ProductDetailView } from './ProductDetailView'
+export { ProductImage } from './ProductImage'
 export { ProductGrid } from './ProductGrid'
 export { ProductListPage } from './ProductListPage'

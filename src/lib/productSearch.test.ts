@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Product } from '../types/product'
 import {
+  EMPTY_PRODUCT_INFO,
+  EMPTY_PRODUCT_RETURN_INFO,
+  EMPTY_PRODUCT_SHIPPING_INFO,
+  EMPTY_PRODUCT_SIZE_GUIDE,
+} from '../types/productDetail'
+import {
   buildProductSearchUrl,
   filterProductsBySearch,
   matchesProductSearch,
@@ -30,6 +36,10 @@ function createProduct(overrides: Partial<Product> = {}): Product {
     status: 'active',
     createdAt: '2026-05-10T09:00:00.000Z',
     updatedAt: '2026-05-10T09:00:00.000Z',
+    sizeGuide: { ...EMPTY_PRODUCT_SIZE_GUIDE, rows: [] },
+    productInfo: { ...EMPTY_PRODUCT_INFO },
+    shippingInfo: { ...EMPTY_PRODUCT_SHIPPING_INFO },
+    returnInfo: { ...EMPTY_PRODUCT_RETURN_INFO },
     ...overrides,
   }
 }

@@ -1,23 +1,24 @@
 import { formatPrice } from '../../../../lib/formatPrice'
 import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
+import { adminCardClassName, adminPageStackClassName, adminSectionTitleClassName } from './adminFormStyles'
 
 interface AdminProductPreviewProps {
   form: AdminProductDetailForm
 }
 
-function PreviewImage({ src, alt }: { src: string; alt: string }) {
+function PreviewImage({ src, alt, className = '' }: { src: string; alt: string; className?: string }) {
   if (!src) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-2xl bg-neutral-200 text-neutral-500">
+      <div
+        className={`flex aspect-square items-center justify-center bg-neutral-100 text-neutral-400 ${className}`}
+      >
         이미지 없음
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-neutral-100">
-      <img src={src} alt={alt} className="aspect-square w-full object-cover" />
-    </div>
+    <img src={src} alt={alt} className={`aspect-square w-full object-cover ${className}`} />
   )
 }
 
@@ -26,93 +27,97 @@ export function AdminProductPreview({ form }: AdminProductPreviewProps) {
   const hasDiscount = form.discount_rate > 0
 
   return (
-    <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4 sm:p-6">
-      <p className="mb-4 text-sm font-medium text-neutral-500">
-        저장 전 고객 화면 미리보기 (실제 쇼핑몰과 레이아웃이 다를 수 있습니다)
-      </p>
-
-      <div className="mx-auto max-w-5xl rounded-2xl bg-white p-4 shadow-sm sm:p-8">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <div className="space-y-4">
+    <div className={adminPageStackClassName}>
+      <section className={adminCardClassName}>
+        <h3 className={`${adminSectionTitleClassName} mb-6`}>상품 목록 미리보기</h3>
+        <div className="mx-auto max-w-xs">
+          <article className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
             <PreviewImage src={form.thumbnail} alt={form.name} />
-            {form.images.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {form.images.map((image, index) => (
-                  <img
-                    key={`${image}-${index}`}
-                    src={image}
-                    alt={`${form.name} 상세 ${index + 1}`}
-                    className="aspect-square rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            <div className="space-y-3 p-4">
+              <h4 className="line-clamp-2 text-base font-bold text-neutral-900">
+                {form.name || '상품명'}
+              </h4>
+              <p className="text-xl font-bold text-neutral-900">{formatPrice(form.price)}</p>
+              {isSoldOut && (
+                <span className="inline-block rounded-md bg-neutral-800 px-2 py-1 text-xs font-semibold text-white">
+                  품절
+                </span>
+              )}
+            </div>
+          </article>
+        </div>
+      </section>
 
-          <div className="space-y-5">
-            {form.brand && <p className="text-sm font-medium text-neutral-500">{form.brand}</p>}
-            <h2 className="text-2xl font-bold text-neutral-900 sm:text-3xl">{form.name || '상품명'}</h2>
-            {form.short_description && (
-              <p className="text-base text-neutral-500">{form.short_description}</p>
-            )}
-
-            <div className="space-y-2">
-              {hasDiscount && (
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-red-600">{form.discount_rate}%</span>
-                  <span className="text-lg text-neutral-400 line-through">
-                    {formatPrice(form.original_price)}
-                  </span>
+      <section className={adminCardClassName}>
+        <h3 className={`${adminSectionTitleClassName} mb-6`}>상품 상세 미리보기</h3>
+        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
+          <div className="grid gap-6 p-4 lg:grid-cols-2 lg:p-6">
+            <div className="space-y-3">
+              <PreviewImage
+                src={form.thumbnail}
+                alt={form.name}
+                className="rounded-2xl"
+              />
+              {form.images.length > 1 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {form.images.map((image, index) => (
+                    <img
+                      key={`${image}-${index}`}
+                      src={image}
+                      alt={`${form.name} ${index + 1}`}
+                      className="aspect-square rounded-xl object-cover"
+                    />
+                  ))}
                 </div>
               )}
-              <p className="text-3xl font-bold text-neutral-900">{formatPrice(form.price)}</p>
             </div>
 
-            {isSoldOut && (
-              <span className="inline-block rounded-md bg-neutral-700 px-3 py-1.5 text-sm font-semibold text-white">
-                품절
-              </span>
-            )}
+            <div className="space-y-4 rounded-2xl bg-white p-5">
+              {form.brand && <p className="text-sm font-medium text-neutral-500">{form.brand}</p>}
+              <h2 className="text-2xl font-bold text-neutral-900">{form.name || '상품명'}</h2>
+              {form.short_description && (
+                <p className="text-base text-neutral-500">{form.short_description}</p>
+              )}
 
-            {form.description && (
-              <div className="whitespace-pre-wrap text-base leading-relaxed text-neutral-600">
-                {form.description}
-              </div>
-            )}
-
-            {form.size_guide.rows.length > 0 && (
-              <div>
-                <h3 className="mb-2 text-lg font-semibold text-neutral-900">사이즈 가이드</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="bg-neutral-50">
-                        <th className="px-2 py-2 text-left">사이즈</th>
-                        <th className="px-2 py-2 text-left">총장</th>
-                        <th className="px-2 py-2 text-left">어깨</th>
-                        <th className="px-2 py-2 text-left">가슴</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.size_guide.rows.map((row, index) => (
-                        <tr key={index} className="border-t border-neutral-200">
-                          <td className="px-2 py-2">{row.size}</td>
-                          <td className="px-2 py-2">{row.total_length}</td>
-                          <td className="px-2 py-2">{row.shoulder}</td>
-                          <td className="px-2 py-2">{row.chest}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {form.size_guide.model_info && (
-                  <p className="mt-2 text-sm text-neutral-600">{form.size_guide.model_info}</p>
+              <div className="space-y-1">
+                {hasDiscount && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-red-600">{form.discount_rate}%</span>
+                    <span className="text-neutral-400 line-through">
+                      {formatPrice(form.original_price)}
+                    </span>
+                  </div>
                 )}
+                <p className="text-3xl font-bold text-neutral-900">{formatPrice(form.price)}</p>
               </div>
-            )}
+
+              {isSoldOut && (
+                <span className="inline-block rounded-md bg-neutral-700 px-3 py-1.5 text-sm font-semibold text-white">
+                  품절
+                </span>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="rounded-xl bg-neutral-900 py-3 text-center text-sm font-semibold text-white">
+                  장바구니 담기
+                </div>
+                <div className="rounded-xl border border-neutral-300 py-3 text-center text-sm font-semibold text-neutral-800">
+                  구매하기
+                </div>
+              </div>
+
+              {form.description && (
+                <div className="border-t border-neutral-100 pt-4">
+                  <p className="mb-2 text-sm font-bold text-neutral-900">상세정보</p>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-600">
+                    {form.description}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { EMPTY_SIZE_GUIDE_ROW } from '../../../../lib/adminProductDetailDefaults'
 import type { AdminProductDetailForm, AdminSizeGuideRow } from '../../../../types/adminProductDetail'
-import { adminInputClassName, adminLabelClassName, adminSectionClassName } from './adminFormStyles'
+import { adminCardClassName, adminLabelClassName, adminSectionTitleClassName, adminTextareaClassName } from './adminFormStyles'
 
 interface SizeGuideTabProps {
   form: AdminProductDetailForm
@@ -46,9 +46,9 @@ export function SizeGuideTab({ form, onChange }: SizeGuideTabProps) {
   }
 
   return (
-    <div className={`${adminSectionClassName} space-y-4`}>
+    <div className={`${adminCardClassName} space-y-6`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-neutral-900">사이즈 가이드</h3>
+        <h3 className={adminSectionTitleClassName}>사이즈 가이드</h3>
         <button
           type="button"
           onClick={addRow}
@@ -112,7 +112,7 @@ export function SizeGuideTab({ form, onChange }: SizeGuideTabProps) {
             onChange('size_guide', { ...form.size_guide, model_info: event.target.value })
           }
           rows={4}
-          className={`${adminInputClassName} resize-y`}
+          className={`${adminTextareaClassName} resize-y`}
         />
       </div>
     </div>

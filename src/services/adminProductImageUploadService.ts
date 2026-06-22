@@ -1,0 +1,128 @@
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import {
+  PRODUCT_IMAGE_BUCKET,
+  buildProductImagePath,
+  extractProductImageStoragePath,
+  getProductImagePublicUrl,
+  getProductImageUploadEndpoint,
+  getSupabaseAnonKey,
+  validateProductImageFile,
+} from '../lib/productImageStorage'
+
+export class ProductImageUploadError extends Error {
+  cause?: unknown
+
+  constructor(message: string, cause?: unknown) {
+    super(message)
+    this.name = 'ProductImageUploadError'
+    this.cause = cause
+  }
+}
+
+function assertUploadReady(): void {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new ProductImageUploadError(
+      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
+    )
+  }
+}
+
+async function getAccessToken(): Promise<string> {
+  assertUploadReady()
+
+  const { data, error } = await supabase!.auth.getSession()
+  if (error) {
+    throw new ProductImageUploadError('로그인 세션을 확인하지 못했습니다.', error)
+  }
+
+  const token = data.session?.access_token
+  if (!token) {
+    throw new ProductImageUploadError('로그인이 필요합니다. 관리자 계정으로 다시 로그인해주세요.')
+  }
+
+  return token
+}
+
+function uploadFileWithProgress(
+  path: string,
+  file: File,
+  token: string,
+  onProgress?: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const endpoint = getProductImageUploadEndpoint(path)
+
+    xhr.open('POST', endpoint)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('apikey', getSupabaseAnonKey())
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.setRequestHeader('x-upsert', 'true')
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (!onProgress) {
+        return
+      }
+
+      if (event.lengthComputable) {
+        onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+        return
+      }
+
+      onProgress(50)
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100)
+        resolve()
+        return
+      }
+
+      let message = '이미지 업로드에 실패했습니다.'
+      if (xhr.status === 401 || xhr.status === 403) {
+        message =
+          '이미지 업로드 권한이 없습니다. 관리자 로그인 상태와 Storage 정책(product-images-storage.sql)을 확인해주세요.'
+      }
+
+      reject(new ProductImageUploadError(message, xhr.responseText))
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new ProductImageUploadError('네트워크 오류로 이미지를 업로드하지 못했습니다.'))
+    })
+
+    xhr.send(file)
+  })
+}
+
+export async function uploadProductImage(
+  productId: string,
+  file: File,
+  role: 'thumbnail' | 'detail',
+  onProgress?: (percent: number) => void,
+): Promise<string> {
+  validateProductImageFile(file)
+
+  const path = buildProductImagePath(productId, role, file.name)
+  const token = await getAccessToken()
+
+  onProgress?.(0)
+  await uploadFileWithProgress(path, file, token, onProgress)
+
+  return getProductImagePublicUrl(path)
+}
+
+export async function deleteProductImageByUrl(url: string): Promise<void> {
+  const path = extractProductImageStoragePath(url)
+  if (!path) {
+    return
+  }
+
+  assertUploadReady()
+
+  const { error } = await supabase!.storage.from(PRODUCT_IMAGE_BUCKET).remove([path])
+  if (error) {
+    console.warn('[product-image] storage delete failed', { path, error })
+  }
+}
