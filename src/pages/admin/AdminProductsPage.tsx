@@ -92,19 +92,25 @@ export function AdminProductsPage() {
 
   useEffect(() => {
     const statusParam = searchParams.get('status')
+    const slugParam = searchParams.get('slug')
+    let nextFilters = { ...EMPTY_FILTERS }
 
-    if (!statusParam || !isProductStatusFilter(statusParam) || statusParam === 'all') {
-      return
+    if (statusParam && isProductStatusFilter(statusParam) && statusParam !== 'all') {
+      nextFilters = { ...nextFilters, status: statusParam }
     }
 
-    const statusFilters: AdminProductSearchFilters = {
-      ...EMPTY_FILTERS,
-      status: statusParam,
+    if (slugParam) {
+      nextFilters = { ...nextFilters, slug: slugParam }
     }
 
-    setDraftFilters(statusFilters)
-    setAppliedFilters(statusFilters)
-    setPage(1)
+    if (
+      nextFilters.status !== EMPTY_FILTERS.status ||
+      nextFilters.slug !== EMPTY_FILTERS.slug
+    ) {
+      setDraftFilters(nextFilters)
+      setAppliedFilters(nextFilters)
+      setPage(1)
+    }
   }, [searchParams])
 
   function handleFilterChange(field: keyof AdminProductSearchFilters, value: string) {

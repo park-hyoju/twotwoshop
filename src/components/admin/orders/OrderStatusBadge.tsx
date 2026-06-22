@@ -9,7 +9,7 @@ interface OrderStatusBadgeProps {
 export function OrderStatusBadge({ status, className = '' }: OrderStatusBadgeProps) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold leading-none ring-1 ring-inset sm:text-sm ${getOrderStatusBadgeClassName(status)} ${className}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight ring-1 ring-inset sm:text-xs ${getOrderStatusBadgeClassName(status)} ${className}`}
     >
       {getOrderStatusLabel(status)}
     </span>

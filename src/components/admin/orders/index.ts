@@ -1,5 +1,6 @@
 export { AdminOrdersList } from './AdminOrdersList'
 export { AdminOrdersPagination } from './AdminOrdersPagination'
 export { AdminOrdersSearch } from './AdminOrdersSearch'
+export { AdminOrdersSummary } from './AdminOrdersSummary'
 export { OrderStatusBadge } from './OrderStatusBadge'
 export { OrderStatusSelect } from './OrderStatusSelect'

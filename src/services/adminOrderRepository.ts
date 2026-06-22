@@ -2,9 +2,11 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type {
   AdminOrderItemRow,
   AdminOrderRow,
+  AdminOrderSummaryStats,
   AdminOrdersQueryParams,
   AdminOrdersQueryResult,
 } from '../types/adminOrder'
+import type { DbOrderStatus } from '../types/adminOrder'
 
 const ORDER_HEADER_SELECT = `
   id,
@@ -19,6 +21,7 @@ const ORDER_HEADER_SELECT = `
 const ORDER_ITEM_SELECT = `
   id,
   order_id,
+  product_slug,
   product_name,
   quantity,
   unit_price,
@@ -37,6 +40,67 @@ interface OrderHeaderRow {
 
 interface OrderItemDbRow extends AdminOrderItemRow {
   order_id: string
+}
+
+function getTodayBoundaries() {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+
+  return {
+    todayStart: todayStart.toISOString(),
+    tomorrowStart: tomorrowStart.toISOString(),
+  }
+}
+
+async function fetchOrderCount(options?: {
+  status?: DbOrderStatus
+  from?: string
+  to?: string
+}): Promise<number> {
+  let query = supabase!.from('orders').select('*', { count: 'exact', head: true })
+
+  if (options?.status) {
+    query = query.eq('status', options.status)
+  }
+
+  if (options?.from) {
+    query = query.gte('created_at', options.from)
+  }
+
+  if (options?.to) {
+    query = query.lt('created_at', options.to)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    throw error
+  }
+
+  return count ?? 0
+}
+
+export async function fetchAdminOrderSummary(): Promise<AdminOrderSummaryStats> {
+  assertSupabaseReady()
+
+  const { todayStart, tomorrowStart } = getTodayBoundaries()
+
+  const [todayOrderCount, pendingOrderCount, shippedOrderCount, completedOrderCount] =
+    await Promise.all([
+      fetchOrderCount({ from: todayStart, to: tomorrowStart }),
+      fetchOrderCount({ status: 'pending' }),
+      fetchOrderCount({ status: 'shipped' }),
+      fetchOrderCount({ status: 'completed' }),
+    ])
+
+  return {
+    todayOrderCount,
+    pendingOrderCount,
+    shippedOrderCount,
+    completedOrderCount,
+  }
 }
 
 export class AdminOrderRepositoryError extends Error {
@@ -70,6 +134,7 @@ function groupOrderItemsByOrderId(items: OrderItemDbRow[]): Map<string, AdminOrd
     const current = map.get(item.order_id) ?? []
     current.push({
       id: item.id,
+      product_slug: item.product_slug ?? null,
       product_name: item.product_name,
       quantity: item.quantity,
       unit_price: item.unit_price,

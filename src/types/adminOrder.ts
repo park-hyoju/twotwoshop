@@ -8,6 +8,7 @@ export type DbOrderStatus =
 
 export interface AdminOrderItemRow {
   id: string
+  product_slug: string | null
   product_name: string
   quantity: number
   unit_price: number
@@ -43,4 +44,11 @@ export interface AdminOrdersQueryParams {
 export interface AdminOrdersQueryResult {
   orders: AdminOrderRow[]
   totalCount: number
+}
+
+export interface AdminOrderSummaryStats {
+  todayOrderCount: number
+  pendingOrderCount: number
+  shippedOrderCount: number
+  completedOrderCount: number
 }
