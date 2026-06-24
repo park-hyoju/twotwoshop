@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react'
 import {
   DEFAULT_PRODUCT_SHIPPING_INFO,
-  DEFAULT_PRODUCT_SHIPPING_NOTES,
   type ProductShippingInfo,
 } from '../../../types/productDetail'
 
@@ -16,7 +16,18 @@ function resolveShippingInfo(shippingInfo: ProductShippingInfo): ProductShipping
     free_shipping_threshold:
       shippingInfo.free_shipping_threshold.trim() ||
       DEFAULT_PRODUCT_SHIPPING_INFO.free_shipping_threshold,
+    additional_notes:
+      shippingInfo.additional_notes.trim() || DEFAULT_PRODUCT_SHIPPING_INFO.additional_notes,
   }
+}
+
+function PolicyBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3.5">
+      <h3 className="text-sm font-semibold text-neutral-500">{title}</h3>
+      <div className="mt-2 text-sm leading-6 text-neutral-800">{children}</div>
+    </div>
+  )
 }
 
 export function ProductDetailShippingSection({ shippingInfo }: ProductDetailShippingSectionProps) {
@@ -24,25 +35,21 @@ export function ProductDetailShippingSection({ shippingInfo }: ProductDetailShip
 
   return (
     <div className="space-y-4">
-      <dl className="divide-y divide-neutral-200 rounded-2xl border border-neutral-200 bg-white">
-        <div className="grid grid-cols-[7.5rem_1fr] gap-3 px-4 py-3.5 sm:grid-cols-[9rem_1fr]">
-          <dt className="text-sm font-semibold text-neutral-500">배송비</dt>
-          <dd className="text-sm leading-6 text-neutral-800">{resolved.shipping_fee}</dd>
-        </div>
-        <div className="grid grid-cols-[7.5rem_1fr] gap-3 px-4 py-3.5 sm:grid-cols-[9rem_1fr]">
-          <dt className="text-sm font-semibold text-neutral-500">배송기간</dt>
-          <dd className="text-sm leading-6 text-neutral-800">{resolved.delivery_period}</dd>
-        </div>
-        <div className="grid grid-cols-[7.5rem_1fr] gap-3 px-4 py-3.5 sm:grid-cols-[9rem_1fr]">
-          <dt className="text-sm font-semibold text-neutral-500">무료배송</dt>
-          <dd className="text-sm leading-6 text-neutral-800">{resolved.free_shipping_threshold}</dd>
-        </div>
-      </dl>
+      <PolicyBlock title="배송비">
+        <p>{resolved.shipping_fee}</p>
+      </PolicyBlock>
 
-      <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3.5">
-        <h3 className="text-sm font-semibold text-neutral-500">기타 배송 안내</h3>
-        <p className="mt-2 text-sm leading-6 text-neutral-700">{DEFAULT_PRODUCT_SHIPPING_NOTES}</p>
-      </div>
+      <PolicyBlock title="배송기간">
+        <p className="whitespace-pre-wrap">{resolved.delivery_period}</p>
+      </PolicyBlock>
+
+      <PolicyBlock title="무료배송 안내">
+        <p>{resolved.free_shipping_threshold}</p>
+      </PolicyBlock>
+
+      <PolicyBlock title="추가 안내">
+        <p className="whitespace-pre-wrap">{resolved.additional_notes}</p>
+      </PolicyBlock>
     </div>
   )
 }

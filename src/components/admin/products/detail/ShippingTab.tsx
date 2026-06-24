@@ -4,11 +4,8 @@ import type {
   AdminShippingInfoFields,
 } from '../../../../types/adminProductDetail'
 import {
-  adminCardClassName,
   adminInputClassName,
   adminLabelClassName,
-  adminPageStackClassName,
-  adminSectionTitleClassName,
   adminTextareaClassName,
 } from './adminFormStyles'
 
@@ -18,6 +15,7 @@ interface ShippingTabProps {
     field: K,
     value: AdminProductDetailForm[K],
   ) => void
+  minimal?: boolean
 }
 
 const SHIPPING_FIELDS: Array<{ key: keyof AdminShippingInfoFields; label: string }> = [
@@ -27,12 +25,12 @@ const SHIPPING_FIELDS: Array<{ key: keyof AdminShippingInfoFields; label: string
 ]
 
 const RETURN_FIELDS: Array<{ key: keyof AdminReturnInfoFields; label: string }> = [
-  { key: 'exchange_period', label: '교환 가능 기간' },
-  { key: 'return_address', label: '반품 주소' },
+  { key: 'exchange_period', label: '교환기간' },
+  { key: 'return_address', label: '반품주소' },
   { key: 'notes', label: '유의사항' },
 ]
 
-export function ShippingTab({ form, onChange }: ShippingTabProps) {
+export function ShippingTab({ form, onChange, minimal = false }: ShippingTabProps) {
   function updateShipping(key: keyof AdminShippingInfoFields, value: string) {
     onChange('shipping_info', { ...form.shipping_info, [key]: value })
   }
@@ -41,51 +39,47 @@ export function ShippingTab({ form, onChange }: ShippingTabProps) {
     onChange('return_info', { ...form.return_info, [key]: value })
   }
 
-  return (
-    <div className={adminPageStackClassName}>
-      <section className={`${adminCardClassName} grid gap-6 md:grid-cols-2`}>
-        <div className="md:col-span-2">
-          <h3 className={adminSectionTitleClassName}>배송과 교환 안내</h3>
-        </div>
+  const wrapperClassName = minimal ? 'grid gap-8 sm:grid-cols-2' : 'grid gap-6 md:grid-cols-2'
 
-        {SHIPPING_FIELDS.map((field) => (
-          <div key={field.key}>
-            <label htmlFor={`shipping-${field.key}`} className={adminLabelClassName}>
-              {field.label}
-            </label>
+  return (
+    <div className={wrapperClassName}>
+      {SHIPPING_FIELDS.map((field) => (
+        <div key={field.key}>
+          <label htmlFor={`shipping-${field.key}`} className={adminLabelClassName}>
+            {field.label}
+          </label>
+          <input
+            id={`shipping-${field.key}`}
+            value={form.shipping_info[field.key]}
+            onChange={(event) => updateShipping(field.key, event.target.value)}
+            className={adminInputClassName}
+          />
+        </div>
+      ))}
+
+      {RETURN_FIELDS.map((field) => (
+        <div key={field.key} className={field.key === 'notes' ? 'sm:col-span-2' : undefined}>
+          <label htmlFor={`return-${field.key}`} className={adminLabelClassName}>
+            {field.label}
+          </label>
+          {field.key === 'notes' ? (
+            <textarea
+              id={`return-${field.key}`}
+              value={form.return_info[field.key]}
+              onChange={(event) => updateReturn(field.key, event.target.value)}
+              rows={4}
+              className={`${adminTextareaClassName} resize-y`}
+            />
+          ) : (
             <input
-              id={`shipping-${field.key}`}
-              value={form.shipping_info[field.key]}
-              onChange={(event) => updateShipping(field.key, event.target.value)}
+              id={`return-${field.key}`}
+              value={form.return_info[field.key]}
+              onChange={(event) => updateReturn(field.key, event.target.value)}
               className={adminInputClassName}
             />
-          </div>
-        ))}
-
-        {RETURN_FIELDS.map((field) => (
-          <div key={field.key} className={field.key === 'notes' ? 'md:col-span-2' : undefined}>
-            <label htmlFor={`return-${field.key}`} className={adminLabelClassName}>
-              {field.label}
-            </label>
-            {field.key === 'notes' ? (
-              <textarea
-                id={`return-${field.key}`}
-                value={form.return_info[field.key]}
-                onChange={(event) => updateReturn(field.key, event.target.value)}
-                rows={5}
-                className={`${adminTextareaClassName} resize-y`}
-              />
-            ) : (
-              <input
-                id={`return-${field.key}`}
-                value={form.return_info[field.key]}
-                onChange={(event) => updateReturn(field.key, event.target.value)}
-                className={adminInputClassName}
-              />
-            )}
-          </div>
-        ))}
-      </section>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

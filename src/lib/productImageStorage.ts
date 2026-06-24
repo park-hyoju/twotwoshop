@@ -1,18 +1,23 @@
 export const PRODUCT_IMAGE_BUCKET = 'product-images'
 
-const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/heic',
-  'image/heif',
-])
+export const PRODUCT_IMAGE_MAX_ORIGINAL_BYTES = 20 * 1024 * 1024
 
-const IMAGE_EXTENSION_PATTERN = /\.(jpe?g|png|gif|webp|heic|heif)$/i
+export const PRODUCT_IMAGE_ACCEPT =
+  'image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+export const PRODUCT_IMAGE_UPLOAD_HINT =
+  'JPG, PNG, WEBP · 원본 최대 20MB · 업로드 시 자동 최적화'
+
+export const PRODUCT_IMAGE_HEIC_MESSAGE =
+  '아이폰 HEIC 사진은 JPG로 변환 후 업로드해 주세요.'
+
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+
+const ALLOWED_EXTENSION_PATTERN = /\.(jpe?g|png|webp)$/i
+
+const HEIC_EXTENSION_PATTERN = /\.(heic|heif)$/i
+
+const HEIC_MIME_TYPES = new Set(['image/heic', 'image/heif'])
 
 function getSupabaseUrl(): string {
   const url = import.meta.env.VITE_SUPABASE_URL
@@ -35,16 +40,28 @@ function sanitizeFileName(fileName: string): string {
   return `${safeBase || 'image'}.${extension.toLowerCase()}`
 }
 
+export function isHeicImageFile(file: File): boolean {
+  if (HEIC_MIME_TYPES.has(file.type)) {
+    return true
+  }
+
+  return HEIC_EXTENSION_PATTERN.test(file.name)
+}
+
 export function isAcceptedImageFile(file: File): boolean {
-  if (file.type.startsWith('image/')) {
+  if (isHeicImageFile(file)) {
+    return false
+  }
+
+  if (ALLOWED_MIME_TYPES.has(file.type)) {
     return true
   }
 
-  if (file.type === '' && IMAGE_EXTENSION_PATTERN.test(file.name)) {
+  if (file.type === '' && ALLOWED_EXTENSION_PATTERN.test(file.name)) {
     return true
   }
 
-  return ALLOWED_MIME_TYPES.has(file.type)
+  return false
 }
 
 export function filterAcceptedImageFiles(files: File[]): File[] {
@@ -96,12 +113,16 @@ export function extractProductImageStoragePath(url: string): string | null {
 }
 
 export function validateProductImageFile(file: File): void {
-  if (!isAcceptedImageFile(file)) {
-    throw new Error('JPG, PNG, WEBP, GIF 형식의 이미지만 업로드할 수 있습니다.')
+  if (isHeicImageFile(file)) {
+    throw new Error(PRODUCT_IMAGE_HEIC_MESSAGE)
   }
 
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new Error('이미지 크기는 10MB 이하여야 합니다.')
+  if (!isAcceptedImageFile(file)) {
+    throw new Error('JPG, PNG, WEBP 형식의 이미지만 업로드할 수 있습니다.')
+  }
+
+  if (file.size > PRODUCT_IMAGE_MAX_ORIGINAL_BYTES) {
+    throw new Error('원본 이미지 크기는 20MB 이하여야 합니다.')
   }
 }
 

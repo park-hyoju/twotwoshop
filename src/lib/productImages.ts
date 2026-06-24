@@ -1,7 +1,41 @@
+import { parseProductIntroPayload } from './productIntroContent'
 import { isPlaceholderProductImage } from './productImageStorage'
 
 export function placeholderImageForSlug(slug: string): string {
   return `/images/placeholder/${slug}.jpg`
+}
+
+/** PDP hero carousel: thumbnail + gallery images only (excludes detail images). */
+export function buildProductGalleryImages(
+  thumbnail: string,
+  images: string[],
+  shortDescription = '',
+): string[] {
+  const payload = parseProductIntroPayload(shortDescription)
+  const galleryExtras = payload ? images.slice(0, payload.galleryCount) : images
+  const result: string[] = []
+  const seen = new Set<string>()
+
+  for (const url of [thumbnail, ...galleryExtras]) {
+    const trimmed = url.trim()
+    if (!trimmed || seen.has(trimmed)) {
+      continue
+    }
+
+    if (isPlaceholderProductImage(trimmed) && result.length > 0) {
+      continue
+    }
+
+    seen.add(trimmed)
+    result.push(trimmed)
+  }
+
+  if (result.length > 0) {
+    return result
+  }
+
+  const fallback = thumbnail.trim()
+  return fallback ? [fallback] : []
 }
 
 export function resolveProductThumbnail(

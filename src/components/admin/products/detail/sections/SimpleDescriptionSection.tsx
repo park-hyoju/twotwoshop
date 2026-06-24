@@ -5,7 +5,7 @@ import {
   ProductImageUploadError,
   uploadProductImage,
 } from '../../../../../services/adminProductImageUploadService'
-import { isPlaceholderProductImage } from '../../../../../lib/productImageStorage'
+import { PRODUCT_IMAGE_ACCEPT, isPlaceholderProductImage } from '../../../../../lib/productImageStorage'
 import {
   adminCardClassName,
   adminInputClassName,
@@ -168,7 +168,7 @@ export function SimpleDescriptionSection({ form, onChange }: SimpleDescriptionSe
         <input
           ref={replaceRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+          accept={PRODUCT_IMAGE_ACCEPT}
           className="absolute h-0 w-0 opacity-0"
           disabled={isUploading}
           onChange={(event) => {

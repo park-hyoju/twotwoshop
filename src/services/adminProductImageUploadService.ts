@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { compressProductImage } from '../lib/productImageCompression'
 import {
   PRODUCT_IMAGE_BUCKET,
   buildProductImagePath,
@@ -79,21 +80,39 @@ function uploadFileWithProgress(
         return
       }
 
-      let message = '이미지 업로드에 실패했습니다.'
+      let message = '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.'
       if (xhr.status === 401 || xhr.status === 403) {
         message =
-          '이미지 업로드 권한이 없습니다. 관리자 로그인 상태와 Storage 정책(product-images-storage.sql)을 확인해주세요.'
+          '이미지 업로드 권한이 없습니다. 관리자 로그인 상태와 Storage 정책(product-images-storage.sql)을 확인해 주세요.'
+      } else if (xhr.status === 413) {
+        message = '이미지 용량이 너무 큽니다. 다른 사진으로 다시 시도해 주세요.'
       }
 
       reject(new ProductImageUploadError(message, xhr.responseText))
     })
 
     xhr.addEventListener('error', () => {
-      reject(new ProductImageUploadError('네트워크 오류로 이미지를 업로드하지 못했습니다.'))
+      reject(
+        new ProductImageUploadError(
+          '네트워크 오류로 이미지를 업로드하지 못했습니다. 연결 상태를 확인해 주세요.',
+        ),
+      )
     })
 
     xhr.send(file)
   })
+}
+
+function wrapValidationError(error: unknown): ProductImageUploadError {
+  if (error instanceof ProductImageUploadError) {
+    return error
+  }
+
+  if (error instanceof Error) {
+    return new ProductImageUploadError(error.message, error)
+  }
+
+  return new ProductImageUploadError('이미지를 업로드할 수 없습니다. 다시 시도해 주세요.', error)
 }
 
 export async function uploadProductImage(
@@ -102,13 +121,31 @@ export async function uploadProductImage(
   role: 'thumbnail' | 'detail',
   onProgress?: (percent: number) => void,
 ): Promise<string> {
-  validateProductImageFile(file)
+  try {
+    validateProductImageFile(file)
+  } catch (error) {
+    throw wrapValidationError(error)
+  }
 
-  const path = buildProductImagePath(productId, role, file.name)
+  let uploadFile: File
+
+  try {
+    onProgress?.(5)
+    uploadFile = await compressProductImage(file)
+  } catch (error) {
+    throw new ProductImageUploadError(
+      '이미지를 자동 최적화하는 중 문제가 생겼어요. 다른 사진으로 다시 시도해 주세요.',
+      error,
+    )
+  }
+
+  const path = buildProductImagePath(productId, role, uploadFile.name)
   const token = await getAccessToken()
 
-  onProgress?.(0)
-  await uploadFileWithProgress(path, file, token, onProgress)
+  onProgress?.(10)
+  await uploadFileWithProgress(path, uploadFile, token, (percent) => {
+    onProgress?.(10 + Math.round(percent * 0.9))
+  })
 
   return getProductImagePublicUrl(path)
 }

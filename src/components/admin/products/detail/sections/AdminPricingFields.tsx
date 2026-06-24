@@ -1,3 +1,7 @@
+import {
+  calculateDiscountRate,
+  calculateDiscountRateForStorage,
+} from '../../../../../lib/calculateDiscountRate'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
 import type { ProductStatus } from '../../../../../types/status'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
@@ -11,30 +15,22 @@ interface AdminPricingFieldsProps {
   showSoldOutToggle?: boolean
 }
 
-function computeDiscountRate(price: number, originalPrice: number): number {
-  if (originalPrice <= 0 || price <= 0 || price >= originalPrice) {
-    return 0
-  }
-
-  return Math.round(((originalPrice - price) / originalPrice) * 100)
-}
-
 export function AdminPricingFields({
   form,
   onChange,
   showSoldOutToggle = false,
 }: AdminPricingFieldsProps) {
   const isSoldOut = form.status === 'soldout'
-  const discountRate = computeDiscountRate(form.price, form.original_price)
+  const discountRate = calculateDiscountRate(form.original_price, form.price)
 
   function handlePriceChange(value: number) {
     onChange('price', value)
-    onChange('discount_rate', computeDiscountRate(value, form.original_price))
+    onChange('discount_rate', calculateDiscountRateForStorage(form.original_price, value))
   }
 
   function handleOriginalPriceChange(value: number) {
     onChange('original_price', value)
-    onChange('discount_rate', computeDiscountRate(form.price, value))
+    onChange('discount_rate', calculateDiscountRateForStorage(value, form.price))
   }
 
   function handleSoldOutToggle(checked: boolean) {
@@ -78,7 +74,7 @@ export function AdminPricingFields({
           id="detail-discount-rate"
           className={`${adminInputClassName} flex items-center bg-neutral-50 text-neutral-700`}
         >
-          {discountRate > 0 ? `${discountRate}%` : '할인 없음'}
+          {discountRate !== null ? `${discountRate}%` : '할인 없음'}
         </div>
       </div>
       <div>

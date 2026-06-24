@@ -62,7 +62,6 @@ export function AdminProductsPage() {
   const [isFormSubmitting, setIsFormSubmitting] = useState(false)
   const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
   const [detailProductId, setDetailProductId] = useState<string | null>(null)
-  const [detailSaveMessage, setDetailSaveMessage] = useState<string | null>(null)
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true)
@@ -203,7 +202,6 @@ export function AdminProductsPage() {
   }
 
   function openDetailEditor(product: AdminProductRow) {
-    setDetailSaveMessage(null)
     setDetailProductId(product.id)
   }
 
@@ -211,8 +209,7 @@ export function AdminProductsPage() {
     setDetailProductId(null)
   }
 
-  function handleDetailSaved(message: string) {
-    setDetailSaveMessage(message)
+  function handleDetailSaved(_message: string) {
     void loadProducts()
   }
 
@@ -264,15 +261,6 @@ export function AdminProductsPage() {
           className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:text-base"
         >
           {actionErrorMessage}
-        </p>
-      )}
-
-      {detailSaveMessage && (
-        <p
-          role="status"
-          className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 sm:text-base"
-        >
-          {detailSaveMessage}
         </p>
       )}
 

@@ -5,6 +5,7 @@ import { PRODUCT_DETAIL_TABS } from './productDetailTabs'
 interface ProductDetailTabNavProps {
   activeTab: ProductDetailTab
   onTabChange: (tab: ProductDetailTab) => void
+  inline?: boolean
 }
 
 interface TabIndicator {
@@ -12,7 +13,11 @@ interface TabIndicator {
   left: number
 }
 
-export function ProductDetailTabNav({ activeTab, onTabChange }: ProductDetailTabNavProps) {
+export function ProductDetailTabNav({
+  activeTab,
+  onTabChange,
+  inline = false,
+}: ProductDetailTabNavProps) {
   const tabListRef = useRef<HTMLDivElement>(null)
   const tabButtonRefs = useRef<Partial<Record<ProductDetailTab, HTMLButtonElement>>>({})
   const [indicator, setIndicator] = useState<TabIndicator>({ width: 0, left: 0 })
@@ -51,13 +56,21 @@ export function ProductDetailTabNav({ activeTab, onTabChange }: ProductDetailTab
   return (
     <nav
       aria-label="상품 상세 탭"
-      className="sticky top-16 z-30 -mx-4 border-b border-neutral-200 bg-white sm:-mx-6 lg:-mx-8"
+      className={
+        inline
+          ? 'border-b border-neutral-200 bg-white'
+          : 'sticky top-16 z-30 -mx-4 border-b border-neutral-200 bg-white sm:-mx-6 lg:-mx-8'
+      }
     >
-      <div className="relative mx-auto max-w-7xl">
+      <div className={inline ? 'relative' : 'relative mx-auto max-w-7xl'}>
         <div
           ref={tabListRef}
           role="tablist"
-          className="flex overflow-x-auto px-4 sm:px-6 lg:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={
+            inline
+              ? 'flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+              : 'flex overflow-x-auto px-4 sm:px-6 lg:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          }
         >
           {PRODUCT_DETAIL_TABS.map((tab) => {
             const isActive = activeTab === tab.id

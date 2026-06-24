@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { AdminToastProvider } from '../components/admin/AdminToast'
 import { useAdminAuth } from '../contexts/AdminAuthProvider'
 import { ADMIN_ROUTES } from '../lib/adminRoutes'
 import { ROUTES } from '../lib/routes'
@@ -119,7 +120,8 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 lg:flex">
+    <AdminToastProvider>
+      <div className="min-h-screen bg-neutral-100 lg:flex">
       {isSidebarOpen && (
         <button
           type="button"
@@ -182,6 +184,7 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
-    </div>
+      </div>
+    </AdminToastProvider>
   )
 }

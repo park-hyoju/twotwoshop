@@ -10,6 +10,7 @@ import {
   type ProductSizeGuide,
   type ProductSizeGuideRow,
 } from '../types/productDetail'
+import { getLegacyDescriptionText } from './productIntroContent'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -80,6 +81,7 @@ export function parseProductShippingInfo(value: unknown): ProductShippingInfo {
     shipping_fee: asString(value.shipping_fee),
     delivery_period: asString(value.delivery_period),
     free_shipping_threshold: asString(value.free_shipping_threshold),
+    additional_notes: asString(value.additional_notes),
   }
 }
 
@@ -88,10 +90,14 @@ export function parseProductReturnInfo(value: unknown): ProductReturnInfo {
     return { ...EMPTY_PRODUCT_RETURN_INFO }
   }
 
+  const legacyNotes = asString(value.notes)
+
   return {
     exchange_period: asString(value.exchange_period),
     return_address: asString(value.return_address),
-    notes: asString(value.notes),
+    eligible_cases: asString(value.eligible_cases) || legacyNotes,
+    ineligible_cases: asString(value.ineligible_cases),
+    shipping_fee_notes: asString(value.shipping_fee_notes),
   }
 }
 
@@ -121,12 +127,7 @@ export function getProductDescriptionText(
   shortDescription: string,
   description: string,
 ): string {
-  const full = description.trim()
-  if (full) {
-    return full
-  }
-
-  return shortDescription.trim()
+  return getLegacyDescriptionText(shortDescription, description)
 }
 
 export const PRODUCT_INFO_LABELS: Array<{ key: keyof ProductInfoFields; label: string }> = [

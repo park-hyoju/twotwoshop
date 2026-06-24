@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { loadStorePolicy } from '../../../lib/storePolicy'
 import type { Product } from '../../../types/product'
 import { ProductDetailInfoPanel } from './ProductDetailInfoPanel'
 import { ProductDetailReturnSection } from './ProductDetailReturnSection'
@@ -12,22 +13,25 @@ interface ProductDetailContentProps {
 
 export function ProductDetailContent({ product }: ProductDetailContentProps) {
   const [activeTab, setActiveTab] = useState<ProductDetailTab>('info')
+  const policy = loadStorePolicy()
 
   return (
-    <section className="mt-4 border-t border-neutral-200 sm:mt-8">
-      <ProductDetailTabNav activeTab={activeTab} onTabChange={setActiveTab} />
+    <section className="border-t border-neutral-200 pt-6">
+      <ProductDetailTabNav activeTab={activeTab} onTabChange={setActiveTab} inline />
 
       <div
         id="product-detail-tabpanel"
         role="tabpanel"
         aria-labelledby={`product-detail-tab-${activeTab}`}
-        className="mx-auto max-w-3xl py-8 sm:py-10"
+        className="mx-auto max-w-3xl pt-5"
       >
         {activeTab === 'info' && <ProductDetailInfoPanel product={product} />}
         {activeTab === 'shipping' && (
-          <ProductDetailShippingSection shippingInfo={product.shippingInfo} />
+          <ProductDetailShippingSection shippingInfo={policy.shipping} />
         )}
-        {activeTab === 'return' && <ProductDetailReturnSection returnInfo={product.returnInfo} />}
+        {activeTab === 'return' && (
+          <ProductDetailReturnSection returnInfo={policy.returns} />
+        )}
       </div>
     </section>
   )

@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import { formatPrice } from '../../lib/formatPrice'
 import { getProductDetailPath } from '../../lib/productPaths'
 import type { Product } from '../../types/product'
 import { ProductImage } from './ProductImage'
+import { ProductPriceDisplay } from './ProductPriceDisplay'
 
 interface ProductCardProps {
   product: Product
@@ -41,9 +41,7 @@ export function ProductCard({ product }: ProductCardProps) {
           </h3>
         </Link>
 
-        <p className="text-xl font-bold text-neutral-900 sm:text-2xl">
-          {formatPrice(product.price)}
-        </p>
+        <ProductPriceDisplay originalPrice={product.originalPrice} salePrice={product.price} />
 
         <Link
           to={detailPath}

@@ -1,8 +1,11 @@
 import { useId, useState, type ChangeEvent, type DragEvent } from 'react'
-import { filterAcceptedImageFiles } from '../../../../../lib/productImageStorage'
-
-const FILE_ACCEPT =
-  'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,image/*,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif'
+import {
+  PRODUCT_IMAGE_ACCEPT,
+  PRODUCT_IMAGE_HEIC_MESSAGE,
+  PRODUCT_IMAGE_UPLOAD_HINT,
+  filterAcceptedImageFiles,
+  isHeicImageFile,
+} from '../../../../../lib/productImageStorage'
 
 interface ProductImageUploadZoneProps {
   title: string
@@ -37,6 +40,12 @@ export function ProductImageUploadZone({
   const [isDragging, setIsDragging] = useState(false)
   const [localStatus, setLocalStatus] = useState<string | null>(null)
 
+  function reject(message: string, source: 'input' | 'drop', detail?: unknown) {
+    setLocalStatus(message)
+    onReject?.(message)
+    logUploadEvent(`${source}:rejected`, detail)
+  }
+
   function processFileList(fileList: FileList | null, source: 'input' | 'drop') {
     logUploadEvent(`${source}:received`, {
       length: fileList?.length ?? 0,
@@ -44,27 +53,30 @@ export function ProductImageUploadZone({
     })
 
     if (disabled) {
-      onReject?.('업로드가 진행 중입니다. 잠시 후 다시 시도해주세요.')
+      onReject?.('업로드가 진행 중입니다. 잠시 후 다시 시도해 주세요.')
       return
     }
 
     if (!fileList || fileList.length === 0) {
-      const message = '선택된 파일이 없습니다. JPG, PNG, WEBP, GIF 이미지를 선택해주세요.'
-      setLocalStatus(message)
-      onReject?.(message)
-      logUploadEvent(`${source}:empty`)
+      reject('선택된 파일이 없습니다. JPG, PNG, WEBP 이미지를 선택해 주세요.', source)
       return
     }
 
     const allFiles = Array.from(fileList)
+
+    if (allFiles.some(isHeicImageFile)) {
+      reject(PRODUCT_IMAGE_HEIC_MESSAGE, source, {
+        names: allFiles.filter(isHeicImageFile).map((file) => file.name),
+      })
+      return
+    }
+
     const acceptedFiles = filterAcceptedImageFiles(allFiles)
 
     if (acceptedFiles.length === 0) {
-      const message =
-        '지원하지 않는 파일 형식입니다. JPG, PNG, WEBP, GIF 이미지를 선택해주세요.'
-      setLocalStatus(message)
-      onReject?.(message)
-      logUploadEvent(`${source}:rejected`, { names: allFiles.map((file) => file.name) })
+      reject('JPG, PNG, WEBP 형식의 이미지만 업로드할 수 있습니다.', source, {
+        names: allFiles.map((file) => file.name),
+      })
       return
     }
 
@@ -134,7 +146,7 @@ export function ProductImageUploadZone({
       <input
         id={inputId}
         type="file"
-        accept={FILE_ACCEPT}
+        accept={PRODUCT_IMAGE_ACCEPT}
         multiple={multiple}
         disabled={disabled}
         aria-label={title}
@@ -173,7 +185,7 @@ export function ProductImageUploadZone({
           {description}
         </p>
         <p className={`mt-2 text-xs ${previewUrl ? 'text-white/80' : 'text-neutral-400'}`}>
-          JPG, PNG, WEBP, GIF · 최대 10MB
+          {PRODUCT_IMAGE_UPLOAD_HINT}
         </p>
       </label>
 

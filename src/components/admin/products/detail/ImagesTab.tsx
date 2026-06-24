@@ -1,12 +1,16 @@
 import { useRef, useState } from 'react'
 import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
+import { PRODUCT_IMAGE_ACCEPT, isPlaceholderProductImage } from '../../../../lib/productImageStorage'
 import {
   deleteProductImageByUrl,
   ProductImageUploadError,
   uploadProductImage,
 } from '../../../../services/adminProductImageUploadService'
-import { isPlaceholderProductImage } from '../../../../lib/productImageStorage'
-import { adminCardClassName, adminPageStackClassName } from './adminFormStyles'
+import {
+  collectGalleryPhotos,
+  getDetailImagesFromForm,
+  syncProductImagesToForm,
+} from './detailContent/detailContent'
 import { ProductImageGalleryItem } from './images/ProductImageGalleryItem'
 import { ProductImageUploadZone } from './images/ProductImageUploadZone'
 import { UploadProgressBar } from './images/UploadProgressBar'
@@ -37,30 +41,12 @@ function getUploadErrorMessage(error: unknown): string {
   return '사진 업로드 중 문제가 생겼어요. 다시 시도해 주세요.'
 }
 
-function collectPhotos(form: AdminProductDetailForm): string[] {
-  const photos: string[] = []
-  const thumbnail = form.thumbnail?.trim()
-
-  if (thumbnail && !isPlaceholderProductImage(thumbnail)) {
-    photos.push(thumbnail)
-  }
-
-  for (const image of form.images) {
-    const url = image?.trim()
-    if (url && !isPlaceholderProductImage(url) && !photos.includes(url)) {
-      photos.push(url)
-    }
-  }
-
-  return photos
-}
-
-function applyPhotos(
+function applyGalleryPhotos(
   photos: string[],
+  form: AdminProductDetailForm,
   onChange: ImagesTabProps['onChange'],
 ) {
-  onChange('thumbnail', photos[0] ?? '')
-  onChange('images', photos.slice(1))
+  syncProductImagesToForm(photos, getDetailImagesFromForm(form), onChange)
 }
 
 export function ImagesTab({ form, onChange }: ImagesTabProps) {
@@ -73,7 +59,7 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null)
 
   const isUploading = uploadTasks.length > 0
-  const photos = collectPhotos(form)
+  const photos = collectGalleryPhotos(form)
   const hasPhotos = photos.length > 0
 
   function markUploadPreparing() {
@@ -125,7 +111,7 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
       const role = nextPhotos.length === 0 ? 'thumbnail' : 'detail'
       await runUpload(file, role, (publicUrl) => {
         nextPhotos = [...nextPhotos, publicUrl]
-        applyPhotos(nextPhotos, onChange)
+        applyGalleryPhotos(nextPhotos, form, onChange)
       })
     }
   }
@@ -143,7 +129,7 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
     await runUpload(file, role, async (publicUrl) => {
       const nextPhotos = [...photos]
       nextPhotos[targetIndex] = publicUrl
-      applyPhotos(nextPhotos, onChange)
+      applyGalleryPhotos(nextPhotos, form, onChange)
 
       if (previousUrl && previousUrl !== publicUrl) {
         await deleteProductImageByUrl(previousUrl)
@@ -156,7 +142,7 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
   async function removePhoto(index: number) {
     const previousUrl = photos[index]
     const nextPhotos = photos.filter((_, photoIndex) => photoIndex !== index)
-    applyPhotos(nextPhotos, onChange)
+      applyGalleryPhotos(nextPhotos, form, onChange)
     setUploadSuccessMessage('사진이 삭제됐어요.')
 
     if (previousUrl && !isPlaceholderProductImage(previousUrl)) {
@@ -172,11 +158,11 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
     const nextPhotos = [...photos]
     const [moved] = nextPhotos.splice(fromIndex, 1)
     nextPhotos.splice(toIndex, 0, moved)
-    applyPhotos(nextPhotos, onChange)
+      applyGalleryPhotos(nextPhotos, form, onChange)
   }
 
   return (
-    <div className={adminPageStackClassName}>
+    <div className="space-y-6">
       {uploadSuccessMessage && (
         <p
           role="status"
@@ -201,15 +187,11 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
         </div>
       )}
 
-      <section className={adminCardClassName}>
-        <p className="mb-1 text-sm text-neutral-500">
-          첫 번째 사진이 대표 사진으로 자동 설정돼요.
-        </p>
-
+      <section className="space-y-6">
         <input
           ref={replaceRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,image/*"
+          accept={PRODUCT_IMAGE_ACCEPT}
           className="absolute h-0 w-0 opacity-0"
           disabled={isUploading}
           onChange={(event) => {
@@ -218,8 +200,21 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
           }}
         />
 
+        <ProductImageUploadZone
+          title="사진을 드래그하거나 클릭하세요"
+          description="여러 장 한 번에 올릴 수 있어요"
+          multiple
+          compact={hasPhotos}
+          disabled={isUploading}
+          onPrepare={markUploadPreparing}
+          onReject={markUploadRejected}
+          onFilesSelected={(files) => void handleUpload(files)}
+        />
+
+        <p className="text-sm text-neutral-500">첫 번째 사진이 대표 사진이에요.</p>
+
         {hasPhotos && (
-          <div className="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
             {photos.map((image, index) => (
               <ProductImageGalleryItem
                 key={`${image}-${index}`}
@@ -258,17 +253,6 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
             ))}
           </div>
         )}
-
-        <ProductImageUploadZone
-          title={hasPhotos ? '사진 추가' : '사진 올리기'}
-          description="클릭하거나 끌어다 놓으세요 · 여러 장 가능"
-          multiple
-          compact={hasPhotos}
-          disabled={isUploading}
-          onPrepare={markUploadPreparing}
-          onReject={markUploadRejected}
-          onFilesSelected={(files) => void handleUpload(files)}
-        />
       </section>
     </div>
   )
