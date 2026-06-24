@@ -7,6 +7,7 @@ import type {
   AdminDashboardRevenueStats,
 } from '../types/adminDashboard'
 import { isDbOrderStatus } from '../lib/adminOrderStatus'
+import { fetchUnansweredInquiryCount } from './adminInquiryRepository'
 
 const RECENT_ORDER_SELECT = `
   id,
@@ -138,6 +139,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       orderAmountResult,
       productStatusResult,
       recentOrdersResult,
+      unansweredInquiryCount,
     ] = await Promise.all([
       fetchOrderCount({ from: todayStart, to: tomorrowStart }),
       fetchOrderCount(),
@@ -150,6 +152,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         .select(RECENT_ORDER_SELECT)
         .order('created_at', { ascending: false })
         .limit(5),
+      fetchUnansweredInquiryCount(),
     ])
 
     if (orderAmountResult.error) {
@@ -207,7 +210,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         pendingOrderCount,
         shippingReadyCount,
         soldOutProductCount: productStats.soldOutCount,
-        unansweredInquiryCount: null,
+        unansweredInquiryCount,
       },
       revenueStats: buildRevenueStats(orderAmountRows),
       productStats,

@@ -82,7 +82,10 @@ export function DashboardTodayTasks({ taskStats }: DashboardTodayTasksProps) {
         taskStats.unansweredInquiryCount === null
           ? '준비 중'
           : `${formatTaskCount(taskStats.unansweredInquiryCount)}건`,
-      tone: 'neutral',
+      tone:
+        taskStats.unansweredInquiryCount !== null && taskStats.unansweredInquiryCount > 0
+          ? 'warning'
+          : 'neutral',
       preparing: taskStats.unansweredInquiryCount === null,
     },
   ]
