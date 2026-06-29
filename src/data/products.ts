@@ -1,5 +1,8 @@
 import type { Product } from '../types/product'
 import {
+  resolveProductCategory,
+} from '../constants/productCategories'
+import {
   EMPTY_PRODUCT_INFO,
   EMPTY_PRODUCT_RETURN_INFO,
   EMPTY_PRODUCT_SHIPPING_INFO,
@@ -13,20 +16,51 @@ function placeholderImage(slug: string): string {
 function createProduct(
   product: Omit<
     Product,
-    'thumbnail' | 'images' | 'sizeGuide' | 'productInfo' | 'shippingInfo' | 'returnInfo'
+    | 'thumbnail'
+    | 'images'
+    | 'sizeGuide'
+    | 'productInfo'
+    | 'shippingInfo'
+    | 'returnInfo'
+    | 'productCategory'
+    | 'soldOut'
+    | 'isNew'
+    | 'isBest'
+    | 'isSale'
   > &
     Partial<
       Pick<
         Product,
-        'thumbnail' | 'images' | 'sizeGuide' | 'productInfo' | 'shippingInfo' | 'returnInfo'
+        | 'thumbnail'
+        | 'images'
+        | 'sizeGuide'
+        | 'productInfo'
+        | 'shippingInfo'
+        | 'returnInfo'
+        | 'productCategory'
+        | 'soldOut'
       >
     >,
 ): Product {
   const thumbnail = product.thumbnail ?? placeholderImage(product.slug)
   const images = product.images ?? [thumbnail]
+  const productCategory =
+    product.productCategory ??
+    resolveProductCategory({
+      gender: product.gender,
+      display_category: product.displayCategory,
+      detail_category: product.detailCategory,
+    })
+  const stock = product.stock ?? 0
+  const soldOut = product.soldOut ?? (product.status === 'soldout' || stock <= 0)
 
   return {
     ...product,
+    isNew: false,
+    isBest: false,
+    isSale: false,
+    productCategory,
+    soldOut,
     thumbnail,
     images,
     sizeGuide: product.sizeGuide ?? { ...EMPTY_PRODUCT_SIZE_GUIDE, rows: [] },
@@ -50,9 +84,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'shirt',
     tags: ['linen', 'summer', 'shirt'],
-    isNew: false,
-    isBest: true,
-    isSale: true,
     stock: 42,
     soldOut: false,
     status: 'active',
@@ -72,9 +103,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'bottom',
     detailCategory: 'pants',
     tags: ['slacks', 'wide', 'office'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 35,
     soldOut: false,
     status: 'active',
@@ -94,9 +122,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'dress',
     detailCategory: 'dress',
     tags: ['dress', 'flower', 'midi'],
-    isNew: true,
-    isBest: true,
-    isSale: false,
     stock: 28,
     soldOut: false,
     status: 'active',
@@ -116,9 +141,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'shoes',
     detailCategory: 'sneakers',
     tags: ['sneakers', 'canvas', 'casual'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 50,
     soldOut: false,
     status: 'active',
@@ -138,9 +160,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'bag',
     tags: ['bag', 'crossbody', 'daily'],
-    isNew: false,
-    isBest: true,
-    isSale: true,
     stock: 31,
     soldOut: false,
     status: 'active',
@@ -160,9 +179,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'shirt',
     tags: ['blouse', 'summer', 'lightweight'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 44,
     soldOut: false,
     status: 'active',
@@ -182,9 +198,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'belt',
     tags: ['belt', 'leather', 'accessory'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 0,
     soldOut: true,
     status: 'soldout',
@@ -204,9 +217,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'accessory',
     tags: ['scarf', 'ribbon', 'accessory'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 60,
     soldOut: false,
     status: 'active',
@@ -226,9 +236,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'bag',
     tags: ['bag', 'tote', 'mini'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 26,
     soldOut: false,
     status: 'active',
@@ -248,9 +255,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'knit',
     tags: ['knit', 'cardigan', 'soft'],
-    isNew: false,
-    isBest: true,
-    isSale: false,
     stock: 19,
     soldOut: false,
     status: 'active',
@@ -270,9 +274,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'cap',
     tags: ['cap', 'casual', 'summer'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 72,
     soldOut: false,
     status: 'active',
@@ -292,9 +293,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'tshirt',
     tags: ['tee', 'cooling', 'golf'],
-    isNew: false,
-    isBest: true,
-    isSale: true,
     stock: 55,
     soldOut: false,
     status: 'active',
@@ -314,9 +312,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'bottom',
     detailCategory: 'pants',
     tags: ['chino', 'stretch', 'pants'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 38,
     soldOut: false,
     status: 'active',
@@ -336,9 +331,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'hoodie',
     tags: ['denim', 'jacket', 'overfit'],
-    isNew: false,
-    isBest: true,
-    isSale: false,
     stock: 22,
     soldOut: false,
     status: 'active',
@@ -358,9 +350,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'shoes',
     detailCategory: 'sneakers',
     tags: ['sneakers', 'running', 'lightweight'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 47,
     soldOut: false,
     status: 'active',
@@ -380,9 +369,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'belt',
     tags: ['belt', 'leather', 'basic'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 33,
     soldOut: false,
     status: 'active',
@@ -402,9 +388,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'bottom',
     detailCategory: 'pants',
     tags: ['shorts', 'cargo', 'summer'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 40,
     soldOut: false,
     status: 'active',
@@ -424,9 +407,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'top',
     detailCategory: 'shirt',
     tags: ['linen', 'shirt', 'summer'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 0,
     soldOut: true,
     status: 'soldout',
@@ -446,9 +426,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'shoes',
     detailCategory: 'sneakers',
     tags: ['sneakers', 'canvas', 'casual'],
-    isNew: false,
-    isBest: true,
-    isSale: false,
     stock: 29,
     soldOut: false,
     status: 'active',
@@ -468,9 +445,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'wallet',
     tags: ['wallet', 'leather', 'slim'],
-    isNew: false,
-    isBest: true,
-    isSale: false,
     stock: 18,
     soldOut: false,
     status: 'active',
@@ -490,9 +464,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'misc',
     detailCategory: 'cap',
     tags: ['cap', 'casual', 'basic'],
-    isNew: true,
-    isBest: false,
-    isSale: false,
     stock: 64,
     soldOut: false,
     status: 'active',
@@ -512,9 +483,6 @@ export const PRODUCTS: Product[] = [
     displayCategory: 'shoes',
     detailCategory: 'loafers',
     tags: ['loafers', 'classic', 'formal'],
-    isNew: false,
-    isBest: false,
-    isSale: true,
     stock: 12,
     soldOut: false,
     status: 'active',

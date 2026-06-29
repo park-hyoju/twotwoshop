@@ -1,6 +1,6 @@
 export { PRODUCTS } from './products'
 export { categoryShortcuts } from './categories'
-export { heroBanner, liveBanner } from './banners'
+export { liveBanner } from './banners'
 export { benefits } from './benefits'
-export { NAV_ITEMS } from './navigation'
+export { MENU_ITEMS, NAV_ITEMS } from './navigation'
 export { FOOTER_LINKS } from './footerLinks'

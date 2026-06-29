@@ -143,8 +143,8 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
     ] = await Promise.all([
       fetchOrderCount({ from: todayStart, to: tomorrowStart }),
       fetchOrderCount(),
-      fetchOrderCount({ status: 'pending' }),
-      fetchOrderCount({ status: 'confirmed' }),
+      fetchOrderCount({ status: 'pending_payment' }),
+      fetchOrderCount({ status: 'preparing' }),
       supabase!.from('orders').select('total_amount, created_at, status'),
       supabase!.from('products').select('status'),
       supabase!

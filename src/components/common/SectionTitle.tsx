@@ -1,14 +1,17 @@
+import { cn } from '../../lib/cn'
+
 interface SectionTitleProps {
   title: string
   description?: string
+  className?: string
 }
 
-export function SectionTitle({ title, description }: SectionTitleProps) {
+export function SectionTitle({ title, description, className }: SectionTitleProps) {
   return (
-    <div className="mb-10 text-center sm:mb-12">
-      <h2 className="text-2xl font-bold text-neutral-900 sm:text-3xl">{title}</h2>
+    <div className={cn('text-center sm:text-left', className)}>
+      <h2 className="text-xl font-semibold tracking-tight text-[#111] sm:text-2xl">{title}</h2>
       {description && (
-        <p className="mt-3 text-base text-neutral-600 sm:text-lg">{description}</p>
+        <p className="mt-2 text-sm text-[#888] sm:text-base">{description}</p>
       )}
     </div>
   )

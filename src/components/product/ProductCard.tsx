@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom'
 import { getProductDetailPath } from '../../lib/productPaths'
+import {
+  getCustomerStockBadgeClassName,
+  getCustomerStockLabel,
+  isProductSoldOut,
+} from '../../lib/productStock'
 import type { Product } from '../../types/product'
 import { ProductImage } from './ProductImage'
 import { ProductPriceDisplay } from './ProductPriceDisplay'
@@ -10,7 +15,8 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const detailPath = getProductDetailPath(product.slug)
-  const isSoldOut = product.stock === 0
+  const isSoldOut = isProductSoldOut(product)
+  const stockLabel = getCustomerStockLabel(product.stock)
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
@@ -27,9 +33,11 @@ export function ProductCard({ product }: ProductCardProps) {
             isSoldOut ? 'opacity-70' : ''
           }`}
         />
-        {isSoldOut && (
-          <span className="absolute left-3 top-3 rounded-md bg-neutral-800 px-2.5 py-1 text-sm font-semibold text-white">
-            품절
+        {stockLabel && (
+          <span
+            className={`absolute left-3 top-3 rounded-md px-2.5 py-1 text-sm font-semibold ${getCustomerStockBadgeClassName(product.stock)}`}
+          >
+            {stockLabel}
           </span>
         )}
       </Link>

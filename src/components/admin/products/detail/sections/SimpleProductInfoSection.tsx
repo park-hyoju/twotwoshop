@@ -1,6 +1,6 @@
-import { DISPLAY_CATEGORY_OPTIONS } from '../../../../../lib/adminProductStatus'
+import type { ProductCategoryId } from '../../../../../constants/productCategories'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
-import type { DisplayCategory } from '../../../../../types/displayCategory'
+import { ProductCategorySelect } from '../../ProductCategorySelect'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
 
 interface SimpleProductInfoSectionProps {
@@ -72,20 +72,13 @@ export function SimpleProductInfoSection({ form, onChange }: SimpleProductInfoSe
         <label htmlFor="seller-product-category" className={adminLabelClassName}>
           카테고리
         </label>
-        <select
+        <ProductCategorySelect
           id="seller-product-category"
-          value={form.display_category}
-          onChange={(event) =>
-            onChange('display_category', event.target.value as DisplayCategory)
-          }
+          value={form.product_category}
+          onChange={(value: ProductCategoryId) => onChange('product_category', value)}
           className={adminInputClassName}
-        >
-          {DISPLAY_CATEGORY_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          required
+        />
       </div>
 
       <div className="grid gap-8 sm:grid-cols-2">

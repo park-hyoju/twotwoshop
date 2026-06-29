@@ -4,20 +4,17 @@ import {
   getAdminAuthErrorMessage,
   useAdminAuth,
 } from '../../contexts/AdminAuthProvider'
+import { resolveSafeInternalPath } from '../../lib/safeRedirect'
 import { ADMIN_ROUTES } from '../../lib/adminRoutes'
 import { isSupabaseConfigured } from '../../lib/supabase'
 import { ROUTES } from '../../lib/routes'
 
 function getRedirectPath(from: unknown): string {
-  if (
-    typeof from === 'string' &&
-    from.startsWith('/admin') &&
-    from !== ADMIN_ROUTES.login
-  ) {
-    return from
-  }
-
-  return ADMIN_ROUTES.dashboard
+  return resolveSafeInternalPath(from, {
+    fallback: ADMIN_ROUTES.dashboard,
+    allowedPrefix: '/admin',
+    disallowedPaths: [ADMIN_ROUTES.login],
+  })
 }
 
 function getLocationMessage(state: unknown): string | null {

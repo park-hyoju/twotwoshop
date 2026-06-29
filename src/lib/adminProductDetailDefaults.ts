@@ -1,3 +1,4 @@
+import type { ProductCategoryId } from '../constants/productCategories'
 import type {
   AdminProductDetailForm,
   AdminProductInfoFields,
@@ -56,9 +57,7 @@ export function createEmptyProductDetailForm(id: string): AdminProductDetailForm
     slug: '',
     brand: '',
     sku: '',
-    display_category: 'misc',
-    detail_category: 'accessory',
-    gender: 'common',
+    product_category: 'etc' as ProductCategoryId,
     status: 'active',
     price: 0,
     original_price: 0,

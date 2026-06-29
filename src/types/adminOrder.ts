@@ -1,10 +1,19 @@
 export type DbOrderStatus =
+  | 'pending_payment'
+  | 'payment_confirmed'
+  | 'preparing'
+  | 'shipping'
+  | 'delivered'
+  | 'cancel_requested'
+  | 'cancelled'
   | 'pending'
-  | 'confirmed'
   | 'paid'
+  | 'confirmed'
   | 'shipped'
   | 'completed'
-  | 'cancelled'
+  | 'deposit_confirmed'
+
+export type DbPaymentStatus = 'waiting_deposit' | 'paid' | 'refunded'
 
 export interface AdminOrderItemRow {
   id: string
@@ -20,10 +29,40 @@ export interface AdminOrderRow {
   order_number: string
   customer_name: string
   customer_phone: string
+  customer_email: string | null
+  recipient_name: string | null
+  recipient_phone: string | null
+  depositor_name: string | null
+  zipcode: string | null
+  address1: string | null
+  address2: string | null
+  memo: string | null
+  subtotal: number
+  coupon_discount_amount: number
+  shipping_fee: number
   total_amount: number
   status: DbOrderStatus
+  payment_status: DbPaymentStatus
+  payment_method: string
+  courier: string | null
+  tracking_number: string | null
+  paid_at: string | null
+  shipped_at: string | null
+  delivered_at: string | null
   created_at: string
   order_items: AdminOrderItemRow[]
+}
+
+export type AdminOrderFulfillmentAction =
+  | 'confirm_payment'
+  | 'mark_preparing'
+  | 'mark_shipping'
+  | 'mark_delivered'
+  | 'cancel'
+
+export interface AdminOrderShippingUpdate {
+  courier: string
+  trackingNumber: string
 }
 
 export interface AdminOrderSearchFilters {

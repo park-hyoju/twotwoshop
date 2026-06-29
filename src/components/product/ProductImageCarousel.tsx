@@ -5,12 +5,13 @@ import { ProductImage } from './ProductImage'
 
 interface ProductImageCarouselProps {
   product: Product
+  /** @deprecated 상세 페이지에서는 이미지를 그대로 노출합니다. */
   isSoldOut?: boolean
 }
 
 const SWIPE_THRESHOLD_PX = 48
 
-export function ProductImageCarousel({ product, isSoldOut = false }: ProductImageCarouselProps) {
+export function ProductImageCarousel({ product }: ProductImageCarouselProps) {
   const images = useMemo(
     () => buildProductGalleryImages(product.thumbnail, product.images, product.shortDescription),
     [product.thumbnail, product.images, product.shortDescription],
@@ -98,18 +99,12 @@ export function ProductImageCarousel({ product, isSoldOut = false }: ProductImag
                   src={image}
                   alt={`${product.name} 상품 이미지 ${index + 1}`}
                   slug={product.slug}
-                  className={`h-full w-full object-cover ${isSoldOut ? 'opacity-70' : ''}`}
+                  className="h-full w-full object-cover"
                 />
               </div>
             ))}
           </div>
         </div>
-
-        {isSoldOut && (
-          <span className="absolute left-4 top-4 rounded-lg bg-neutral-800 px-3 py-1.5 text-base font-semibold text-white">
-            품절
-          </span>
-        )}
 
         {hasMultiple && (
           <>

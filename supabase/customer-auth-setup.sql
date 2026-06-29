@@ -1,0 +1,33 @@
+-- =============================================================================
+-- Customer auth setup notes (email + password signup)
+-- =============================================================================
+-- Storefront members sign up with email, password, name, and phone.
+-- Legacy username accounts (username@example.com) can still sign in via
+-- resolve_customer_login_email() when email confirmation is disabled.
+--
+-- Required Supabase Dashboard settings:
+-- 1. Authentication -> Providers -> Email
+--    - Disable "Confirm email" (email confirmation breaks instant signup/login)
+-- 2. Authentication -> URL Configuration
+--    - Site URL should match your storefront origin
+--
+-- user_profiles is created by the app after signUp (id = auth.users.id).
+-- Run restock-notifications.sql first if user_profiles does not exist.
+-- If profile upsert fails with RLS errors, run user-profiles-rls.sql.
+-- For MyPage MVP (addresses, orders link, stats RPCs), run mypage-mvp.sql.
+-- 주문내역 조회 실패 시: supabase/member-orders-fix.sql 을 실행하세요.
+-- 배송지 추가 실패 시: supabase/customer-addresses.sql 만 실행해도 됩니다.
+-- Includes resolve_customer_login_email() for username → email login fallback.
+--
+-- Confirm email OFF 후에도 로그인 시 "Email not confirmed"가 나오면:
+-- 해당 계정이 OFF 전에 생성되어 auth.users.email_confirmed_at 이 NULL 인 경우입니다.
+-- Dashboard → Authentication → Users → 사용자 선택 → Confirm user
+-- 또는 SQL Editor:
+--
+--   update auth.users
+--   set email_confirmed_at = coalesce(email_confirmed_at, now())
+--   where email = lower('your@email.com');
+--
+-- 로컬 세션 초기화(브라우저 콘솔):
+--   localStorage.removeItem('sb-mcqpzbjmgultoksnhcfd-auth-token')
+-- =============================================================================

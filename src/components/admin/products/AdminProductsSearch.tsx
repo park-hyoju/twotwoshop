@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react'
+import { ADMIN_CATEGORY_FILTER_OPTIONS } from '../../../constants/productCategories'
 import type { AdminProductSearchFilters } from '../../../types/adminProduct'
 import { PRODUCT_STATUS_FILTER_OPTIONS } from '../../../lib/adminProductStatus'
 
@@ -28,7 +29,7 @@ export function AdminProductsSearch({
       onSubmit={handleSubmit}
       className="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5"
     >
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div>
           <label htmlFor="admin-product-name" className="mb-2 block text-sm font-medium text-neutral-700">
             상품명
@@ -68,6 +69,24 @@ export function AdminProductsSearch({
             className={inputClassName}
           >
             {PRODUCT_STATUS_FILTER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="admin-product-category" className="mb-2 block text-sm font-medium text-neutral-700">
+            카테고리
+          </label>
+          <select
+            id="admin-product-category"
+            value={filters.category}
+            onChange={(event) => onChange('category', event.target.value)}
+            className={inputClassName}
+          >
+            {ADMIN_CATEGORY_FILTER_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

@@ -1,8 +1,10 @@
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
+import type { ProductCategoryId } from '../../../../../constants/productCategories'
 import {
   calculateDiscountRate,
   calculateDiscountRateForStorage,
 } from '../../../../../lib/calculateDiscountRate'
+import { ProductCategorySelect } from '../../ProductCategorySelect'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
 
 interface ProductPricingSectionProps {
@@ -28,6 +30,19 @@ export function ProductPricingSection({ form, onChange }: ProductPricingSectionP
 
   return (
     <div className="space-y-8">
+      <div>
+        <label htmlFor="pricing-product-category" className={adminLabelClassName}>
+          카테고리
+        </label>
+        <ProductCategorySelect
+          id="pricing-product-category"
+          value={form.product_category}
+          onChange={(value: ProductCategoryId) => onChange('product_category', value)}
+          className={adminInputClassName}
+          required
+        />
+      </div>
+
       <div className="grid gap-8 sm:grid-cols-2">
         <div>
           <label htmlFor="pricing-sale-price" className={adminLabelClassName}>

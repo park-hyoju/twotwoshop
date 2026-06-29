@@ -1,28 +1,51 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Copy, CheckCircle2 } from 'lucide-react'
+import { DepositAccountInfo } from '../../components/deposit/DepositAccountInfo'
 import { formatPrice } from '../../lib/formatPrice'
 import { isValidOrder } from '../../lib/orderStorage'
-import { orderRepository } from '../../services/orderRepository'
 import { ROUTES } from '../../lib/routes'
+import { orderRepository } from '../../services/orderRepository'
 import type { Order } from '../../types/order'
 
-function resolveOrder(state: unknown): Order | null {
-  const stateOrder = (state as { order?: unknown } | null)?.order
+function resolveOrder(state: unknown): { order: Order | null; isMember: boolean } {
+  const locationState = state as { order?: unknown; isMember?: boolean } | null
+  const stateOrder = locationState?.order
 
   if (isValidOrder(stateOrder)) {
-    return stateOrder
+    return {
+      order: stateOrder,
+      isMember: locationState?.isMember === true || stateOrder.isMember,
+    }
   }
 
-  return orderRepository.getLatestOrder()
+  const latest = orderRepository.getLatestOrder()
+  return {
+    order: latest,
+    isMember: latest?.isMember ?? false,
+  }
 }
 
 export function OrderCompletePage() {
   const location = useLocation()
-  const [order, setOrder] = useState<Order | null>(() => resolveOrder(location.state))
+  const [resolved, setResolved] = useState(() => resolveOrder(location.state))
+  const [copyMessage, setCopyMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    setOrder(resolveOrder(location.state))
+    setResolved(resolveOrder(location.state))
   }, [location.key, location.state])
+
+  const { order, isMember } = resolved
+
+  async function handleCopy(text: string, message: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyMessage(message)
+    } catch {
+      setCopyMessage('복사에 실패했습니다.')
+    }
+    window.setTimeout(() => setCopyMessage(null), 2000)
+  }
 
   if (!order) {
     return (
@@ -33,7 +56,7 @@ export function OrderCompletePage() {
           </h1>
           <Link
             to={ROUTES.products}
-            className="mt-8 inline-flex min-h-14 items-center justify-center rounded-xl bg-neutral-900 px-8 text-lg font-semibold text-white transition-colors hover:bg-neutral-700"
+            className="mt-8 inline-flex min-h-14 items-center justify-center rounded-xl bg-neutral-900 px-8 text-lg font-semibold text-white hover:bg-neutral-700"
           >
             쇼핑 계속하기
           </Link>
@@ -42,103 +65,83 @@ export function OrderCompletePage() {
     )
   }
 
-  const fullAddress = [
-    order.shipping.postalCode,
-    order.shipping.address,
-    order.shipping.addressDetail,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8">
-        <h1 className="text-3xl font-bold text-neutral-900 sm:text-4xl">
-          주문이 정상 접수되었습니다.
-        </h1>
-        <p className="mt-4 text-lg text-neutral-600 sm:text-xl">
-          주문 내역을 확인해주세요.
-        </p>
-
-        <dl className="mt-8 space-y-4 text-base sm:text-lg">
-          <div className="flex flex-col gap-1 border-b border-neutral-100 pb-4 sm:flex-row sm:justify-between">
-            <dt className="font-semibold text-neutral-700">주문번호</dt>
-            <dd className="font-bold text-neutral-900">{order.orderNumber}</dd>
+        <div className="flex items-start gap-3">
+          <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-600" aria-hidden />
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900 sm:text-4xl">주문이 접수되었습니다.</h1>
+            <p className="mt-3 text-lg text-neutral-600">
+              아래 계좌로 입금해주시면 확인 후 배송이 시작됩니다.
+            </p>
           </div>
-          <div className="flex flex-col gap-1 border-b border-neutral-100 pb-4 sm:flex-row sm:justify-between">
-            <dt className="font-semibold text-neutral-700">주문자명</dt>
-            <dd className="text-neutral-900">{order.customerName}</dd>
-          </div>
-          <div className="flex flex-col gap-1 border-b border-neutral-100 pb-4 sm:flex-row sm:justify-between">
-            <dt className="font-semibold text-neutral-700">연락처</dt>
-            <dd className="text-neutral-900">{order.phone}</dd>
-          </div>
-          <div className="flex flex-col gap-1 border-b border-neutral-100 pb-4 sm:flex-row sm:justify-between">
-            <dt className="font-semibold text-neutral-700">배송지</dt>
-            <dd className="text-right text-neutral-900 sm:max-w-md">{fullAddress}</dd>
-          </div>
-          {order.shipping.memo && (
-            <div className="flex flex-col gap-1 border-b border-neutral-100 pb-4 sm:flex-row sm:justify-between">
-              <dt className="font-semibold text-neutral-700">배송메모</dt>
-              <dd className="text-right text-neutral-900 sm:max-w-md">{order.shipping.memo}</dd>
-            </div>
-          )}
-        </dl>
-
-        <div className="mt-8 border-t border-neutral-200 pt-6">
-          <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">주문 상품</h2>
-          <ul className="mt-4 space-y-3">
-            {order.items.map((item) => (
-              <li
-                key={item.productId}
-                className="flex items-start justify-between gap-4 border-b border-neutral-100 pb-3 last:border-b-0 last:pb-0"
-              >
-                <div>
-                  <p className="font-semibold text-neutral-900">{item.name}</p>
-                  <p className="mt-1 text-neutral-600">수량 {item.quantity}개</p>
-                </div>
-                <p className="font-bold text-neutral-900">
-                  {formatPrice(item.price * item.quantity)}
-                </p>
-              </li>
-            ))}
-          </ul>
         </div>
 
-        <dl className="mt-6 space-y-3 border-t border-neutral-200 pt-6 text-base sm:text-lg">
-          <div className="flex items-center justify-between text-neutral-600">
-            <dt>총 상품 금액</dt>
-            <dd className="font-semibold text-neutral-900">{formatPrice(order.productTotal)}</dd>
+        <dl className="mt-8 space-y-4 rounded-2xl bg-neutral-50 p-5 sm:p-6">
+          <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+            <dt className="font-semibold text-neutral-600">주문번호</dt>
+            <dd className="font-mono text-lg font-bold text-neutral-900">{order.orderNumber}</dd>
           </div>
-          <div className="flex items-center justify-between text-neutral-600">
-            <dt>배송비</dt>
-            <dd className="font-semibold text-neutral-900">{formatPrice(order.shippingFee)}</dd>
+          <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+            <dt className="font-semibold text-neutral-600">최종 입금금액</dt>
+            <dd className="text-2xl font-bold text-neutral-900">{formatPrice(order.totalAmount)}</dd>
           </div>
-          <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
-            <dt className="font-semibold text-neutral-900">총 결제 예정 금액</dt>
-            <dd className="text-2xl font-bold text-neutral-900 sm:text-3xl">
-              {formatPrice(order.totalAmount)}
-            </dd>
+          <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+            <dt className="font-semibold text-neutral-600">입금자명</dt>
+            <dd className="text-lg font-semibold text-neutral-900">{order.depositorName}</dd>
           </div>
         </dl>
 
-        <div className="mt-8 rounded-xl bg-neutral-100 px-5 py-4">
-          <p className="text-base font-semibold text-neutral-800 sm:text-lg">입금 안내</p>
-          <p className="mt-2 text-base text-neutral-600 sm:text-lg">
-            주문 확인 후 안내에 따라 입금해 주세요.
+        <div className="mt-6 rounded-2xl border border-neutral-200 p-5 sm:p-6">
+          <DepositAccountInfo title="입금 계좌" description="" showCopyButton />
+        </div>
+
+        {copyMessage ? (
+          <p role="status" className="mt-4 text-center text-sm text-neutral-600">
+            {copyMessage}
           </p>
-        </div>
+        ) : null}
+
+        {isMember ? (
+          <div className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-sm text-emerald-900">
+              마이페이지에서 주문내역을 확인할 수 있습니다.
+            </p>
+            <Link
+              to={ROUTES.mypageOrders}
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white hover:bg-neutral-800"
+            >
+              주문내역 보러가기
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-sm font-medium text-amber-900">주문번호를 저장해주세요.</p>
+            <p className="mt-2 text-sm text-amber-800">
+              비회원 주문은 주문번호로 조회할 수 있습니다. 고객센터 또는 1:1 문의를 이용해주세요.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleCopy(order.orderNumber, '주문번호가 복사되었습니다.')}
+              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+            >
+              <Copy className="h-4 w-4" aria-hidden />
+              주문번호 복사
+            </button>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link
             to={ROUTES.home}
-            className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-neutral-900 py-4 text-lg font-semibold text-white transition-colors hover:bg-neutral-700"
+            className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-neutral-900 py-4 text-lg font-semibold text-white hover:bg-neutral-700"
           >
             홈으로
           </Link>
           <Link
             to={ROUTES.products}
-            className="flex min-h-14 flex-1 items-center justify-center rounded-xl border border-neutral-300 bg-white py-4 text-lg font-semibold text-neutral-700 transition-colors hover:bg-neutral-100"
+            className="flex min-h-14 flex-1 items-center justify-center rounded-xl border border-neutral-300 bg-white py-4 text-lg font-semibold text-neutral-700 hover:bg-neutral-100"
           >
             쇼핑 계속하기
           </Link>

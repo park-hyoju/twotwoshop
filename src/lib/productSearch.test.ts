@@ -6,11 +6,7 @@ import {
   EMPTY_PRODUCT_SHIPPING_INFO,
   EMPTY_PRODUCT_SIZE_GUIDE,
 } from '../types/productDetail'
-import {
-  buildProductSearchUrl,
-  filterProductsBySearch,
-  matchesProductSearch,
-} from './productSearch'
+import { buildProductSearchUrl, filterProductsBySearch, matchesProductSearch } from './productSearch'
 
 function createProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -24,13 +20,14 @@ function createProduct(overrides: Partial<Product> = {}): Product {
     discountRate: 22,
     thumbnail: '/images/placeholder/classic-linen-shirt.jpg',
     images: ['/images/placeholder/classic-linen-shirt.jpg'],
+    productCategory: 'women_top',
     gender: 'women',
     displayCategory: 'top',
     detailCategory: 'shirt',
     tags: ['linen', 'summer', 'shirt'],
     isNew: false,
-    isBest: true,
-    isSale: true,
+    isBest: false,
+    isSale: false,
     stock: 42,
     soldOut: false,
     status: 'active',
@@ -61,6 +58,14 @@ describe('matchesProductSearch', () => {
 
   it('matches tags', () => {
     expect(matchesProductSearch(product, 'summer')).toBe(true)
+  })
+
+  it('matches category label', () => {
+    expect(matchesProductSearch(product, '상의')).toBe(true)
+  })
+
+  it('ignores whitespace in query', () => {
+    expect(matchesProductSearch(product, '린 넨')).toBe(true)
   })
 
   it('returns false for unrelated queries', () => {

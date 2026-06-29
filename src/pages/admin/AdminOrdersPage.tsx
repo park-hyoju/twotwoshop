@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { useAdminToast } from '../../components/admin/AdminToast'
 import {
+  AdminOrderDetailModal,
   AdminOrdersList,
   AdminOrdersPagination,
   AdminOrdersSearch,
@@ -10,19 +12,20 @@ import {
   createEmptyAdminOrderFilters,
   parseAdminOrderFiltersFromSearchParams,
 } from '../../lib/adminOrderFilters'
-import { ADMIN_ROUTES } from '../../lib/adminRoutes'
 import { getOrderStatusLabel } from '../../lib/adminOrderStatus'
 import {
   AdminOrderRepositoryError,
+  applyAdminOrderAction,
+  fetchAdminOrderById,
   fetchAdminOrderSummary,
   fetchAdminOrders,
-  updateAdminOrderStatus,
+  saveAdminOrderShippingInfo,
 } from '../../services/adminOrderRepository'
 import type {
+  AdminOrderFulfillmentAction,
   AdminOrderRow,
   AdminOrderSearchFilters,
   AdminOrderSummaryStats,
-  DbOrderStatus,
 } from '../../types/adminOrder'
 
 const PAGE_SIZE = 20
@@ -43,7 +46,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function AdminOrdersPage() {
-  const navigate = useNavigate()
+  const { showToast } = useAdminToast()
   const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -57,8 +60,11 @@ export function AdminOrdersPage() {
   )
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [statusErrorMessage, setStatusErrorMessage] = useState<string | null>(null)
-  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrderRow | null>(null)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(null)
+  const [isFulfillmentProcessing, setIsFulfillmentProcessing] = useState(false)
+  const [fulfillmentErrorMessage, setFulfillmentErrorMessage] = useState<string | null>(null)
 
   const loadSummary = useCallback(async () => {
     try {
@@ -125,46 +131,116 @@ export function AdminOrdersPage() {
     setPage(1)
   }
 
-  async function handleStatusChange(orderId: string, status: DbOrderStatus) {
-    const previousOrders = orders
-    setStatusErrorMessage(null)
-    setUpdatingOrderId(orderId)
-    setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status } : order)),
-    )
+  async function handleDetailClick(order: AdminOrderRow) {
+    setSelectedOrder(order)
+    setDetailErrorMessage(null)
+    setFulfillmentErrorMessage(null)
+    setIsDetailLoading(true)
 
     try {
-      await updateAdminOrderStatus(orderId, status)
-      void loadSummary()
+      const detail = await fetchAdminOrderById(order.id)
+      if (detail) {
+        setSelectedOrder(detail)
+      } else {
+        setDetailErrorMessage('주문 상세를 찾을 수 없습니다.')
+      }
     } catch (error) {
-      setOrders(previousOrders)
-      setStatusErrorMessage(
+      setDetailErrorMessage(
         error instanceof AdminOrderRepositoryError
           ? error.message
-          : '주문 상태 변경 중 오류가 발생했습니다.',
+          : '주문 상세를 불러오지 못했습니다.',
       )
     } finally {
-      setUpdatingOrderId(null)
+      setIsDetailLoading(false)
     }
   }
 
-  function handleOrderNumberClick(order: AdminOrderRow) {
-    if (import.meta.env.DEV) {
-      console.info('[AdminOrdersPage] order detail modal TBD:', order.id)
-    }
+  async function refreshOrderState(updated: AdminOrderRow) {
+    setSelectedOrder(updated)
+    setOrders((current) =>
+      current.map((order) => (order.id === updated.id ? { ...order, ...updated, order_items: [] } : order)),
+    )
+    void loadSummary()
+    void loadOrders()
   }
 
-  function handleCustomerClick(_order: AdminOrderRow) {
-    navigate(ADMIN_ROUTES.customers)
-  }
-
-  function handleProductClick(_order: AdminOrderRow, productSlug: string | null) {
-    if (productSlug) {
-      navigate(`${ADMIN_ROUTES.products}?slug=${encodeURIComponent(productSlug)}`)
+  async function handleSaveShipping(shipping: { courier: string; trackingNumber: string }) {
+    if (!selectedOrder) {
       return
     }
 
-    navigate(ADMIN_ROUTES.products)
+    setFulfillmentErrorMessage(null)
+    setIsFulfillmentProcessing(true)
+
+    try {
+      const updated = await saveAdminOrderShippingInfo(selectedOrder, shipping)
+      await refreshOrderState(updated)
+      showToast('운송장 정보가 저장되었습니다.')
+    } catch (error) {
+      console.error('[AdminOrdersPage] save shipping failed', {
+        orderId: selectedOrder.id,
+        error,
+        cause: error instanceof AdminOrderRepositoryError ? error.cause : undefined,
+      })
+      setFulfillmentErrorMessage(
+        error instanceof AdminOrderRepositoryError
+          ? error.message
+          : '송장 저장 중 오류가 발생했습니다.',
+      )
+    } finally {
+      setIsFulfillmentProcessing(false)
+    }
+  }
+
+  async function handleFulfillmentAction(
+    action: AdminOrderFulfillmentAction,
+    shipping?: { courier: string; trackingNumber: string },
+  ) {
+    if (!selectedOrder) {
+      return
+    }
+
+    setFulfillmentErrorMessage(null)
+    setIsFulfillmentProcessing(true)
+
+    try {
+      const updated = await applyAdminOrderAction(selectedOrder, action, shipping)
+      await refreshOrderState(updated)
+
+      const successMessages: Partial<Record<AdminOrderFulfillmentAction, string>> = {
+        confirm_payment: '입금 확인 처리되었습니다.',
+        mark_preparing: '배송준비 상태로 변경되었습니다.',
+        mark_shipping: '배송중 상태로 변경되었습니다.',
+        mark_delivered: '배송완료 처리되었습니다.',
+        cancel: '주문이 취소되었습니다.',
+      }
+      const message = successMessages[action]
+      if (message) {
+        showToast(message)
+      }
+    } catch (error) {
+      console.error('[AdminOrdersPage] fulfillment action failed', {
+        action,
+        orderId: selectedOrder.id,
+        error,
+        cause: error instanceof AdminOrderRepositoryError ? error.cause : undefined,
+      })
+      setFulfillmentErrorMessage(
+        error instanceof AdminOrderRepositoryError
+          ? error.message
+          : '주문 처리 중 오류가 발생했습니다.',
+      )
+    } finally {
+      setIsFulfillmentProcessing(false)
+    }
+  }
+
+  function handleCloseDetail() {
+    setSelectedOrder(null)
+    setDetailErrorMessage(null)
+    setFulfillmentErrorMessage(null)
+    setIsDetailLoading(false)
+    setIsFulfillmentProcessing(false)
   }
 
   return (
@@ -172,7 +248,7 @@ export function AdminOrdersPage() {
       <div className="shrink-0">
         <h1 className="text-xl font-bold text-neutral-900 sm:text-2xl">주문 관리</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          접수된 주문을 확인하고 배송 상태를 변경합니다.
+          입금 확인부터 배송 완료까지 주문 상태를 처리합니다.
         </p>
       </div>
 
@@ -184,15 +260,6 @@ export function AdminOrdersPage() {
         onSearch={handleSearch}
         onReset={handleReset}
       />
-
-      {statusErrorMessage && (
-        <p
-          role="alert"
-          className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
-          {statusErrorMessage}
-        </p>
-      )}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {isLoading && (
@@ -238,15 +305,7 @@ export function AdminOrdersPage() {
 
         {!isLoading && !errorMessage && orders.length > 0 && (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <AdminOrdersList
-              orders={orders}
-              updatingOrderId={updatingOrderId}
-              onStatusChange={(orderId, status) => void handleStatusChange(orderId, status)}
-              onOrderNumberClick={handleOrderNumberClick}
-              onCustomerClick={handleCustomerClick}
-              onProductClick={handleProductClick}
-              onRowClick={handleOrderNumberClick}
-            />
+            <AdminOrdersList orders={orders} onDetailClick={(order) => void handleDetailClick(order)} />
             <div className="shrink-0">
               <AdminOrdersPagination
                 page={page}
@@ -258,6 +317,17 @@ export function AdminOrdersPage() {
           </div>
         )}
       </div>
+
+      <AdminOrderDetailModal
+        order={selectedOrder}
+        isLoading={isDetailLoading}
+        errorMessage={detailErrorMessage}
+        isFulfillmentProcessing={isFulfillmentProcessing}
+        fulfillmentErrorMessage={fulfillmentErrorMessage}
+        onClose={handleCloseDetail}
+        onFulfillmentAction={handleFulfillmentAction}
+        onSaveShipping={handleSaveShipping}
+      />
     </div>
   )
 }

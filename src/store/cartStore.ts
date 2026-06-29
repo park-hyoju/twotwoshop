@@ -1,13 +1,11 @@
 import type { AddToCartOutcome, CartItem } from '../types/cart'
 import type { Product } from '../types/product'
 import { isCartItemAvailable } from '../lib/cartItem'
+import { isProductPurchasable } from '../lib/productStock'
+import { clampQuantity as clampCartQuantity } from '../utils/sanitize'
 
 function clampQuantity(quantity: number, stock: number): number {
-  if (stock <= 0) {
-    return 0
-  }
-
-  return Math.max(1, Math.min(quantity, stock))
+  return clampCartQuantity(quantity, stock)
 }
 
 export function normalizeCartItems(items: CartItem[]): CartItem[] {
@@ -72,12 +70,8 @@ export function createCartItemFromProduct(product: Product, quantity = 1): CartI
 }
 
 export function addToCart(items: CartItem[], product: Product): AddToCartOutcome {
-  if (product.status === 'hidden') {
-    return { items, result: 'notAvailable' }
-  }
-
-  if (product.stock === 0) {
-    return { items, result: 'soldOut' }
+  if (!isProductPurchasable(product)) {
+    return { items, result: product.stock <= 0 ? 'soldOut' : 'notAvailable' }
   }
 
   const existing = items.find((item) => item.productId === product.id)

@@ -20,7 +20,6 @@ interface ShippingTabProps {
 
 const SHIPPING_FIELDS: Array<{ key: keyof AdminShippingInfoFields; label: string }> = [
   { key: 'shipping_fee', label: '배송비' },
-  { key: 'free_shipping_threshold', label: '무료배송 기준' },
   { key: 'delivery_period', label: '배송기간' },
 ]
 

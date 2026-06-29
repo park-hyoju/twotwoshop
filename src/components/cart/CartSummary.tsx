@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
+import { SHIPPING_FEE, calculateOrderTotal } from '../../lib/orderConstants'
 import { formatPrice } from '../../lib/formatPrice'
 import { ROUTES } from '../../lib/routes'
 
 interface CartSummaryProps {
-  total: number
+  productTotal: number
   itemCount: number
   totalQuantity: number
   hasSoldOutItems: boolean
@@ -11,12 +12,14 @@ interface CartSummaryProps {
 }
 
 export function CartSummary({
-  total,
+  productTotal,
   itemCount,
   totalQuantity,
   hasSoldOutItems,
   canCheckout,
 }: CartSummaryProps) {
+  const totalAmount = calculateOrderTotal(productTotal)
+
   return (
     <aside className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 sm:p-6">
       <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">주문 요약</h2>
@@ -29,9 +32,17 @@ export function CartSummary({
           <dt>주문 가능 수량</dt>
           <dd className="font-semibold text-neutral-900">{itemCount}개</dd>
         </div>
+        <div className="flex items-center justify-between text-neutral-600">
+          <dt>총 상품 금액</dt>
+          <dd className="font-semibold text-neutral-900">{formatPrice(productTotal)}</dd>
+        </div>
+        <div className="flex items-center justify-between text-neutral-600">
+          <dt>배송비</dt>
+          <dd className="font-semibold text-neutral-900">{formatPrice(SHIPPING_FEE)}</dd>
+        </div>
         <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
-          <dt className="font-semibold text-neutral-900">총 상품 금액</dt>
-          <dd className="text-2xl font-bold text-neutral-900 sm:text-3xl">{formatPrice(total)}</dd>
+          <dt className="font-semibold text-neutral-900">총 결제 예정 금액</dt>
+          <dd className="text-2xl font-bold text-neutral-900 sm:text-3xl">{formatPrice(totalAmount)}</dd>
         </div>
       </dl>
 

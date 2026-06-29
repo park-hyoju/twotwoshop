@@ -1,17 +1,20 @@
 -- =============================================================================
--- TWOTWOSHOP: Admin Auth setup guide (v0.9.4)
+-- TWOTWOSHOP: Admin Auth setup guide
 -- =============================================================================
 -- 이 파일은 SQL이 아닙니다. Supabase Dashboard에서 관리자 계정을 만드는 방법입니다.
 --
+-- 계정 삭제 후 복구: supabase/admin-account-recovery.sql 참고
+-- RLS 정책: supabase/production-security-rls.sql 실행 필수
+--
 -- 1. Supabase Dashboard → Authentication → Users → Add user
--- 2. Email / Password 입력 후 "Auto Confirm User" 체크
--- 3. 생성된 계정으로 /admin/login 에서 로그인
+-- 2. Email: admin@twotwoshop.com / Password 입력 / "Auto Confirm User" 체크
+-- 3. 해당 사용자 → App Metadata (raw_app_meta_data) 에 아래 JSON 설정:
+--      { "role": "admin" }
+-- 4. /admin/login 에서 로그인 (아이디: admin 또는 admin@twotwoshop.com)
 --
--- 세션 유지: Supabase JS 클라이언트가 localStorage에 세션을 자동 저장합니다.
--- 로그아웃: 관리자 사이드바 "로그아웃" 버튼 → supabase.auth.signOut()
---
--- 보안 참고 (v0.9.4):
--- - 허용 관리자 이메일: admin@twotwoshop.com (로그인 화면 아이디: admin)
--- - 다른 Supabase Auth 계정은 로그인되어도 /admin 접근 불가 (자동 로그아웃)
--- - v0.10+ 에서 app_metadata.role = 'admin' 검증 또는 RLS authenticated 정책 전환 권장
+-- 권한 구조 (코드 + RLS 기준):
+-- - JWT app_metadata.role = 'admin' 일 때만 관리자 접근
+-- - 이메일 문자열만으로는 관리자 권한 부여하지 않음
+-- - user_profiles.role / is_admin 컬럼 사용 안 함
+-- - public.is_admin() 함수가 RLS에서 동일한 JWT role 검사
 -- =============================================================================

@@ -1,7 +1,7 @@
-import { DISPLAY_CATEGORY_OPTIONS } from '../../../../../lib/adminProductStatus'
+import type { ProductCategoryId } from '../../../../../constants/productCategories'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
-import type { DisplayCategory } from '../../../../../types/displayCategory'
 import type { ProductStatus } from '../../../../../types/status'
+import { ProductCategorySelect } from '../../ProductCategorySelect'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
 
 interface BasicInfoSectionV2Props {
@@ -109,20 +109,13 @@ export function BasicInfoSectionV2({ form, onChange }: BasicInfoSectionV2Props) 
           <label htmlFor="v2-product-category" className={adminLabelClassName}>
             카테고리
           </label>
-          <select
+          <ProductCategorySelect
             id="v2-product-category"
-            value={form.display_category}
-            onChange={(event) =>
-              onChange('display_category', event.target.value as DisplayCategory)
-            }
+            value={form.product_category}
+            onChange={(value: ProductCategoryId) => onChange('product_category', value)}
             className={adminInputClassName}
-          >
-            {DISPLAY_CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            required
+          />
         </div>
       </div>
 

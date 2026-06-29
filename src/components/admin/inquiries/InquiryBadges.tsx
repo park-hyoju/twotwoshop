@@ -6,7 +6,8 @@ import {
   getInquiryTypeLabel,
 } from '../../../lib/adminInquiryDisplay'
 
-const badgeBaseClassName = 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset'
+const badgeBaseClassName =
+  'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset shadow-sm'
 
 export function InquiryTypeBadge({ type }: { type: DbInquiryType }) {
   return (

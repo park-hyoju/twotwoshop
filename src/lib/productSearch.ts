@@ -1,40 +1,31 @@
 import { ROUTES } from './routes'
-import type { Product } from '../types/product'
+import {
+  buildSearchCorrectionMessage,
+  filterProductsByKeyword,
+  matchesProductKeyword,
+  normalizeKeyword,
+  searchProducts,
+} from './search'
 
-export function normalizeProductSearchQuery(query: string): string {
-  return query.trim()
+export {
+  buildSearchCorrectionMessage,
+  filterProductsByKeyword,
+  matchesProductKeyword,
+  normalizeKeyword,
+  searchProducts,
 }
 
-export function matchesProductSearch(product: Product, rawQuery: string): boolean {
-  const query = normalizeProductSearchQuery(rawQuery).toLowerCase()
+/** @deprecated Use normalizeKeyword from lib/search instead. */
+export const normalizeProductSearchQuery = normalizeKeyword
 
-  if (!query) {
-    return true
-  }
+/** @deprecated Use matchesProductKeyword from lib/search instead. */
+export const matchesProductSearch = matchesProductKeyword
 
-  const searchableValues = [
-    product.name,
-    product.slug,
-    product.shortDescription,
-    product.description,
-    ...product.tags,
-  ]
-
-  return searchableValues.some((value) => value.toLowerCase().includes(query))
-}
-
-export function filterProductsBySearch(products: Product[], rawQuery: string): Product[] {
-  const query = normalizeProductSearchQuery(rawQuery)
-
-  if (!query) {
-    return products
-  }
-
-  return products.filter((product) => matchesProductSearch(product, query))
-}
+/** @deprecated Use filterProductsByKeyword from lib/search instead. */
+export const filterProductsBySearch = filterProductsByKeyword
 
 export function buildProductSearchUrl(query: string): string {
-  const normalized = normalizeProductSearchQuery(query)
+  const normalized = normalizeKeyword(query)
 
   if (!normalized) {
     return ROUTES.products

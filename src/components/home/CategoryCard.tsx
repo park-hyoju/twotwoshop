@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { CategoryShortcut } from '../../types/category'
+import { HomeCategoryIcon } from './homeIcons'
 
 interface CategoryCardProps {
   category: CategoryShortcut
@@ -9,20 +10,17 @@ export function CategoryCard({ category }: CategoryCardProps) {
   return (
     <Link
       to={category.href}
-      className="group flex flex-col items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-8 text-center transition-all hover:border-neutral-400 hover:bg-neutral-50 hover:shadow-md active:scale-[0.98] active:bg-neutral-100 sm:px-5 sm:py-10"
+      className="group flex flex-col items-center justify-center gap-3 rounded-[20px] border border-[#eee] bg-white px-4 py-8 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] active:scale-[0.98] sm:py-9"
     >
-      <span
-        className="text-4xl transition-transform group-hover:scale-110 sm:text-5xl"
-        aria-hidden="true"
-      >
-        {category.icon}
+      <span className="flex h-10 w-10 items-center justify-center transition-transform duration-300 group-hover:scale-105">
+        <HomeCategoryIcon icon={category.icon} size={36} className="text-[#111]" />
       </span>
-      <div className="space-y-1.5">
-        <span className="block text-base font-semibold text-neutral-900 sm:text-lg">
+      <div className="space-y-1">
+        <span className="block text-[15px] font-semibold tracking-tight text-[#111] sm:text-base">
           {category.label}
         </span>
-        <span className="block text-sm leading-snug text-neutral-500">
-          {category.description}
+        <span className="block text-[11px] font-medium tracking-[0.14em] text-[#999]">
+          {category.labelEn}
         </span>
       </div>
     </Link>

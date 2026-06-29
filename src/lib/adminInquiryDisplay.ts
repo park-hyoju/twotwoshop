@@ -11,7 +11,8 @@ export const INQUIRY_TYPE_OPTIONS: Array<{ value: DbInquiryType; label: string }
 export const INQUIRY_STATUS_OPTIONS: Array<{ value: DbInquiryStatus; label: string }> = [
   { value: 'pending', label: '답변대기' },
   { value: 'in_progress', label: '답변중' },
-  { value: 'completed', label: '답변완료' },
+  { value: 'answered', label: '답변완료' },
+  { value: 'closed', label: '종료' },
 ]
 
 const INQUIRY_TYPE_LABELS: Record<DbInquiryType, string> = {
@@ -25,7 +26,12 @@ const INQUIRY_TYPE_LABELS: Record<DbInquiryType, string> = {
 const INQUIRY_STATUS_LABELS: Record<DbInquiryStatus, string> = {
   pending: '답변대기',
   in_progress: '답변중',
-  completed: '답변완료',
+  answered: '답변완료',
+  closed: '종료',
+}
+
+const LEGACY_STATUS_MAP: Record<string, DbInquiryStatus> = {
+  completed: 'answered',
 }
 
 export const INQUIRY_TYPE_BADGE_CLASSES: Record<DbInquiryType, string> = {
@@ -37,17 +43,26 @@ export const INQUIRY_TYPE_BADGE_CLASSES: Record<DbInquiryType, string> = {
 }
 
 export const INQUIRY_STATUS_BADGE_CLASSES: Record<DbInquiryStatus, string> = {
-  pending: 'bg-amber-50 text-amber-800 ring-amber-200',
-  in_progress: 'bg-blue-50 text-blue-700 ring-blue-200',
-  completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  pending: 'bg-orange-50 text-orange-700 ring-orange-200/80',
+  in_progress: 'bg-sky-50 text-sky-700 ring-sky-200/80',
+  answered: 'bg-emerald-50 text-emerald-700 ring-emerald-200/80',
+  closed: 'bg-neutral-100 text-neutral-600 ring-neutral-200/80',
+}
+
+export function normalizeInquiryStatus(status: string): DbInquiryStatus {
+  if (isDbInquiryStatus(status)) {
+    return status
+  }
+
+  return LEGACY_STATUS_MAP[status] ?? 'pending'
 }
 
 export function getInquiryTypeLabel(type: DbInquiryType): string {
   return INQUIRY_TYPE_LABELS[type]
 }
 
-export function getInquiryStatusLabel(status: DbInquiryStatus): string {
-  return INQUIRY_STATUS_LABELS[status]
+export function getInquiryStatusLabel(status: DbInquiryStatus | string): string {
+  return INQUIRY_STATUS_LABELS[normalizeInquiryStatus(status)]
 }
 
 export function isDbInquiryType(value: string): value is DbInquiryType {
@@ -67,3 +82,10 @@ export const INQUIRY_STATUS_FILTER_OPTIONS: Array<{ value: InquiryStatusFilter; 
   { value: 'all', label: '전체 상태' },
   ...INQUIRY_STATUS_OPTIONS,
 ]
+
+export function getInquiryDisplayCode(inquiry: {
+  inquiry_code?: string | null
+  inquiry_number?: string | null
+}): string {
+  return inquiry.inquiry_code?.trim() || inquiry.inquiry_number?.trim() || '-'
+}

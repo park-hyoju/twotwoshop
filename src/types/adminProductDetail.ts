@@ -1,6 +1,4 @@
-import type { DetailCategory } from './detailCategory'
-import type { DisplayCategory } from './displayCategory'
-import type { Gender } from './gender'
+import type { ProductCategoryId } from '../constants/productCategories'
 import type { ProductStatus } from './status'
 
 export interface AdminSizeGuideRow {
@@ -51,9 +49,7 @@ export interface AdminProductDetailForm {
   slug: string
   brand: string
   sku: string
-  display_category: DisplayCategory
-  detail_category: DetailCategory
-  gender: Gender
+  product_category: ProductCategoryId
   status: ProductStatus
   price: number
   original_price: number

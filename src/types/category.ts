@@ -1,7 +1,4 @@
-export interface CategoryShortcut {
-  id: string
-  label: string
-  icon: string
-  description: string
-  href: string
-}
+export type {
+  HomeCategoryShortcut as CategoryShortcut,
+  HomeShortcutIconKey as CategoryIconKey,
+} from '../constants/productCategories'

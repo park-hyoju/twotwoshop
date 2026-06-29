@@ -2,19 +2,20 @@ import { Link } from 'react-router-dom'
 import { FOOTER_LINKS } from '../../../data/footerLinks'
 import type { LinkItem } from '../../../types/navigation'
 
-function FooterLink({ item }: { item: LinkItem }) {
-  const className = 'whitespace-nowrap transition-colors hover:text-neutral-900'
+const linkClassName =
+  'inline-flex min-h-10 items-center text-sm text-neutral-600 transition-colors hover:text-neutral-900 sm:text-[15px]'
 
+function FooterLink({ item }: { item: LinkItem }) {
   if (item.href.startsWith('/')) {
     return (
-      <Link to={item.href} className={className}>
+      <Link to={item.href} className={linkClassName}>
         {item.label}
       </Link>
     )
   }
 
   return (
-    <a href={item.href} className={className}>
+    <a href={item.href} className={linkClassName}>
       {item.label}
     </a>
   )
@@ -23,14 +24,9 @@ function FooterLink({ item }: { item: LinkItem }) {
 export function FooterNav() {
   return (
     <nav aria-label="푸터 메뉴">
-      <ul className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-neutral-600">
-        {FOOTER_LINKS.map((item, index) => (
-          <li key={item.label} className="flex items-center">
-            {index > 0 && (
-              <span className="mx-2 text-neutral-300" aria-hidden="true">
-                |
-              </span>
-            )}
+      <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-start sm:gap-x-8">
+        {FOOTER_LINKS.map((item) => (
+          <li key={item.label}>
             <FooterLink item={item} />
           </li>
         ))}

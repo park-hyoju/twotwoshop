@@ -1,3 +1,5 @@
+export { AdminOrderDetailModal } from './AdminOrderDetailModal'
+export { AdminOrderFulfillmentPanel } from './AdminOrderFulfillmentPanel'
 export { AdminOrdersList } from './AdminOrdersList'
 export { AdminOrdersPagination } from './AdminOrdersPagination'
 export { AdminOrdersSearch } from './AdminOrdersSearch'

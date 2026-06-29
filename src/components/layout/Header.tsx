@@ -1,60 +1,20 @@
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { NAV_ITEMS } from '../../data/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { MENU_ITEMS } from '../../data/navigation'
 import { useCart } from '../../hooks/useCart'
+import { useCustomerAuth } from '../../contexts/CustomerAuthProvider'
 import { buildProductSearchUrl, normalizeProductSearchQuery } from '../../lib/productSearch'
 import { ROUTES } from '../../lib/routes'
 import type { NavItem } from '../../types/navigation'
+import { ProductSearchField, saveRecentSearch } from '../search'
 
-interface HeaderSearchFormProps {
-  inputRef?: RefObject<HTMLInputElement | null>
-  value: string
-  onChange: (value: string) => void
-  onSubmit: (query: string) => void
-  className?: string
-}
-
-function HeaderSearchForm({
-  inputRef,
-  value,
-  onChange,
-  onSubmit,
-  className = '',
-}: HeaderSearchFormProps) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    onSubmit(value)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className={`flex items-center gap-2 ${className}`}>
-      <input
-        ref={inputRef}
-        type="search"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="상품을 검색하세요"
-        aria-label="상품 검색"
-        enterKeyHint="search"
-        className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 outline-none focus:border-neutral-400"
-      />
-      <button
-        type="submit"
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-700 transition-colors hover:bg-neutral-100"
-        aria-label="검색"
-      >
-        <SearchIcon />
-      </button>
-    </form>
-  )
-}
 function SearchIcon() {
   return (
     <svg
-      className="h-6 w-6"
+      className="h-5 w-5"
       fill="none"
       viewBox="0 0 24 24"
-      strokeWidth={1.5}
+      strokeWidth={1.8}
       stroke="currentColor"
       aria-hidden="true"
     >
@@ -70,10 +30,10 @@ function SearchIcon() {
 function CartIcon() {
   return (
     <svg
-      className="h-6 w-6"
+      className="h-5 w-5"
       fill="none"
       viewBox="0 0 24 24"
-      strokeWidth={1.5}
+      strokeWidth={1.8}
       stroke="currentColor"
       aria-hidden="true"
     >
@@ -89,10 +49,10 @@ function CartIcon() {
 function UserIcon() {
   return (
     <svg
-      className="h-6 w-6"
+      className="h-5 w-5"
       fill="none"
       viewBox="0 0 24 24"
-      strokeWidth={1.5}
+      strokeWidth={1.8}
       stroke="currentColor"
       aria-hidden="true"
     >
@@ -109,10 +69,10 @@ function MenuIcon({ isOpen }: { isOpen: boolean }) {
   if (isOpen) {
     return (
       <svg
-        className="h-6 w-6"
+        className="h-5 w-5"
         fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.5}
+        strokeWidth={1.8}
         stroke="currentColor"
         aria-hidden="true"
       >
@@ -123,10 +83,10 @@ function MenuIcon({ isOpen }: { isOpen: boolean }) {
 
   return (
     <svg
-      className="h-6 w-6"
+      className="h-5 w-5"
       fill="none"
       viewBox="0 0 24 24"
-      strokeWidth={1.5}
+      strokeWidth={1.8}
       stroke="currentColor"
       aria-hidden="true"
     >
@@ -142,7 +102,7 @@ function MenuIcon({ isOpen }: { isOpen: boolean }) {
 function ChevronIcon({ isOpen }: { isOpen: boolean }) {
   return (
     <svg
-      className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+      className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
       fill="none"
       viewBox="0 0 24 24"
       strokeWidth={2}
@@ -156,17 +116,34 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 
 interface HeaderActionsProps {
   onSearchClick: () => void
+  onDesktopSearchFocus?: () => void
   cartCount: number
+  accountHref: string
+  accountLabel: string
 }
 
-function HeaderActions({ onSearchClick, cartCount }: HeaderActionsProps) {
+function HeaderActions({
+  onSearchClick,
+  onDesktopSearchFocus,
+  cartCount,
+  accountHref,
+  accountLabel,
+}: HeaderActionsProps) {
   return (
-    <div className="flex items-center gap-1 sm:gap-2">
+    <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
       <button
         type="button"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100 md:hidden"
         aria-label="검색"
         onClick={onSearchClick}
+      >
+        <SearchIcon />
+      </button>
+      <button
+        type="button"
+        className="hidden min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100 md:inline-flex"
+        aria-label="검색"
+        onClick={onDesktopSearchFocus}
       >
         <SearchIcon />
       </button>
@@ -177,15 +154,15 @@ function HeaderActions({ onSearchClick, cartCount }: HeaderActionsProps) {
       >
         <CartIcon />
         {cartCount > 0 && (
-          <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
             {cartCount > 99 ? '99+' : cartCount}
           </span>
         )}
       </Link>
       <Link
-        to={ROUTES.login}
+        to={accountHref}
         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100"
-        aria-label="마이페이지"
+        aria-label={accountLabel}
       >
         <UserIcon />
       </Link>
@@ -194,12 +171,17 @@ function HeaderActions({ onSearchClick, cartCount }: HeaderActionsProps) {
 }
 
 interface NavMenuProps {
-  variant: 'desktop' | 'mobile'
+  variant: 'desktop' | 'mobile' | 'panel'
+  items?: NavItem[]
   onNavigate?: () => void
 }
 
-function NavMenu({ variant, onNavigate }: NavMenuProps) {
+function NavMenu({ variant, items = MENU_ITEMS, onNavigate }: NavMenuProps) {
   const [openCategory, setOpenCategory] = useState<string | null>(null)
+
+  if (items.length === 0) {
+    return null
+  }
 
   const toggleCategory = (label: string) => {
     setOpenCategory((prev) => (prev === label ? null : label))
@@ -212,21 +194,27 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
 
   const linkClass =
     variant === 'desktop'
-      ? 'block px-4 py-3 text-base text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
-      : 'block rounded-lg px-4 py-3 pl-8 text-base text-neutral-700 hover:bg-neutral-100'
+      ? 'block px-4 py-3 text-[15px] text-neutral-700 transition-colors hover:bg-neutral-50 hover:text-neutral-900'
+      : variant === 'panel'
+        ? 'block rounded-xl px-5 py-3.5 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-100'
+        : 'block rounded-lg px-4 py-3 pl-8 text-base text-neutral-700 hover:bg-neutral-100'
+
+  const topLevelLinkClass =
+    variant === 'panel'
+      ? 'flex min-h-[52px] items-center rounded-xl px-5 py-3.5 text-[17px] font-semibold text-neutral-900 transition-colors hover:bg-neutral-100 sm:text-lg'
+      : variant === 'desktop'
+        ? 'inline-flex h-14 items-center whitespace-nowrap px-1 text-[15px] font-medium text-neutral-800 transition-colors hover:text-neutral-900 sm:text-base'
+        : 'block rounded-lg px-3 py-3 text-base font-medium text-neutral-800 hover:bg-neutral-100'
+
+  const categoryToggleClass =
+    variant === 'panel'
+      ? 'flex min-h-[52px] w-full items-center justify-between rounded-xl px-5 py-3.5 text-left text-[17px] font-semibold text-neutral-900 transition-colors hover:bg-neutral-100 sm:text-lg'
+      : 'flex w-full items-center justify-between rounded-lg px-3 py-3 text-base font-medium text-neutral-800 hover:bg-neutral-100'
 
   const renderItem = (item: NavItem) => {
     if (!item.children) {
       return (
-        <Link
-          to={item.href}
-          className={
-            variant === 'desktop'
-              ? 'whitespace-nowrap text-base font-medium text-neutral-700 transition-colors hover:text-neutral-900'
-              : 'block rounded-lg px-3 py-3 text-base font-medium text-neutral-800 hover:bg-neutral-100'
-          }
-          onClick={handleNavigate}
-        >
+        <Link to={item.href} className={topLevelLinkClass} onClick={handleNavigate}>
           {item.label}
         </Link>
       )
@@ -236,10 +224,10 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
 
     if (variant === 'desktop') {
       return (
-        <div className="relative">
+        <div className="relative h-14">
           <button
             type="button"
-            className="inline-flex items-center gap-1 whitespace-nowrap text-base font-medium text-neutral-700 transition-colors hover:text-neutral-900"
+            className="inline-flex h-14 items-center gap-1 whitespace-nowrap px-1 text-[15px] font-medium text-neutral-800 transition-colors hover:text-neutral-900 sm:text-base"
             aria-expanded={isOpen}
             aria-haspopup="true"
             onClick={() => toggleCategory(item.label)}
@@ -249,13 +237,9 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
           </button>
 
           {isOpen && (
-            <ul className="absolute left-0 top-full z-50 mt-2 min-w-[160px] overflow-hidden rounded-xl border border-neutral-200 bg-white py-2 shadow-lg">
+            <ul className="absolute left-0 top-full z-50 min-w-[168px] overflow-hidden rounded-xl border border-neutral-200 bg-white py-1.5 shadow-lg">
               <li>
-                <Link
-                  to={item.href}
-                  className={linkClass}
-                  onClick={handleNavigate}
-                >
+                <Link to={item.href} className={linkClass} onClick={handleNavigate}>
                   전체
                 </Link>
               </li>
@@ -276,7 +260,7 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
       <div>
         <button
           type="button"
-          className="flex w-full items-center justify-between rounded-lg px-3 py-3 text-base font-medium text-neutral-800 hover:bg-neutral-100"
+          className={categoryToggleClass}
           aria-expanded={isOpen}
           onClick={() => toggleCategory(item.label)}
         >
@@ -285,13 +269,11 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
         </button>
 
         {isOpen && (
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul
+            className={`flex flex-col ${variant === 'panel' ? 'mt-1 gap-1 border-l-2 border-neutral-200 pl-3' : 'mt-1 gap-1'}`}
+          >
             <li>
-              <Link
-                to={item.href}
-                className={linkClass}
-                onClick={handleNavigate}
-              >
+              <Link to={item.href} className={linkClass} onClick={handleNavigate}>
                 전체
               </Link>
             </li>
@@ -308,11 +290,23 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
     )
   }
 
+  if (variant === 'panel') {
+    return (
+      <ul className="flex flex-col gap-1.5 sm:gap-2">
+        {items.map((item) => (
+          <li key={item.label}>{renderItem(item)}</li>
+        ))}
+      </ul>
+    )
+  }
+
   if (variant === 'desktop') {
     return (
-      <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 xl:gap-x-7">
-        {NAV_ITEMS.map((item) => (
-          <li key={item.label}>{renderItem(item)}</li>
+      <ul className="flex h-14 items-stretch gap-x-6 lg:gap-x-8">
+        {items.map((item) => (
+          <li key={item.label} className="flex shrink-0 items-stretch">
+            {renderItem(item)}
+          </li>
         ))}
       </ul>
     )
@@ -320,17 +314,132 @@ function NavMenu({ variant, onNavigate }: NavMenuProps) {
 
   return (
     <ul className="flex flex-col gap-1">
-      {NAV_ITEMS.map((item) => (
+      {items.map((item) => (
         <li key={item.label}>{renderItem(item)}</li>
       ))}
     </ul>
   )
 }
 
+function AllCategoriesButton({
+  isOpen,
+  onClick,
+  layout,
+}: {
+  isOpen: boolean
+  onClick: () => void
+  layout: 'mobile' | 'desktop'
+}) {
+  if (layout === 'desktop') {
+    const stateClass = isOpen
+      ? 'border-neutral-800 bg-neutral-900 text-white'
+      : 'border-neutral-200 bg-neutral-50 text-neutral-800 hover:border-neutral-300 hover:bg-neutral-100'
+
+    return (
+      <button
+        type="button"
+        className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-4 text-[15px] font-medium transition-colors ${stateClass}`}
+        aria-label={isOpen ? '전체카테고리 메뉴 닫기' : '전체카테고리 메뉴 열기'}
+        aria-expanded={isOpen}
+        onClick={onClick}
+      >
+        <MenuIcon isOpen={isOpen} />
+        <span className="whitespace-nowrap">전체카테고리</span>
+      </button>
+    )
+  }
+
+  const stateClass = isOpen
+    ? 'border-neutral-800 bg-neutral-900 text-white'
+    : 'border-neutral-200 bg-white text-neutral-800 hover:border-neutral-300 hover:bg-neutral-50'
+
+  return (
+    <button
+      type="button"
+      className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 text-[15px] font-semibold transition-colors md:hidden ${stateClass}`}
+      aria-label={isOpen ? '카테고리 메뉴 닫기' : '카테고리 메뉴 열기'}
+      aria-expanded={isOpen}
+      onClick={onClick}
+    >
+      <MenuIcon isOpen={isOpen} />
+      <span className="whitespace-nowrap">카테고리</span>
+    </button>
+  )
+}
+
+interface CategoryMenuPanelProps {
+  layout: 'mobile' | 'desktop'
+  onClose: () => void
+}
+
+function CategoryMenuPanel({ layout, onClose }: CategoryMenuPanelProps) {
+  if (layout === 'desktop') {
+    return (
+      <>
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40"
+          aria-label="전체카테고리 닫기"
+          onClick={onClose}
+        />
+        <aside
+          className="admin-animate-in fixed inset-y-0 left-0 z-50 flex w-full max-w-[360px] flex-col border-r border-neutral-200 bg-white shadow-2xl"
+          aria-label="전체카테고리"
+        >
+          <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+            <p className="text-xl font-bold text-neutral-900">전체카테고리</p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex min-h-11 items-center rounded-xl border border-neutral-200 bg-white px-4 text-[15px] font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+            >
+              닫기
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-5">
+            <NavMenu variant="panel" items={MENU_ITEMS} onNavigate={onClose} />
+          </div>
+        </aside>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-black/30 md:hidden"
+        aria-label="카테고리 닫기"
+        onClick={onClose}
+      />
+      <nav
+        className="admin-animate-in relative z-50 border-t border-neutral-200 bg-white shadow-lg md:hidden"
+        aria-label="카테고리"
+      >
+        <div className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6">
+          <div className="mb-4 flex items-center justify-between border-b border-neutral-100 pb-3">
+            <p className="text-lg font-bold text-neutral-900 sm:text-xl">전체카테고리</p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex min-h-11 items-center rounded-full bg-neutral-100 px-4 text-[15px] font-semibold text-neutral-700 transition-colors hover:bg-neutral-200"
+            >
+              닫기
+            </button>
+          </div>
+          <NavMenu variant="panel" items={MENU_ITEMS} onNavigate={onClose} />
+        </div>
+      </nav>
+    </>
+  )
+}
+
 export function Header() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { isMember, isLoading: isAuthLoading, displayName } = useCustomerAuth()
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [isSearchVisible, setIsSearchVisible] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { getCartCount } = useCart()
@@ -338,12 +447,57 @@ export function Header() {
   const desktopSearchRef = useRef<HTMLInputElement>(null)
   const mobileSearchRef = useRef<HTMLInputElement>(null)
   const urlSearchQuery = normalizeProductSearchQuery(searchParams.get('search') ?? '')
+  const isProductsPage = location.pathname === ROUTES.products
 
   useEffect(() => {
     setSearchQuery(urlSearchQuery)
   }, [urlSearchQuery])
 
-  function handleSearchSubmit(query: string) {
+  useEffect(() => {
+    if (!isCategoryMenuOpen) {
+      return
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsCategoryMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isCategoryMenuOpen])
+
+  const [categoryMenuLayout, setCategoryMenuLayout] = useState<'mobile' | 'desktop'>('mobile')
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)')
+
+    function syncLayout() {
+      setCategoryMenuLayout(mediaQuery.matches ? 'desktop' : 'mobile')
+    }
+
+    function handleViewportChange() {
+      syncLayout()
+      setIsCategoryMenuOpen(false)
+    }
+
+    syncLayout()
+    mediaQuery.addEventListener('change', handleViewportChange)
+    return () => mediaQuery.removeEventListener('change', handleViewportChange)
+  }, [])
+
+  function toggleCategoryMenu() {
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches
+    setCategoryMenuLayout(isDesktop ? 'desktop' : 'mobile')
+    setIsCategoryMenuOpen((prev) => !prev)
+  }
+
+  function closeCategoryMenu() {
+    setIsCategoryMenuOpen(false)
+  }
+
+  function navigateToSearch(query: string) {
     const normalized = normalizeProductSearchQuery(query)
 
     if (!normalized) {
@@ -352,84 +506,115 @@ export function Header() {
     }
 
     navigate(buildProductSearchUrl(normalized))
+  }
+
+  function handleSearchSubmit(query: string) {
+    const normalized = normalizeProductSearchQuery(query)
+
+    if (normalized) {
+      saveRecentSearch(normalized)
+    }
+
+    navigateToSearch(query)
     setIsSearchVisible(false)
-    setIsMenuOpen(false)
+    closeCategoryMenu()
+  }
+
+  function handleDebouncedSearch(query: string) {
+    if (!isProductsPage) {
+      return
+    }
+
+    navigateToSearch(query)
   }
 
   const handleSearchClick = () => {
     setIsSearchVisible(true)
     requestAnimationFrame(() => {
-      const isDesktop = window.matchMedia('(min-width: 768px)').matches
-      if (isDesktop) {
-        desktopSearchRef.current?.focus()
-      } else {
-        mobileSearchRef.current?.focus()
-      }
+      mobileSearchRef.current?.focus()
     })
   }
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white shadow-sm">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-3 py-3">
-          <Link
-            to={ROUTES.home}
-            className="shrink-0 text-xl font-bold tracking-widest text-neutral-900 sm:text-2xl"
-            translate="no"
-          >
-            투투샵
-          </Link>
+  const handleDesktopSearchFocus = () => {
+    desktopSearchRef.current?.focus()
+  }
 
-          <div className="hidden flex-1 justify-center px-4 md:flex">
-            <HeaderSearchForm
+  const accountHref = isMember ? ROUTES.mypage : ROUTES.signin
+  const accountLabel = isAuthLoading
+    ? '회원 메뉴'
+    : isMember
+      ? `${displayName ?? '회원'} 마이페이지`
+      : '로그인'
+
+  return (
+    <header className="sticky top-0 z-50 bg-white">
+      <div className="border-b border-neutral-200">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <AllCategoriesButton
+              layout="mobile"
+              isOpen={isCategoryMenuOpen && categoryMenuLayout === 'mobile'}
+              onClick={toggleCategoryMenu}
+            />
+            <Link
+              to={ROUTES.home}
+              className="shrink-0 text-xl font-bold tracking-wide text-neutral-900 sm:text-2xl"
+              translate="no"
+            >
+              투투샵
+            </Link>
+          </div>
+
+          <div className="hidden min-w-0 flex-1 justify-center px-6 md:flex lg:px-10">
+            <ProductSearchField
               inputRef={desktopSearchRef}
               value={searchQuery}
               onChange={setSearchQuery}
               onSubmit={handleSearchSubmit}
-              className="w-full max-w-md"
+              onDebouncedSearch={handleDebouncedSearch}
+              className="w-full max-w-xl"
+              showSubmitButton={false}
             />
           </div>
 
-          <div className="flex items-center gap-1">
-            <HeaderActions onSearchClick={handleSearchClick} cartCount={cartCount} />
-            <button
-              type="button"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 transition-colors hover:bg-neutral-100 lg:hidden"
-              aria-label={isMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
-              aria-expanded={isMenuOpen}
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-            >
-              <MenuIcon isOpen={isMenuOpen} />
-            </button>
-          </div>
+          <HeaderActions
+            onSearchClick={handleSearchClick}
+            onDesktopSearchFocus={handleDesktopSearchFocus}
+            cartCount={cartCount}
+            accountHref={accountHref}
+            accountLabel={accountLabel}
+          />
         </div>
 
         {isSearchVisible && (
-          <div className="pb-3 md:hidden">
-            <HeaderSearchForm
+          <div className="border-t border-neutral-100 px-4 pb-3 pt-3 md:hidden">
+            <ProductSearchField
               inputRef={mobileSearchRef}
               value={searchQuery}
               onChange={setSearchQuery}
               onSubmit={handleSearchSubmit}
+              onDebouncedSearch={handleDebouncedSearch}
             />
           </div>
         )}
-
-        <nav
-          className="hidden border-t border-neutral-100 py-3 lg:block"
-          aria-label="메인 메뉴"
-        >
-          <NavMenu variant="desktop" />
-        </nav>
       </div>
 
-      {isMenuOpen && (
-        <nav
-          className="border-t border-neutral-200 bg-white px-4 py-4 lg:hidden"
-          aria-label="모바일 메뉴"
-        >
-          <NavMenu variant="mobile" onNavigate={() => setIsMenuOpen(false)} />
-        </nav>
+      <nav
+        className="hidden h-14 border-b border-neutral-200 bg-white md:block"
+        aria-label="메인 메뉴"
+      >
+        <div className="mx-auto flex h-full max-w-7xl items-center gap-6 px-4 lg:gap-8 lg:px-8">
+          <AllCategoriesButton
+            layout="desktop"
+            isOpen={isCategoryMenuOpen && categoryMenuLayout === 'desktop'}
+            onClick={toggleCategoryMenu}
+          />
+          <NavMenu variant="desktop" items={MENU_ITEMS} />
+        </div>
+      </nav>
+
+      {isCategoryMenuOpen && (
+        <CategoryMenuPanel layout={categoryMenuLayout} onClose={closeCategoryMenu} />
       )}
     </header>
   )

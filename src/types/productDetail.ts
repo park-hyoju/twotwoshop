@@ -89,12 +89,12 @@ export const EMPTY_PRODUCT_RETURN_INFO: ProductReturnInfo = {
 }
 
 export const DEFAULT_PRODUCT_SHIPPING_INFO: ProductShippingInfo = {
-  shipping_fee: '4,000원 (70,000원 이상 구매 시 무료배송)',
+  shipping_fee: '4,000원',
   delivery_period:
     '결제 완료 후 평균 3~5일 이내 발송됩니다.\n주말·공휴일은 배송 기간에서 제외됩니다.',
-  free_shipping_threshold: '70,000원 이상 구매 시 배송비가 무료로 적용됩니다.',
+  free_shipping_threshold: '',
   additional_notes:
-    '주문량 증가 또는 택배사 사정에 따라 배송이 다소 지연될 수 있습니다.\n제주 및 도서산간 지역은 추가 배송비가 발생할 수 있습니다.\n배송 관련 문의는 고객센터 또는 1:1 상담을 이용해 주세요.',
+    '전 상품 배송비 4,000원이 적용됩니다.\n제주 및 도서산간 지역은 추가 배송비가 발생할 수 있습니다.\n배송 관련 문의는 고객센터 또는 1:1 상담을 이용해 주세요.',
 }
 
 export const DEFAULT_PRODUCT_RETURN_INFO: ProductReturnInfo = {

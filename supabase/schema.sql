@@ -129,8 +129,18 @@ create table if not exists public.orders (
   subtotal integer not null check (subtotal >= 0),
   shipping_fee integer not null check (shipping_fee >= 0),
   total_amount integer not null check (total_amount >= 0),
-  status text not null default 'pending'
-    check (status in ('pending', 'confirmed', 'paid', 'shipped', 'completed', 'cancelled')),
+  status text not null default 'pending_payment'
+    check (status in (
+      'pending_payment',
+      'payment_confirmed',
+      'preparing',
+      'shipping',
+      'delivered',
+      'cancel_requested',
+      'cancelled'
+    )),
+  payment_status text not null default 'waiting_deposit'
+    check (payment_status in ('waiting_deposit', 'paid', 'refunded')),
   created_at timestamptz not null default now()
 );
 
@@ -144,7 +154,7 @@ comment on column public.orders.subtotal is
   '상품 합계(원). 프론트 Order.productTotal과 매핑됩니다.';
 
 comment on column public.orders.status is
-  'pending=접수, confirmed=확인, paid=입금확인, shipped=배송중, completed=완료, cancelled=취소';
+  'pending_payment=입금대기, payment_confirmed=입금확인, preparing=배송준비, shipping=배송중, delivered=배송완료, cancel_requested=취소요청, cancelled=취소완료';
 
 -- =============================================================================
 -- order_items

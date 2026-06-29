@@ -1,7 +1,8 @@
 import { formatDateTime } from '../../../lib/formatDateTime'
 import { formatPrice } from '../../../lib/formatPrice'
-import { getDisplayCategoryLabel } from '../../../lib/adminProductStatus'
+import { getProductCategoryDisplayLabel, resolveProductCategory } from '../../../constants/productCategories'
 import type { AdminProductRow } from '../../../types/adminProduct'
+import { ProductExposureBadges } from './ProductExposureBadges'
 import { ProductStatusBadge } from './ProductStatusBadge'
 
 interface AdminProductsListProps {
@@ -42,6 +43,28 @@ function ActionButton({
       {children}
     </button>
   )
+}
+
+function StockCell({ stock }: { stock: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span>{stock.toLocaleString('ko-KR')}</span>
+      {stock <= 0 && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          품절
+        </span>
+      )}
+    </div>
+  )
+}
+
+function getAdminCategoryLabel(product: AdminProductRow): string {
+  const categoryId = resolveProductCategory({
+    product_category: product.product_category,
+    display_category: product.display_category,
+  })
+
+  return getProductCategoryDisplayLabel(categoryId)
 }
 
 function ProductActions({
@@ -123,8 +146,22 @@ function MobileProductCard({
             {product.name}
           </button>
           <p className="mt-1 text-xs text-neutral-500">{product.slug}</p>
+          <div className="mt-2">
+            <ProductExposureBadges
+              isNew={product.is_new}
+              isBest={product.is_best}
+              isSale={product.is_sale}
+            />
+          </div>
         </div>
-        <ProductStatusBadge status={product.status} />
+        <div className="flex flex-col items-end gap-2">
+          <ProductStatusBadge status={product.status} />
+          {product.stock <= 0 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              품절
+            </span>
+          )}
+        </div>
       </div>
 
       <dl className="mt-4 space-y-2 text-sm text-neutral-700">
@@ -134,11 +171,13 @@ function MobileProductCard({
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-neutral-500">재고</dt>
-          <dd>{product.stock.toLocaleString('ko-KR')}</dd>
+          <dd>
+            <StockCell stock={product.stock} />
+          </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-neutral-500">카테고리</dt>
-          <dd>{getDisplayCategoryLabel(product.display_category)}</dd>
+          <dd>{getAdminCategoryLabel(product)}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-neutral-500">생성일</dt>
@@ -212,15 +251,31 @@ export function AdminProductsList({
                     {product.name}
                   </button>
                   <p className="mt-1 text-xs text-neutral-500">{product.slug}</p>
+                  <div className="mt-2">
+                    <ProductExposureBadges
+                      isNew={product.is_new}
+                      isBest={product.is_best}
+                      isSale={product.is_sale}
+                    />
+                  </div>
                 </td>
                 <td className="px-4 py-3 font-semibold text-neutral-900">
                   {formatPrice(product.price)}
                 </td>
-                <td className="px-4 py-3">{product.stock.toLocaleString('ko-KR')}</td>
                 <td className="px-4 py-3">
-                  <ProductStatusBadge status={product.status} />
+                  <StockCell stock={product.stock} />
                 </td>
-                <td className="px-4 py-3">{getDisplayCategoryLabel(product.display_category)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    <ProductStatusBadge status={product.status} />
+                    {product.stock <= 0 && (
+                      <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        품절
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">{getAdminCategoryLabel(product)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(product.created_at)}</td>
                 <td className="px-4 py-3">
                   <ProductActions

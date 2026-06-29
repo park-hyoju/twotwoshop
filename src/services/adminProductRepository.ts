@@ -1,5 +1,8 @@
+import { buildProductCategoryPayload } from '../services/productMapper'
 import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { sanitizeSlug, sanitizeText } from '../utils/sanitize'
+import { validateAdminProductInput, validateNonNegativeInteger, validatePrice } from '../utils/validators'
 import type {
   AdminProductFormInput,
   AdminProductRow,
@@ -8,6 +11,7 @@ import type {
   AdminProductUpdateInput,
 } from '../types/adminProduct'
 import type { ProductStatus } from '../types/status'
+import { isProductCategoryId } from '../constants/productCategories'
 
 const PRODUCT_SELECT = `
   id,
@@ -16,7 +20,11 @@ const PRODUCT_SELECT = `
   price,
   stock,
   status,
+  product_category,
   display_category,
+  is_new,
+  is_best,
+  is_sale,
   created_at
 `
 
@@ -42,27 +50,42 @@ function placeholderImage(slug: string): string {
   return `/images/placeholder/${slug}.jpg`
 }
 
+function normalizeAdminProductRow(row: AdminProductRow): AdminProductRow {
+  return {
+    ...row,
+    is_new: row.is_new === true,
+    is_best: row.is_best === true,
+    is_sale: row.is_sale === true,
+  }
+}
+
+function buildExposurePayload(input: Pick<AdminProductFormInput, 'isNew' | 'isBest' | 'isSale'>) {
+  return {
+    is_new: input.isNew === true,
+    is_best: input.isBest === true,
+    is_sale: input.isSale === true,
+  }
+}
+
 function buildCreatePayload(input: AdminProductFormInput) {
-  const slug = input.slug.trim()
+  const slug = sanitizeSlug(input.slug)
+  const name = sanitizeText(input.name, { maxLength: 200 })
   const thumbnail = placeholderImage(slug)
+  const categoryFields = buildProductCategoryPayload(input.product_category)
 
   return {
     slug,
-    name: input.name.trim(),
-    short_description: input.name.trim(),
-    description: input.name.trim(),
+    name,
+    short_description: name,
+    description: name,
     price: input.price,
     original_price: input.price,
     discount_rate: 0,
     thumbnail,
     images: [thumbnail],
-    gender: input.gender,
-    display_category: input.display_category,
-    detail_category: 'accessory',
+    ...categoryFields,
     tags: [],
-    is_new: false,
-    is_best: false,
-    is_sale: false,
+    ...buildExposurePayload(input),
     stock: input.stock,
     display_order: 0,
     status: input.status,
@@ -98,6 +121,10 @@ export async function fetchAdminProducts(
     query = query.eq('status', filters.status)
   }
 
+  if (filters.category !== 'all' && isProductCategoryId(filters.category)) {
+    query = query.eq('product_category', filters.category)
+  }
+
   const { data, error, count } = await query.range(from, to)
 
   if (error) {
@@ -108,26 +135,52 @@ export async function fetchAdminProducts(
   }
 
   return {
-    products: (data ?? []) as AdminProductRow[],
+    products: (data ?? []).map((row) => normalizeAdminProductRow(row as AdminProductRow)),
     totalCount: count ?? 0,
   }
 }
 
-export async function createAdminProduct(input: AdminProductFormInput): Promise<void> {
+export async function createAdminProduct(input: AdminProductFormInput): Promise<string> {
   assertSupabaseReady()
 
-  const { error } = await supabase!.from('products').insert(buildCreatePayload(input))
+  const validationError = validateAdminProductInput({
+    slug: input.slug,
+    name: input.name,
+    price: input.price,
+    stock: input.stock,
+  })
 
-  if (error) {
+  if (validationError) {
+    throw new AdminProductRepositoryError(validationError)
+  }
+
+  const { data, error } = await supabase!
+    .from('products')
+    .insert(buildCreatePayload(input))
+    .select('id')
+    .single()
+
+  if (error || !data) {
     throw new AdminProductRepositoryError('상품을 등록하지 못했습니다.', error)
   }
+
+  return data.id
 }
 
 export async function updateAdminProduct(
   productId: string,
   input: AdminProductUpdateInput,
-): Promise<void> {
+): Promise<AdminProductRow> {
   assertSupabaseReady()
+
+  const validationError =
+    validatePrice(input.price) ?? validateNonNegativeInteger(input.stock, '재고')
+
+  if (validationError) {
+    throw new AdminProductRepositoryError(validationError)
+  }
+
+  const categoryFields = buildProductCategoryPayload(input.product_category)
 
   const { data, error } = await supabase!
     .from('products')
@@ -135,18 +188,21 @@ export async function updateAdminProduct(
       price: input.price,
       stock: input.stock,
       status: input.status,
-      display_category: input.display_category,
+      ...buildExposurePayload(input),
+      ...categoryFields,
     })
     .eq('id', productId)
-    .select('id')
+    .select(PRODUCT_SELECT)
     .maybeSingle()
 
-  assertSupabaseMutationRow(
+  const row = assertSupabaseMutationRow(
     data,
     error,
     '상품을 수정하지 못했습니다.',
     AdminProductRepositoryError,
   )
+
+  return normalizeAdminProductRow(row as AdminProductRow)
 }
 
 export async function deleteAdminProduct(productId: string): Promise<void> {
@@ -164,7 +220,7 @@ export async function setAdminProductSoldOut(productId: string): Promise<void> {
 
   const { data, error } = await supabase!
     .from('products')
-    .update({ status: 'soldout' })
+    .update({ status: 'soldout', stock: 0 })
     .eq('id', productId)
     .select('id')
     .maybeSingle()

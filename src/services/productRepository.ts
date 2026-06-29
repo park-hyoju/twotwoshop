@@ -5,10 +5,12 @@
  * - On missing env, query error, or empty result: falls back to `productService` (static).
  * - UI pages should use this repository; do not call Supabase directly from components.
  */
+import {
+  getCategoryIdsForGroup,
+  type ProductCategoryGroup,
+  type ProductCategoryId,
+} from '../constants/productCategories'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { DetailCategory } from '../types/detailCategory'
-import type { DisplayCategory } from '../types/displayCategory'
-import type { Gender } from '../types/gender'
 import type { Product } from '../types/product'
 import {
   mapProductRowToProduct,
@@ -18,36 +20,29 @@ import {
   getAllProducts,
   getBestProducts,
   getNewProducts,
-  getProductBySlug,
-  getProductsByDetailCategory,
-  getProductsByDisplayCategory,
-  getProductsByGender,
+  getPerfumeProducts,
+  getProductsByCategoryGroup,
+  getProductsByProductCategory,
   getSaleProducts,
 } from './productService'
-
-export interface ProductCategoryFilter {
-  gender?: Gender
-  displayCategory?: DisplayCategory
-  detailCategory?: DetailCategory
-}
 
 export interface ProductRepository {
   findAllProducts(): Promise<Product[]>
   findProductBySlug(slug: string): Promise<Product | undefined>
-  findProductsByCategory(filter?: ProductCategoryFilter): Promise<Product[]>
+  findProductsByProductCategory(categoryId: ProductCategoryId): Promise<Product[]>
+  findProductsByCategoryGroup(group: ProductCategoryGroup): Promise<Product[]>
   findBestProducts(): Promise<Product[]>
   findNewProducts(): Promise<Product[]>
   findSaleProducts(): Promise<Product[]>
-  findProductsByDisplayCategory(category: DisplayCategory): Promise<Product[]>
-  findProductsByDetailCategory(category: DetailCategory): Promise<Product[]>
+  findPerfumeProducts(): Promise<Product[]>
+  findRelatedProducts(productId: string): Promise<Product[]>
 }
 
 const PRODUCT_COLUMNS = '*'
 
 interface ProductRowFilter {
-  gender?: Gender
-  displayCategory?: DisplayCategory
-  detailCategory?: DetailCategory
+  productCategory?: ProductCategoryId
+  productCategories?: ProductCategoryId[]
   isBest?: boolean
   isNew?: boolean
   isSale?: boolean
@@ -77,14 +72,10 @@ async function fetchActiveProductRows(
     .select(PRODUCT_COLUMNS)
     .eq('status', 'active')
 
-  if (filter.gender) {
-    query = query.eq('gender', filter.gender)
-  }
-  if (filter.displayCategory) {
-    query = query.eq('display_category', filter.displayCategory)
-  }
-  if (filter.detailCategory) {
-    query = query.eq('detail_category', filter.detailCategory)
+  if (filter.productCategory) {
+    query = query.eq('product_category', filter.productCategory)
+  } else if (filter.productCategories && filter.productCategories.length > 0) {
+    query = query.in('product_category', filter.productCategories)
   }
   if (filter.isBest !== undefined) {
     query = query.eq('is_best', filter.isBest)
@@ -105,7 +96,45 @@ async function fetchActiveProductRows(
     return null
   }
 
-  return (data ?? []) as ProductRow[]
+  let rows = (data ?? []) as ProductRow[]
+
+  if (!filter.productCategory && !filter.productCategories) {
+    return rows
+  }
+
+  if (!filter.productCategory && filter.productCategories) {
+    return rows
+  }
+
+  if (filter.productCategory && rows.length === 0) {
+    const legacyRows = await fetchLegacyCategoryRows(filter.productCategory)
+    return legacyRows
+  }
+
+  return rows
+}
+
+async function fetchLegacyCategoryRows(
+  categoryId: ProductCategoryId,
+): Promise<ProductRow[] | null> {
+  if (!isSupabaseConfigured || !supabase) {
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_COLUMNS)
+    .eq('status', 'active')
+
+  if (error) {
+    return null
+  }
+
+  const rows = (data ?? []) as ProductRow[]
+  return rows.filter((row) => {
+    const mapped = mapProductRowToProduct(row)
+    return mapped.productCategory === categoryId
+  })
 }
 
 async function fetchActiveProductRowBySlug(
@@ -128,6 +157,48 @@ async function fetchActiveProductRowBySlug(
   }
 
   return (data as ProductRow | null) ?? null
+}
+
+async function fetchRelatedProductRows(productId: string): Promise<ProductRow[] | null> {
+  if (!isSupabaseConfigured || !supabase) {
+    return null
+  }
+
+  const { data: links, error: linksError } = await supabase
+    .from('product_related')
+    .select('related_product_id, sort_order')
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true })
+
+  if (linksError) {
+    console.warn('[productRepository] Related products fetch failed:', linksError.message)
+    return null
+  }
+
+  if (!links || links.length === 0) {
+    return []
+  }
+
+  const relatedIds = links.map((link) => link.related_product_id)
+
+  const { data: products, error: productsError } = await supabase
+    .from('products')
+    .select(PRODUCT_COLUMNS)
+    .in('id', relatedIds)
+    .eq('status', 'active')
+
+  if (productsError) {
+    console.warn('[productRepository] Related product rows fetch failed:', productsError.message)
+    return null
+  }
+
+  const productById = new Map(
+    ((products ?? []) as ProductRow[]).map((row) => [row.id, row]),
+  )
+
+  return links
+    .map((link) => productById.get(link.related_product_id))
+    .filter((row): row is ProductRow => row !== undefined)
 }
 
 async function withSupabaseFallback<T>(
@@ -160,60 +231,29 @@ export const productRepository: ProductRepository = {
       const row = await fetchActiveProductRowBySlug(slug)
       if (!row) return null
       return mapProductRowToProduct(row)
-    }, () => getProductBySlug(slug)),
+    }, () => getAllProducts().find((product) => product.slug === slug)),
 
-  findProductsByCategory: (filter = {}) =>
+  findProductsByProductCategory: (categoryId) =>
     withSupabaseFallback(async () => {
-      const { gender, displayCategory, detailCategory } = filter
-
-      if (detailCategory) {
-        const rows = await fetchActiveProductRows({ detailCategory })
-        if (!rows) return null
-        if (rows.length === 0) return null
-        return mapRows(rows)
-      }
-
-      if (gender && displayCategory) {
-        const rows = await fetchActiveProductRows({ gender, displayCategory })
-        if (!rows) return null
-        if (rows.length === 0) return null
-        return mapRows(rows)
-      }
-
-      if (gender) {
-        const rows = await fetchActiveProductRows({ gender })
-        if (!rows) return null
-        if (rows.length === 0) return null
-        return mapRows(rows)
-      }
-
-      const rows = await fetchActiveProductRows()
+      const rows = await fetchActiveProductRows({ productCategory: categoryId })
       if (!rows) return null
       if (rows.length === 0) return null
       return mapRows(rows)
-    }, () => {
-      const { gender, displayCategory, detailCategory } = filter
+    }, () => getProductsByProductCategory(categoryId)),
 
-      if (detailCategory) {
-        return getProductsByDetailCategory(detailCategory)
-      }
-
-      if (gender && displayCategory) {
-        return getProductsByDisplayCategory(gender, displayCategory)
-      }
-
-      if (gender) {
-        return getProductsByGender(gender)
-      }
-
-      return getAllProducts()
-    }),
+  findProductsByCategoryGroup: (group) =>
+    withSupabaseFallback(async () => {
+      const categoryIds = getCategoryIdsForGroup(group)
+      const rows = await fetchActiveProductRows({ productCategories: categoryIds })
+      if (!rows) return null
+      if (rows.length === 0) return null
+      return mapRows(rows)
+    }, () => getProductsByCategoryGroup(group)),
 
   findBestProducts: () =>
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isBest: true })
       if (!rows) return null
-      if (rows.length === 0) return null
       return mapRows(rows)
     }, getBestProducts),
 
@@ -221,7 +261,6 @@ export const productRepository: ProductRepository = {
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isNew: true })
       if (!rows) return null
-      if (rows.length === 0) return null
       return mapRows(rows)
     }, getNewProducts),
 
@@ -229,27 +268,21 @@ export const productRepository: ProductRepository = {
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isSale: true })
       if (!rows) return null
-      if (rows.length === 0) return null
       return mapRows(rows)
     }, getSaleProducts),
 
-  findProductsByDisplayCategory: (category) =>
+  findPerfumeProducts: () =>
     withSupabaseFallback(async () => {
-      const rows = await fetchActiveProductRows({ displayCategory: category })
+      const rows = await fetchActiveProductRows({ productCategory: 'perfume' })
       if (!rows) return null
-      if (rows.length === 0) return null
       return mapRows(rows)
-    }, () =>
-      getAllProducts().filter(
-        (product) => product.displayCategory === category,
-      ),
-    ),
+    }, getPerfumeProducts),
 
-  findProductsByDetailCategory: (category) =>
+  findRelatedProducts: (productId) =>
     withSupabaseFallback(async () => {
-      const rows = await fetchActiveProductRows({ detailCategory: category })
-      if (!rows) return null
-      if (rows.length === 0) return null
+      const rows = await fetchRelatedProductRows(productId)
+      if (rows === null) return null
+      if (rows.length === 0) return []
       return mapRows(rows)
-    }, () => getProductsByDetailCategory(category)),
+    }, () => []),
 }

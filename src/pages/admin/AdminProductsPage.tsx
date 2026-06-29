@@ -17,6 +17,7 @@ import {
   setAdminProductVisibility,
   updateAdminProduct,
 } from '../../services/adminProductRepository'
+import { saveAdminRelatedProducts } from '../../services/adminProductRelatedRepository'
 import type {
   AdminProductFormInput,
   AdminProductRow,
@@ -36,6 +37,7 @@ const EMPTY_FILTERS: AdminProductSearchFilters = {
   name: '',
   slug: '',
   status: 'all',
+  category: 'all',
 }
 
 function getErrorMessage(error: unknown): string {
@@ -177,16 +179,26 @@ export function AdminProductsPage() {
     setIsFormSubmitting(true)
 
     try {
+      let productId: string
+
       if (formMode === 'create') {
-        await createAdminProduct(input)
+        productId = await createAdminProduct(input)
       } else if (formMode === 'edit' && editingProduct) {
+        productId = editingProduct.id
         await updateAdminProduct(editingProduct.id, {
           price: input.price,
           stock: input.stock,
           status: input.status,
-          display_category: input.display_category,
+          product_category: input.product_category,
+          isNew: input.isNew,
+          isBest: input.isBest,
+          isSale: input.isSale,
         })
+      } else {
+        return
       }
+
+      await saveAdminRelatedProducts(productId, input.relatedProductIds)
 
       closeForm()
       await loadProducts()

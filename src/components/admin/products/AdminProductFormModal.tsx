@@ -1,11 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import {
-  DISPLAY_CATEGORY_OPTIONS,
-  PRODUCT_STATUS_OPTIONS,
-} from '../../../lib/adminProductStatus'
+import { resolveProductCategory } from '../../../constants/productCategories'
+import { PRODUCT_STATUS_OPTIONS } from '../../../lib/adminProductStatus'
+import { fetchAdminRelatedProducts } from '../../../services/adminProductRelatedRepository'
 import type { AdminProductFormInput, AdminProductRow } from '../../../types/adminProduct'
-import type { DisplayCategory } from '../../../types/displayCategory'
+import type { RelatedProductPick } from '../../../types/adminProductRelated'
+import type { ProductCategoryId } from '../../../constants/productCategories'
 import type { ProductStatus } from '../../../types/status'
+import { ProductCategorySelect } from './ProductCategorySelect'
+import { ProductExposureSettings } from './ProductExposureSettings'
+import { RelatedProductsSection } from './RelatedProductsSection'
 
 export type AdminProductFormMode = 'create' | 'edit'
 
@@ -25,8 +28,11 @@ const EMPTY_FORM: AdminProductFormInput = {
   price: 0,
   stock: 0,
   status: 'active',
-  display_category: 'misc',
-  gender: 'common',
+  product_category: 'etc',
+  isNew: false,
+  isBest: false,
+  isSale: false,
+  relatedProductIds: [],
 }
 
 const inputClassName =
@@ -39,8 +45,14 @@ function toFormInput(product: AdminProductRow): AdminProductFormInput {
     price: product.price,
     stock: product.stock,
     status: product.status,
-    display_category: (product.display_category as DisplayCategory) ?? 'misc',
-    gender: 'common',
+    product_category: resolveProductCategory({
+      product_category: product.product_category,
+      display_category: product.display_category,
+    }),
+    isNew: product.is_new === true,
+    isBest: product.is_best === true,
+    isSale: product.is_sale === true,
+    relatedProductIds: [],
   }
 }
 
@@ -54,6 +66,9 @@ export function AdminProductFormModal({
   onSubmit,
 }: AdminProductFormModalProps) {
   const [form, setForm] = useState<AdminProductFormInput>(EMPTY_FORM)
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProductPick[]>([])
+  const [isLoadingRelated, setIsLoadingRelated] = useState(false)
+  const [relatedLoadError, setRelatedLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isOpen) {
@@ -62,10 +77,27 @@ export function AdminProductFormModal({
 
     if (mode === 'edit' && product) {
       setForm(toFormInput(product))
+      setRelatedProducts([])
+      setRelatedLoadError(null)
+      setIsLoadingRelated(true)
+
+      void fetchAdminRelatedProducts(product.id)
+        .then((items) => {
+          setRelatedProducts(items)
+          setIsLoadingRelated(false)
+        })
+        .catch(() => {
+          setRelatedLoadError('연관상품을 불러오지 못했습니다.')
+          setIsLoadingRelated(false)
+        })
+
       return
     }
 
     setForm(EMPTY_FORM)
+    setRelatedProducts([])
+    setRelatedLoadError(null)
+    setIsLoadingRelated(false)
   }, [isOpen, mode, product])
 
   if (!isOpen) {
@@ -74,7 +106,14 @@ export function AdminProductFormModal({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onSubmit(form)
+    onSubmit({
+      ...form,
+      relatedProductIds: relatedProducts.map((item) => item.id),
+    })
+  }
+
+  function handleRelatedProductsChange(products: RelatedProductPick[]) {
+    setRelatedProducts(products)
   }
 
   function updateField<K extends keyof AdminProductFormInput>(
@@ -84,13 +123,17 @@ export function AdminProductFormModal({
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  function updateExposureField(field: 'isNew' | 'isBest' | 'isSale', value: boolean) {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-product-form-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
       >
         <h2 id="admin-product-form-title" className="text-xl font-bold text-neutral-900">
           {mode === 'create' ? '상품 추가' : '상품 수정'}
@@ -172,20 +215,13 @@ export function AdminProductFormModal({
               <label htmlFor="product-category" className="mb-2 block text-sm font-medium text-neutral-700">
                 카테고리
               </label>
-              <select
+              <ProductCategorySelect
                 id="product-category"
-                value={form.display_category}
-                onChange={(event) =>
-                  updateField('display_category', event.target.value as DisplayCategory)
-                }
+                value={form.product_category}
+                onChange={(value: ProductCategoryId) => updateField('product_category', value)}
                 className={inputClassName}
-              >
-                {DISPLAY_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                required
+              />
             </div>
 
             <div>
@@ -205,6 +241,35 @@ export function AdminProductFormModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          <ProductExposureSettings
+            isNew={form.isNew}
+            isBest={form.isBest}
+            isSale={form.isSale}
+            onChange={updateExposureField}
+            disabled={isSubmitting}
+          />
+
+          <div className="border-t border-neutral-200 pt-4">
+            {isLoadingRelated && (
+              <p className="text-sm text-neutral-500">연관상품을 불러오는 중...</p>
+            )}
+
+            {relatedLoadError && (
+              <p role="alert" className="mb-3 text-sm text-red-600">
+                {relatedLoadError}
+              </p>
+            )}
+
+            {!isLoadingRelated && (
+              <RelatedProductsSection
+                productId={mode === 'edit' ? product?.id ?? null : null}
+                selectedProducts={relatedProducts}
+                onChange={handleRelatedProductsChange}
+                disabled={isSubmitting}
+              />
+            )}
           </div>
 
           {errorMessage && (

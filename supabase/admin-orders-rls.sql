@@ -49,6 +49,4 @@ create policy "orders_update_admin"
   for update
   to anon, authenticated
   using (true)
-  with check (
-    status in ('pending', 'confirmed', 'paid', 'shipped', 'completed', 'cancelled')
-  );
+  with check (true);

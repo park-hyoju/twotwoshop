@@ -7,4 +7,5 @@ export {
   ProductsBestPage,
   ProductsSalePage,
 } from './products/ProductsPages'
-export { LivePage, CartPage, LoginPage, NoticesPage } from './ServicePages'
+export { LivePage, CartPage } from './ServicePages'
+export { MyPage, SignInPage, SignUpPage } from './auth'

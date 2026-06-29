@@ -4,15 +4,15 @@ export {
   getNewProducts,
   getProductById,
   getProductBySlug,
-  getProductsByDetailCategory,
-  getProductsByDisplayCategory,
+  getProductsByCategoryGroup,
+  getProductsByProductCategory,
   getProductsByGender,
+  getPerfumeProducts,
   getSaleProducts,
 } from './productService'
 
 export {
   productRepository,
-  type ProductCategoryFilter,
   type ProductRepository,
 } from './productRepository'
 

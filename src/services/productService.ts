@@ -7,11 +7,14 @@
  *
  * For storefront UI, prefer `productRepository` (async, Supabase + fallback to this module).
  */
+import {
+  getCategoryIdsForGroup,
+  type ProductCategoryGroup,
+  type ProductCategoryId,
+} from '../constants/productCategories'
 import { PRODUCTS } from '../data/products'
-import type { DetailCategory } from '../types/detailCategory'
-import type { DisplayCategory } from '../types/displayCategory'
-import type { Gender } from '../types/gender'
 import type { Product } from '../types/product'
+import { enrichProduct } from './productMapper'
 
 function isVisibleOnStorefront(product: Product): boolean {
   return product.status !== 'hidden'
@@ -24,11 +27,12 @@ function sortByCreatedAtDesc(products: Product[]): Product[] {
 }
 
 function filterStorefront(products: Product[]): Product[] {
-  return sortByCreatedAtDesc(products.filter(isVisibleOnStorefront))
+  return sortByCreatedAtDesc(products.filter(isVisibleOnStorefront).map(enrichProduct))
 }
 
-function matchesGender(product: Product, gender: Gender): boolean {
-  return product.gender === gender || product.gender === 'common'
+function matchesCategoryGroup(product: Product, group: ProductCategoryGroup): boolean {
+  const ids = getCategoryIdsForGroup(group)
+  return ids.includes(product.productCategory)
 }
 
 export function getAllProducts(): Product[] {
@@ -48,35 +52,51 @@ export function getSaleProducts(): Product[] {
 }
 
 export function getProductBySlug(slug: string): Product | undefined {
-  return PRODUCTS.find(
-    (product) => product.slug === slug && isVisibleOnStorefront(product),
+  const product = PRODUCTS.find(
+    (item) => item.slug === slug && isVisibleOnStorefront(item),
   )
+
+  return product ? enrichProduct(product) : undefined
 }
 
 export function getProductById(id: string): Product | undefined {
-  return PRODUCTS.find((product) => product.id === id)
+  const product = PRODUCTS.find((item) => item.id === id)
+  return product ? enrichProduct(product) : undefined
 }
 
-export function getProductsByGender(gender: Gender): Product[] {
-  return filterStorefront(PRODUCTS.filter((product) => matchesGender(product, gender)))
+export function getProductsByCategoryGroup(group: ProductCategoryGroup): Product[] {
+  return filterStorefront(PRODUCTS.filter((product) => matchesCategoryGroup(enrichProduct(product), group)))
 }
 
-export function getProductsByDisplayCategory(
-  gender: Gender,
-  displayCategory: DisplayCategory,
-): Product[] {
+export function getProductsByProductCategory(categoryId: ProductCategoryId): Product[] {
   return filterStorefront(
-    PRODUCTS.filter(
-      (product) =>
-        matchesGender(product, gender) && product.displayCategory === displayCategory,
-    ),
+    PRODUCTS.filter((product) => enrichProduct(product).productCategory === categoryId),
   )
 }
 
-export function getProductsByDetailCategory(
-  detailCategory: DetailCategory,
-): Product[] {
-  return filterStorefront(
-    PRODUCTS.filter((product) => product.detailCategory === detailCategory),
-  )
+export function getPerfumeProducts(): Product[] {
+  return getProductsByProductCategory('perfume')
+}
+
+/** @deprecated 레거시 호환 */
+export function getProductsByGender(gender: 'women' | 'men' | 'common' | 'perfume') {
+  if (gender === 'perfume') {
+    return getPerfumeProducts()
+  }
+
+  if (gender === 'women' || gender === 'men') {
+    return getProductsByCategoryGroup(gender)
+  }
+
+  return filterStorefront(PRODUCTS.filter((product) => enrichProduct(product).gender === 'common'))
+}
+
+/** @deprecated 레거시 호환 */
+export function getProductsByDisplayCategory() {
+  return getAllProducts()
+}
+
+/** @deprecated 레거시 호환 */
+export function getProductsByDetailCategory() {
+  return getAllProducts()
 }

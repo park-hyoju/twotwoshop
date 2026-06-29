@@ -1,8 +1,7 @@
-import { DISPLAY_CATEGORY_OPTIONS } from '../../../../../lib/adminProductStatus'
+import type { ProductCategoryId } from '../../../../../constants/productCategories'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
-import type { DisplayCategory } from '../../../../../types/displayCategory'
-import type { Gender } from '../../../../../types/gender'
 import type { ProductStatus } from '../../../../../types/status'
+import { ProductCategorySelect } from '../../ProductCategorySelect'
 import {
   adminCardClassName,
   adminInputClassName,
@@ -10,12 +9,6 @@ import {
   adminPageStackClassName,
 } from '../adminFormStyles'
 import { AdminPricingFields } from './AdminPricingFields'
-
-const GENDER_OPTIONS: Array<{ value: Gender; label: string }> = [
-  { value: 'women', label: '여성' },
-  { value: 'men', label: '남성' },
-  { value: 'common', label: '공통' },
-]
 
 const SALE_STATUS_OPTIONS: Array<{ value: ProductStatus; label: string }> = [
   { value: 'active', label: '판매중' },
@@ -56,41 +49,16 @@ export function BasicInfoSection({
         </div>
 
         <div>
-          <label htmlFor="detail-display-category" className={adminLabelClassName}>
+          <label htmlFor="detail-product-category" className={adminLabelClassName}>
             카테고리
           </label>
-          <select
-            id="detail-display-category"
-            value={form.display_category}
-            onChange={(event) =>
-              onChange('display_category', event.target.value as DisplayCategory)
-            }
+          <ProductCategorySelect
+            id="detail-product-category"
+            value={form.product_category}
+            onChange={(value: ProductCategoryId) => onChange('product_category', value)}
             className={adminInputClassName}
-          >
-            {DISPLAY_CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="detail-gender" className={adminLabelClassName}>
-            성별
-          </label>
-          <select
-            id="detail-gender"
-            value={form.gender}
-            onChange={(event) => onChange('gender', event.target.value as Gender)}
-            className={adminInputClassName}
-          >
-            {GENDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            required
+          />
         </div>
 
         <div className="md:col-span-2">

@@ -1,18 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAdminToast } from '../../components/admin/AdminToast'
 import {
-  AdminInquiriesList,
-  AdminInquiriesSearch,
-  AdminInquiriesSummary,
-  AdminInquiryDetailModal,
+  AdminConsultationStatusDropdown,
+  AdminInquiryDeleteModal,
+  AdminInquiryDetailEmpty,
+  AdminInquiryDetailPanel,
+  AdminInquiryListEmpty,
+  AdminInquiryListToolbar,
+  AdminInquirySidebarList,
+  AdminInquirySidebarSkeleton,
+  AdminInquirySoundButton,
+  AdminInquiryStatsBar,
 } from '../../components/admin/inquiries'
 import { AdminOrdersPagination } from '../../components/admin/orders'
+import { useAdminInquiryRealtime } from '../../contexts/AdminInquiryRealtimeContext'
 import { EMPTY_ADMIN_INQUIRY_FILTERS } from '../../lib/adminInquiryFilters'
-import { getInquiryStatusLabel, getInquiryTypeLabel } from '../../lib/adminInquiryDisplay'
 import {
   AdminInquiryRepositoryError,
+  deleteAdminInquiries,
+  deleteAdminInquiry,
   fetchAdminInquiries,
+  fetchAdminInquiryById,
   fetchAdminInquirySummary,
-  updateAdminInquiry,
+  markAdminInquiryAsRead,
+  sendAdminInquiryMessage,
+  updateAdminInquiryMeta,
 } from '../../services/adminInquiryRepository'
 import type {
   AdminInquiryRow,
@@ -20,13 +32,17 @@ import type {
   AdminInquirySummaryStats,
   DbInquiryStatus,
 } from '../../types/adminInquiry'
+import { getConsultationStatusOption } from '../../lib/consultationStatusDisplay'
+import type { ConsultationStatus } from '../../types/consultationStatus'
 
 const PAGE_SIZE = 20
 
 const EMPTY_SUMMARY: AdminInquirySummaryStats = {
   totalCount: 0,
   pendingCount: 0,
+  answeredCount: 0,
   todayCount: 0,
+  unreadCount: 0,
 }
 
 function getErrorMessage(error: unknown): string {
@@ -38,6 +54,8 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function AdminChatPage() {
+  const { showToast } = useAdminToast()
+  const { summary: globalSummary, subscribeListRefresh } = useAdminInquiryRealtime()
   const [inquiries, setInquiries] = useState<AdminInquiryRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [summary, setSummary] = useState<AdminInquirySummaryStats>(EMPTY_SUMMARY)
@@ -51,8 +69,14 @@ export function AdminChatPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedInquiry, setSelectedInquiry] = useState<AdminInquiryRow | null>(null)
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null)
+  const [showMobileDetail, setShowMobileDetail] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const loadSummary = useCallback(async () => {
     try {
@@ -63,8 +87,10 @@ export function AdminChatPage() {
     }
   }, [])
 
-  const loadInquiries = useCallback(async () => {
-    setIsLoading(true)
+  const loadInquiries = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true)
+    }
     setErrorMessage(null)
 
     try {
@@ -76,14 +102,48 @@ export function AdminChatPage() {
 
       setInquiries(result.inquiries)
       setTotalCount(result.totalCount)
+      setSelectedIds((current) => {
+        const next = new Set<string>()
+        for (const id of current) {
+          if (result.inquiries.some((inquiry) => inquiry.id === id)) {
+            next.add(id)
+          }
+        }
+        return next
+      })
     } catch (error) {
       setInquiries([])
       setTotalCount(0)
       setErrorMessage(getErrorMessage(error))
     } finally {
-      setIsLoading(false)
+      if (!options?.silent) {
+        setIsLoading(false)
+      }
     }
   }, [appliedFilters, page])
+
+  const refreshSelectedInquiry = useCallback(async () => {
+    if (!selectedInquiryId) {
+      return
+    }
+
+    const detail = await fetchAdminInquiryById(selectedInquiryId)
+    if (detail) {
+      setSelectedInquiry(detail)
+    }
+  }, [selectedInquiryId])
+
+  useEffect(() => {
+    return subscribeListRefresh(() => {
+      void loadSummary()
+      void loadInquiries({ silent: true })
+      void refreshSelectedInquiry()
+    })
+  }, [loadInquiries, loadSummary, refreshSelectedInquiry, subscribeListRefresh])
+
+  useEffect(() => {
+    setSummary(globalSummary)
+  }, [globalSummary])
 
   useEffect(() => {
     void loadSummary()
@@ -92,6 +152,14 @@ export function AdminChatPage() {
   useEffect(() => {
     void loadInquiries()
   }, [loadInquiries])
+
+  useEffect(() => {
+    if (!selectedInquiryId) {
+      return
+    }
+
+    void refreshSelectedInquiry()
+  }, [refreshSelectedInquiry, selectedInquiryId])
 
   function handleFilterChange(field: keyof AdminInquirySearchFilters, value: string) {
     setDraftFilters((current) => ({
@@ -111,21 +179,129 @@ export function AdminChatPage() {
     setPage(1)
   }
 
-  function handleInquiryClick(inquiry: AdminInquiryRow) {
-    setSelectedInquiry(inquiry)
-    setSaveErrorMessage(null)
+  function handleToggleSelect(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
   }
 
-  function handleCloseDetail() {
-    setSelectedInquiry(null)
-    setSaveErrorMessage(null)
+  function handleToggleSelectAll() {
+    const allSelected =
+      inquiries.length > 0 && inquiries.every((inquiry) => selectedIds.has(inquiry.id))
+
+    if (allSelected) {
+      setSelectedIds(new Set())
+      return
+    }
+
+    setSelectedIds(new Set(inquiries.map((inquiry) => inquiry.id)))
   }
 
-  async function handleSave(input: {
-    status: DbInquiryStatus
-    adminReply: string
-    adminNote: string
-  }) {
+  function openDeleteModal(ids: string[]) {
+    setDeleteTargetIds(ids)
+    setIsDeleteModalOpen(true)
+  }
+
+  function handleDeleteClick(inquiry: AdminInquiryRow) {
+    openDeleteModal([inquiry.id])
+  }
+
+  function handleBulkDeleteClick() {
+    openDeleteModal(Array.from(selectedIds))
+  }
+
+  function closeDeleteModal() {
+    if (isDeleting) {
+      return
+    }
+
+    setIsDeleteModalOpen(false)
+    setDeleteTargetIds([])
+  }
+
+  async function handleConfirmDelete() {
+    if (deleteTargetIds.length === 0) {
+      return
+    }
+
+    setIsDeleting(true)
+
+    try {
+      if (deleteTargetIds.length === 1) {
+        await deleteAdminInquiry(deleteTargetIds[0])
+      } else {
+        await deleteAdminInquiries(deleteTargetIds)
+      }
+
+      if (selectedInquiryId && deleteTargetIds.includes(selectedInquiryId)) {
+        setSelectedInquiry(null)
+        setSelectedInquiryId(null)
+        setShowMobileDetail(false)
+        setSaveErrorMessage(null)
+      }
+
+      setSelectedIds((current) => {
+        const next = new Set(current)
+        for (const id of deleteTargetIds) {
+          next.delete(id)
+        }
+        return next
+      })
+
+      setInquiries((current) => current.filter((inquiry) => !deleteTargetIds.includes(inquiry.id)))
+      setTotalCount((current) => Math.max(0, current - deleteTargetIds.length))
+      showToast(
+        deleteTargetIds.length > 1
+          ? `${deleteTargetIds.length}건의 문의가 삭제되었습니다.`
+          : '문의가 삭제되었습니다.',
+      )
+      setIsDeleteModalOpen(false)
+      setDeleteTargetIds([])
+      void loadSummary()
+      void loadInquiries({ silent: true })
+    } catch (error) {
+      showToast(getErrorMessage(error), { durationMs: 4000 })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  async function handleInquiryClick(inquiry: AdminInquiryRow) {
+    setSelectedInquiry({
+      ...inquiry,
+      has_unread_for_admin: false,
+      admin_unread_count: 0,
+    })
+    setSelectedInquiryId(inquiry.id)
+    setShowMobileDetail(true)
+    setSaveErrorMessage(null)
+
+    try {
+      await markAdminInquiryAsRead(inquiry.id)
+      setInquiries((current) =>
+        current.map((item) =>
+          item.id === inquiry.id
+            ? { ...item, has_unread_for_admin: false, admin_unread_count: 0 }
+            : item,
+        ),
+      )
+      void loadSummary()
+    } catch {
+      // Read marking failure should not block opening the chat room.
+    }
+  }
+
+  function handleBackToList() {
+    setShowMobileDetail(false)
+  }
+
+  async function handleSendMessage(input: { message: string; status: DbInquiryStatus }) {
     if (!selectedInquiry) {
       return
     }
@@ -134,20 +310,43 @@ export function AdminChatPage() {
     setSaveErrorMessage(null)
 
     try {
-      await updateAdminInquiry({
+      await sendAdminInquiryMessage({
+        id: selectedInquiry.id,
+        message: input.message,
+        status: input.status,
+      })
+
+      await refreshSelectedInquiry()
+      void loadSummary()
+      void loadInquiries({ silent: true })
+      showToast('답변이 전송되었습니다.')
+    } catch (error) {
+      setSaveErrorMessage(getErrorMessage(error))
+      showToast(getErrorMessage(error), { durationMs: 4000 })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleUpdateMeta(input: { status: DbInquiryStatus; adminNote: string }) {
+    if (!selectedInquiry) {
+      return
+    }
+
+    try {
+      await updateAdminInquiryMeta({
         id: selectedInquiry.id,
         status: input.status,
-        adminReply: input.adminReply,
         adminNote: input.adminNote,
       })
 
-      handleCloseDetail()
+      await refreshSelectedInquiry()
       void loadSummary()
-      void loadInquiries()
+      void loadInquiries({ silent: true })
+      showToast('문의 상태가 저장되었습니다.')
     } catch (error) {
       setSaveErrorMessage(getErrorMessage(error))
-    } finally {
-      setIsSubmitting(false)
+      showToast(getErrorMessage(error), { durationMs: 4000 })
     }
   }
 
@@ -156,92 +355,124 @@ export function AdminChatPage() {
     appliedFilters.inquiryType !== 'all' ||
     appliedFilters.status !== 'all'
 
+  function handleConsultationStatusChanged(nextStatus: ConsultationStatus) {
+    const option = getConsultationStatusOption(nextStatus)
+    showToast(`상담 상태가 "${option.label}"(으)로 변경되었습니다.`)
+  }
+
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-3">
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold text-neutral-900 sm:text-2xl">상담 관리</h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          고객 1:1 문의를 확인하고 답변·상태를 관리합니다.
-        </p>
-      </div>
-
-      <AdminInquiriesSummary stats={summary} />
-
-      <AdminInquiriesSearch
-        filters={draftFilters}
-        onChange={handleFilterChange}
-        onSearch={handleSearch}
-        onReset={handleReset}
-      />
-
-      <div className="flex min-h-0 flex-1 flex-col">
-        {isLoading && (
-          <div className="flex flex-1 items-center justify-center rounded-lg border border-neutral-200 bg-white px-6 py-12 text-center">
-            <p className="text-sm text-neutral-600">문의 목록을 불러오는 중입니다...</p>
+    <div className="-m-4 flex min-h-[calc(100dvh-8rem)] flex-col overflow-hidden sm:-m-6 lg:-m-8">
+      <header className="admin-chat-panel shrink-0 border border-neutral-200/60 bg-white px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+              Customer Care
+            </p>
+            <h1 className="mt-0.5 text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl">
+              상담 관리
+            </h1>
           </div>
-        )}
+          <div className="flex flex-wrap items-start gap-3">
+            <AdminConsultationStatusDropdown
+              onStatusChanged={handleConsultationStatusChanged}
+              onError={(message) => showToast(message, { durationMs: 4000 })}
+            />
+            <AdminInquirySoundButton />
+          </div>
+        </div>
+        <div className="mt-3">
+          <AdminInquiryStatsBar stats={summary} />
+        </div>
+      </header>
 
-        {!isLoading && errorMessage && (
-          <div
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-6 py-8 text-center"
-          >
-            <p className="text-sm font-medium text-red-700">{errorMessage}</p>
-            <button
-              type="button"
-              onClick={() => void loadInquiries()}
-              className="mt-3 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800"
+      <div className="mt-3 flex min-h-0 flex-1 gap-3">
+        <section
+          className={`admin-chat-panel flex min-h-0 w-full flex-col overflow-hidden border border-neutral-200/60 bg-white lg:w-[35%] ${
+            showMobileDetail ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
+          <AdminInquiryListToolbar
+            filters={draftFilters}
+            selectedCount={selectedIds.size}
+            onChange={handleFilterChange}
+            onSearch={handleSearch}
+            onReset={handleReset}
+            onBulkDelete={selectedIds.size > 0 ? handleBulkDeleteClick : undefined}
+          />
+
+          {isLoading && <AdminInquirySidebarSkeleton />}
+
+          {!isLoading && errorMessage && (
+            <div
+              role="alert"
+              className="m-4 rounded-[20px] border border-red-200 bg-red-50 px-5 py-8 text-center"
             >
-              다시 시도
-            </button>
-          </div>
-        )}
-
-        {!isLoading && !errorMessage && inquiries.length === 0 && (
-          <div className="flex flex-1 items-center justify-center rounded-lg border border-neutral-200 bg-white px-6 py-12 text-center">
-            <div>
-              <p className="text-base font-medium text-neutral-700">아직 접수된 문의가 없습니다.</p>
-              {hasActiveFilters && (
-                <p className="mt-3 text-sm text-neutral-500">
-                  {appliedFilters.inquiryType !== 'all' && (
-                    <span className="block">
-                      문의유형: {getInquiryTypeLabel(appliedFilters.inquiryType)}
-                    </span>
-                  )}
-                  {appliedFilters.status !== 'all' && (
-                    <span className="block">
-                      상태: {getInquiryStatusLabel(appliedFilters.status)}
-                    </span>
-                  )}
-                  검색/필터 조건을 초기화한 뒤 다시 확인해 주세요.
-                </p>
-              )}
+              <p className="text-sm font-medium text-red-700">{errorMessage}</p>
+              <button
+                type="button"
+                onClick={() => void loadInquiries()}
+                className="mt-3 rounded-2xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800"
+              >
+                다시 시도
+              </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {!isLoading && !errorMessage && inquiries.length > 0 && (
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <AdminInquiriesList inquiries={inquiries} onInquiryClick={handleInquiryClick} />
-            <div className="shrink-0">
-              <AdminOrdersPagination
-                page={page}
-                pageSize={PAGE_SIZE}
-                totalCount={totalCount}
-                onPageChange={setPage}
+          {!isLoading && !errorMessage && inquiries.length === 0 && (
+            <AdminInquiryListEmpty hasActiveFilters={hasActiveFilters} onReset={handleReset} />
+          )}
+
+          {!isLoading && !errorMessage && inquiries.length > 0 && (
+            <>
+              <AdminInquirySidebarList
+                inquiries={inquiries}
+                activeId={selectedInquiryId}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleSelectAll={handleToggleSelectAll}
+                onSelect={(inquiry) => void handleInquiryClick(inquiry)}
+                onDelete={handleDeleteClick}
               />
-            </div>
-          </div>
-        )}
+              <div className="shrink-0 border-t border-neutral-100 px-3 py-3">
+                <AdminOrdersPagination
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  totalCount={totalCount}
+                  onPageChange={setPage}
+                />
+              </div>
+            </>
+          )}
+        </section>
+
+        <section
+          className={`admin-chat-panel flex min-h-0 w-full flex-col overflow-hidden border border-neutral-200/60 bg-white lg:w-[65%] ${
+            showMobileDetail ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
+          {selectedInquiry ? (
+            <AdminInquiryDetailPanel
+              inquiry={selectedInquiry}
+              isSubmitting={isSubmitting}
+              errorMessage={saveErrorMessage}
+              onSendMessage={(input) => void handleSendMessage(input)}
+              onUpdateMeta={(input) => void handleUpdateMeta(input)}
+              onRefresh={() => void refreshSelectedInquiry()}
+              onDelete={() => handleDeleteClick(selectedInquiry)}
+              onBack={handleBackToList}
+            />
+          ) : (
+            <AdminInquiryDetailEmpty />
+          )}
+        </section>
       </div>
 
-      <AdminInquiryDetailModal
-        inquiry={selectedInquiry}
-        isOpen={selectedInquiry !== null}
-        isSubmitting={isSubmitting}
-        errorMessage={saveErrorMessage}
-        onClose={handleCloseDetail}
-        onSave={(input) => void handleSave(input)}
+      <AdminInquiryDeleteModal
+        isOpen={isDeleteModalOpen}
+        count={deleteTargetIds.length}
+        isSubmitting={isDeleting}
+        onClose={closeDeleteModal}
+        onConfirm={() => void handleConfirmDelete()}
       />
     </div>
   )

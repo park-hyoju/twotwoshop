@@ -1,38 +1,9 @@
-import {
-  DISPLAY_CATEGORY_OPTIONS,
-  PRODUCT_STATUS_OPTIONS,
-} from '../../../../lib/adminProductStatus'
+import { PRODUCT_STATUS_OPTIONS } from '../../../../lib/adminProductStatus'
 import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
-import type { DetailCategory } from '../../../../types/detailCategory'
-import type { DisplayCategory } from '../../../../types/displayCategory'
-import type { Gender } from '../../../../types/gender'
+import type { ProductCategoryId } from '../../../../constants/productCategories'
 import type { ProductStatus } from '../../../../types/status'
+import { ProductCategorySelect } from '../ProductCategorySelect'
 import { adminInputClassName, adminLabelClassName, adminSectionClassName } from './adminFormStyles'
-
-const DETAIL_CATEGORY_OPTIONS: DetailCategory[] = [
-  'shirt',
-  'knit',
-  'hoodie',
-  'tshirt',
-  'pants',
-  'dress',
-  'sneakers',
-  'loafers',
-  'bag',
-  'belt',
-  'wallet',
-  'cap',
-  'accessory',
-  'skirt',
-  'socks',
-  'etc',
-]
-
-const GENDER_OPTIONS: Array<{ value: Gender; label: string }> = [
-  { value: 'women', label: '여성' },
-  { value: 'men', label: '남성' },
-  { value: 'common', label: '공통' },
-]
 
 interface BasicInfoTabProps {
   form: AdminProductDetailForm
@@ -91,57 +62,16 @@ export function BasicInfoTab({ form, onChange }: BasicInfoTabProps) {
           />
         </div>
         <div>
-          <label htmlFor="detail-display-category" className={adminLabelClassName}>
+          <label htmlFor="detail-product-category" className={adminLabelClassName}>
             카테고리
           </label>
-          <select
-            id="detail-display-category"
-            value={form.display_category}
-            onChange={(event) =>
-              onChange('display_category', event.target.value as DisplayCategory)
-            }
+          <ProductCategorySelect
+            id="detail-product-category"
+            value={form.product_category}
+            onChange={(value: ProductCategoryId) => onChange('product_category', value)}
             className={adminInputClassName}
-          >
-            {DISPLAY_CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="detail-detail-category" className={adminLabelClassName}>
-            상세 카테고리
-          </label>
-          <select
-            id="detail-detail-category"
-            value={form.detail_category}
-            onChange={(event) => onChange('detail_category', event.target.value as DetailCategory)}
-            className={adminInputClassName}
-          >
-            {DETAIL_CATEGORY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="detail-gender" className={adminLabelClassName}>
-            성별
-          </label>
-          <select
-            id="detail-gender"
-            value={form.gender}
-            onChange={(event) => onChange('gender', event.target.value as Gender)}
-            className={adminInputClassName}
-          >
-            {GENDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            required
+          />
         </div>
         <div>
           <label htmlFor="detail-status" className={adminLabelClassName}>

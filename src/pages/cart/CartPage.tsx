@@ -21,7 +21,7 @@ export function CartPage() {
     syncCart()
   }, [syncCart])
 
-  const total = getCartTotal()
+  const productTotal = getCartTotal()
   const itemCount = getCartCount()
   const totalQuantity = getCartTotalQuantity()
   const soldOutIncluded = hasSoldOutItems()
@@ -70,7 +70,7 @@ export function CartPage() {
           </ul>
 
           <CartSummary
-            total={total}
+            productTotal={productTotal}
             itemCount={itemCount}
             totalQuantity={totalQuantity}
             hasSoldOutItems={soldOutIncluded}

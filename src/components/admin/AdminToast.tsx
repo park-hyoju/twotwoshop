@@ -12,7 +12,7 @@ import {
 const TOAST_DURATION_MS = 2500
 
 interface AdminToastContextValue {
-  showToast: (message: string) => void
+  showToast: (message: string, options?: { durationMs?: number }) => void
   dismissToast: () => void
 }
 
@@ -78,7 +78,7 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const showToast = useCallback(
-    (message: string) => {
+    (message: string, options?: { durationMs?: number }) => {
       if (dismissTimerRef.current !== null) {
         window.clearTimeout(dismissTimerRef.current)
       }
@@ -89,7 +89,7 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
       dismissTimerRef.current = window.setTimeout(() => {
         dismissTimerRef.current = null
         setToast(null)
-      }, TOAST_DURATION_MS)
+      }, options?.durationMs ?? TOAST_DURATION_MS)
     },
     [],
   )

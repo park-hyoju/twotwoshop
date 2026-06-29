@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ADMIN_ALLOWED_EMAIL,
-  ADMIN_INVALID_CREDENTIALS_MESSAGE,
+  ADMIN_ROLE,
   ADMIN_UNAUTHORIZED_MESSAGE,
-  isAllowedAdminEmail,
+  ADMIN_INVALID_CREDENTIALS_MESSAGE,
+  isAdminUser,
   resolveAdminLoginId,
 } from './adminAuthConfig'
 
 describe('resolveAdminLoginId', () => {
   it('maps admin alias to allowed email', () => {
-    expect(resolveAdminLoginId('admin')).toBe(ADMIN_ALLOWED_EMAIL)
-    expect(resolveAdminLoginId(' Admin ')).toBe(ADMIN_ALLOWED_EMAIL)
-    expect(resolveAdminLoginId('ADMIN')).toBe(ADMIN_ALLOWED_EMAIL)
+    expect(resolveAdminLoginId('admin')).toBe('admin@twotwoshop.com')
+    expect(resolveAdminLoginId(' Admin ')).toBe('admin@twotwoshop.com')
+    expect(resolveAdminLoginId('ADMIN')).toBe('admin@twotwoshop.com')
   })
 
   it('passes through full admin email', () => {
@@ -25,14 +25,22 @@ describe('resolveAdminLoginId', () => {
   })
 })
 
-describe('isAllowedAdminEmail', () => {
-  it('allows only the configured admin email', () => {
-    expect(isAllowedAdminEmail('admin@twotwoshop.com')).toBe(true)
-    expect(isAllowedAdminEmail(' Admin@twotwoshop.com ')).toBe(true)
-    expect(isAllowedAdminEmail('other@example.com')).toBe(false)
-    expect(isAllowedAdminEmail('admin')).toBe(false)
-    expect(isAllowedAdminEmail(null)).toBe(false)
-    expect(isAllowedAdminEmail(undefined)).toBe(false)
+describe('isAdminUser', () => {
+  it('allows only JWT app_metadata.role = admin', () => {
+    expect(isAdminUser({ app_metadata: { role: ADMIN_ROLE } })).toBe(true)
+    expect(isAdminUser({ app_metadata: { role: 'user' } })).toBe(false)
+    expect(isAdminUser({ app_metadata: {} })).toBe(false)
+    expect(isAdminUser({ app_metadata: undefined })).toBe(false)
+    expect(isAdminUser(null)).toBe(false)
+  })
+
+  it('does not grant admin by email alone', () => {
+    expect(
+      isAdminUser({
+        email: 'admin@twotwoshop.com',
+        app_metadata: {},
+      } as never),
+    ).toBe(false)
   })
 })
 

@@ -18,6 +18,7 @@ const PRODUCT_DETAIL_SELECT = `
   discount_rate,
   thumbnail,
   images,
+  product_category,
   gender,
   display_category,
   detail_category,

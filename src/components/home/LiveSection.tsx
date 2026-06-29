@@ -8,7 +8,7 @@ interface LiveSectionProps {
 
 export function LiveSection({ banner }: LiveSectionProps) {
   return (
-    <Section id="live" ariaLabel="라이브방송" className="bg-neutral-900">
+    <Section id="live" ariaLabel="라이브방송" className="bg-[#111]">
       <LiveBanner banner={banner} />
     </Section>
   )

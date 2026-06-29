@@ -1,12 +1,27 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
 import { ProductDetailView } from '../../components/product/ProductDetailView'
 import { ProductLoadingMessage } from '../../components/product/ProductLoadingMessage'
 import { useProductBySlug } from '../../hooks/useProductBySlug'
+import { addRecentProduct } from '../../lib/recentProducts'
 import { ROUTES } from '../../lib/routes'
 
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const { product, isLoading, notFound } = useProductBySlug(slug)
+
+  useEffect(() => {
+    if (!product) {
+      return
+    }
+
+    addRecentProduct({
+      slug: product.slug,
+      name: product.name,
+      thumbnail: product.thumbnail,
+      price: product.price,
+    })
+  }, [product])
 
   if (!slug) {
     return <Navigate to={ROUTES.notFound} replace />

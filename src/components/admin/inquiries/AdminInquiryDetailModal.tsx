@@ -1,7 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateTime } from '../../../lib/formatDateTime'
-import { INQUIRY_STATUS_OPTIONS } from '../../../lib/adminInquiryDisplay'
+import { buildInquiryChatTimeline } from '../../../lib/inquiryChatTimeline'
+import { INQUIRY_STATUS_OPTIONS, getInquiryDisplayCode } from '../../../lib/adminInquiryDisplay'
+import { INQUIRY_REPLY_OVERWRITE_CONFIRM_MESSAGE, getInquiryReplyTemplate, type InquiryReplyTemplateKey } from '../../../lib/inquiryReplyTemplates'
+import { useAdminInquiryChatRealtime } from '../../../hooks/useInquiryRealtime'
 import type { AdminInquiryRow, DbInquiryStatus } from '../../../types/adminInquiry'
+import { InquiryChatComposer } from '../../chat/InquiryChatComposer'
+import { InquiryChatTimeline } from '../../chat/InquiryChatTimeline'
+import { InquiryReplyTemplateButtons } from './InquiryReplyTemplateButtons'
 import { InquiryStatusBadge, InquiryTypeBadge } from './InquiryBadges'
 
 interface AdminInquiryDetailModalProps {
@@ -10,19 +16,9 @@ interface AdminInquiryDetailModalProps {
   isSubmitting: boolean
   errorMessage: string | null
   onClose: () => void
-  onSave: (input: { status: DbInquiryStatus; adminReply: string; adminNote: string }) => void
-}
-
-const inputClassName =
-  'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500'
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[5.5rem_1fr] gap-2 text-sm">
-      <dt className="text-neutral-500">{label}</dt>
-      <dd className="text-neutral-900">{value}</dd>
-    </div>
-  )
+  onSendMessage: (input: { message: string; status: DbInquiryStatus }) => void
+  onUpdateMeta: (input: { status: DbInquiryStatus; adminNote: string }) => void
+  onRefresh: () => void
 }
 
 export function AdminInquiryDetailModal({
@@ -31,11 +27,27 @@ export function AdminInquiryDetailModal({
   isSubmitting,
   errorMessage,
   onClose,
-  onSave,
+  onSendMessage,
+  onUpdateMeta,
+  onRefresh,
 }: AdminInquiryDetailModalProps) {
+  const [draftMessage, setDraftMessage] = useState('')
   const [status, setStatus] = useState<DbInquiryStatus>('pending')
-  const [adminReply, setAdminReply] = useState('')
   const [adminNote, setAdminNote] = useState('')
+  const [showNote, setShowNote] = useState(false)
+  const [replyStatus, setReplyStatus] = useState<DbInquiryStatus>('in_progress')
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<InquiryReplyTemplateKey | null>(null)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
+
+  const handleRealtimeRefresh = useCallback(() => {
+    onRefresh()
+  }, [onRefresh])
+
+  useAdminInquiryChatRealtime({
+    inquiryId: inquiry?.id ?? null,
+    enabled: isOpen,
+    onRefresh: handleRealtimeRefresh,
+  })
 
   useEffect(() => {
     if (!isOpen || !inquiry) {
@@ -43,76 +55,116 @@ export function AdminInquiryDetailModal({
     }
 
     setStatus(inquiry.status)
-    setAdminReply(inquiry.admin_reply ?? '')
     setAdminNote(inquiry.admin_note ?? '')
+    setDraftMessage('')
+    setSelectedTemplateKey(null)
+    setReplyStatus(inquiry.status === 'answered' ? 'answered' : 'in_progress')
   }, [inquiry, isOpen])
+
+  const timeline = useMemo(() => {
+    if (!inquiry) {
+      return []
+    }
+
+    return buildInquiryChatTimeline({
+      inquiryId: inquiry.id,
+      initialMessage: inquiry.message,
+      initialImageUrls: inquiry.image_urls,
+      initialCreatedAt: inquiry.created_at,
+      adminReply: inquiry.admin_reply,
+      updatedAt: inquiry.updated_at,
+      messages: (inquiry.messages ?? []).map((message) => ({
+        id: message.id,
+        sender: message.sender,
+        message: message.message,
+        image_urls: message.image_urls,
+        created_at: message.created_at,
+      })),
+    })
+  }, [inquiry])
 
   if (!isOpen || !inquiry) {
     return null
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    onSave({ status, adminReply, adminNote })
+  function handleSend() {
+    const trimmed = draftMessage.trim()
+    if (!trimmed) {
+      return
+    }
+
+    onSendMessage({ message: trimmed, status: replyStatus })
+    setDraftMessage('')
+    setSelectedTemplateKey(null)
+  }
+
+  function applyTemplate(templateKey: InquiryReplyTemplateKey) {
+    const content = getInquiryReplyTemplate(templateKey).content
+
+    if (draftMessage.trim().length > 0) {
+      const confirmed = window.confirm(INQUIRY_REPLY_OVERWRITE_CONFIRM_MESSAGE)
+      if (!confirmed) {
+        return
+      }
+    }
+
+    setDraftMessage(content)
+    setSelectedTemplateKey(templateKey)
+  }
+
+  function handleStatusChange(nextStatus: DbInquiryStatus) {
+    setStatus(nextStatus)
+    onUpdateMeta({ status: nextStatus, adminNote })
+  }
+
+  function handleNoteBlur() {
+    if (!inquiry) {
+      return
+    }
+
+    if (adminNote !== (inquiry.admin_note ?? '') || status !== inquiry.status) {
+      onUpdateMeta({ status, adminNote })
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-inquiry-detail-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="flex h-[min(720px,calc(100dvh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#f7f7f7] shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 id="admin-inquiry-detail-title" className="text-xl font-bold text-neutral-900">
-              {inquiry.inquiry_number}
-            </h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              접수 {formatDateTime(inquiry.created_at)}
-            </p>
+        <header className="shrink-0 border-b border-neutral-200 bg-white px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id="admin-inquiry-detail-title" className="truncate text-base font-bold text-neutral-900">
+                {inquiry.customer_name}
+              </h2>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {getInquiryDisplayCode(inquiry)} · {inquiry.customer_phone}
+              </p>
+              <p className="mt-0.5 text-xs text-neutral-400">
+                접수 {formatDateTime(inquiry.created_at)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              aria-label="닫기"
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-          >
-            닫기
-          </button>
-        </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <InquiryTypeBadge type={inquiry.inquiry_type} />
-          <InquiryStatusBadge status={inquiry.status} />
-        </div>
-
-        <section className="mt-6 space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-          <h3 className="text-sm font-semibold text-neutral-900">고객 정보</h3>
-          <dl className="space-y-2">
-            <InfoRow label="고객명" value={inquiry.customer_name} />
-            <InfoRow label="연락처" value={inquiry.customer_phone} />
-            <InfoRow label="이메일" value={inquiry.customer_email ?? '-'} />
-          </dl>
-        </section>
-
-        <section className="mt-4 rounded-xl border border-neutral-200 p-4">
-          <h3 className="text-sm font-semibold text-neutral-900">문의 내용</h3>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
-            {inquiry.message}
-          </p>
-        </section>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4 border-t border-neutral-200 pt-6">
-          <div>
-            <label htmlFor="admin-inquiry-status" className="mb-2 block text-sm font-medium text-neutral-700">
-              상태
-            </label>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <InquiryTypeBadge type={inquiry.inquiry_type} />
+            <InquiryStatusBadge status={inquiry.status} />
             <select
-              id="admin-inquiry-status"
               value={status}
-              onChange={(event) => setStatus(event.target.value as DbInquiryStatus)}
-              className={inputClassName}
+              onChange={(event) => handleStatusChange(event.target.value as DbInquiryStatus)}
+              className="ml-auto rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-700 outline-none"
             >
               {INQUIRY_STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -120,61 +172,78 @@ export function AdminInquiryDetailModal({
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label htmlFor="admin-inquiry-reply" className="mb-2 block text-sm font-medium text-neutral-700">
-              관리자 답변
-            </label>
-            <textarea
-              id="admin-inquiry-reply"
-              rows={5}
-              value={adminReply}
-              onChange={(event) => setAdminReply(event.target.value)}
-              placeholder="고객에게 전달할 답변을 입력하세요."
-              className={inputClassName}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="admin-inquiry-note" className="mb-2 block text-sm font-medium text-neutral-700">
-              관리자 메모
-            </label>
-            <textarea
-              id="admin-inquiry-note"
-              rows={3}
-              value={adminNote}
-              onChange={(event) => setAdminNote(event.target.value)}
-              placeholder="내부 참고용 메모 (고객 비노출)"
-              className={inputClassName}
-            />
-          </div>
-
-          {errorMessage && (
-            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
-            </p>
-          )}
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-lg border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+              onClick={() => setShowNote((current) => !current)}
+              className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
             >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 disabled:opacity-50"
-            >
-              {isSubmitting ? '저장 중...' : '저장'}
+              내부 메모
             </button>
           </div>
-        </form>
+
+          {showNote && (
+            <textarea
+              rows={2}
+              value={adminNote}
+              onChange={(event) => setAdminNote(event.target.value)}
+              onBlur={handleNoteBlur}
+              placeholder="내부 참고용 메모 (고객 비노출)"
+              className="mt-3 w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs text-neutral-800 outline-none focus:border-neutral-400"
+            />
+          )}
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <InquiryChatTimeline
+            items={timeline}
+            perspective="admin"
+            onImageClick={setPreviewImageUrl}
+          />
+        </div>
+
+        <div className="shrink-0 border-t border-neutral-200 bg-white">
+          <div className="border-b border-neutral-100 px-3 py-2">
+            <InquiryReplyTemplateButtons
+              selectedKey={selectedTemplateKey}
+              onSelect={applyTemplate}
+            />
+          </div>
+          <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
+            <span className="text-xs text-neutral-500">전송 후 상태</span>
+            <select
+              value={replyStatus}
+              onChange={(event) => setReplyStatus(event.target.value as DbInquiryStatus)}
+              className="rounded-full border border-neutral-200 bg-[#f7f7f7] px-2.5 py-1 text-xs font-medium text-neutral-700 outline-none"
+            >
+              <option value="in_progress">답변중</option>
+              <option value="answered">답변완료</option>
+            </select>
+          </div>
+          <InquiryChatComposer
+            value={draftMessage}
+            onChange={setDraftMessage}
+            onSend={handleSend}
+            isSubmitting={isSubmitting}
+            placeholder="답변을 입력하세요"
+            errorMessage={errorMessage}
+          />
+        </div>
       </div>
+
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewImageUrl(null)}
+          role="presentation"
+        >
+          <img
+            src={previewImageUrl}
+            alt="첨부 이미지 크게 보기"
+            className="max-h-[90vh] max-w-full rounded-2xl object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }

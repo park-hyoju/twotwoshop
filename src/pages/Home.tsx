@@ -1,19 +1,18 @@
 import {
   BenefitSection,
-  BestSection,
   CategoryShortcutSection,
   HeroSection,
+  HomeProductSection,
   LiveSection,
-  NewSection,
 } from '../components/home'
 import { useHomePageData } from '../hooks/useHomePageData'
 
 export function Home() {
   const {
-    heroBanner,
+    banners,
+    isLoadingBanners,
     categoryShortcuts,
-    bestProducts,
-    newProducts,
+    homeProductSections,
     isLoadingProducts,
     liveBanner,
     benefits,
@@ -21,10 +20,23 @@ export function Home() {
 
   return (
     <>
-      <HeroSection banner={heroBanner} />
+      <HeroSection banners={banners} isLoading={isLoadingBanners} />
       <CategoryShortcutSection categories={categoryShortcuts} />
-      <BestSection products={bestProducts} isLoading={isLoadingProducts} />
-      <NewSection products={newProducts} isLoading={isLoadingProducts} />
+      {homeProductSections.map((section) => (
+        <HomeProductSection
+          key={section.id}
+          id={section.id}
+          ariaLabel={section.ariaLabel}
+          eyebrow={section.eyebrow}
+          title={section.title}
+          description={section.description}
+          emptyMessage={section.emptyMessage}
+          moreHref={section.moreHref}
+          products={section.products}
+          isLoading={isLoadingProducts}
+          className={section.className}
+        />
+      ))}
       <LiveSection banner={liveBanner} />
       <BenefitSection benefits={benefits} />
     </>

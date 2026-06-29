@@ -5,8 +5,8 @@ import {
   EMPTY_SIZE_GUIDE,
   EMPTY_SIZE_GUIDE_ROW,
 } from '../lib/adminProductDetailDefaults'
-import type { DetailCategory } from '../types/detailCategory'
-import type { DisplayCategory } from '../types/displayCategory'
+import { resolveProductCategory } from '../constants/productCategories'
+import { buildProductCategoryPayload } from './productMapper'
 import type {
   AdminProductDetailForm,
   AdminProductInfoFields,
@@ -15,7 +15,6 @@ import type {
   AdminSizeGuide,
   AdminSizeGuideRow,
 } from '../types/adminProductDetail'
-import type { Gender } from '../types/gender'
 import type { ProductStatus } from '../types/status'
 
 export interface AdminProductDetailRow {
@@ -29,6 +28,7 @@ export interface AdminProductDetailRow {
   discount_rate: number | null
   thumbnail: string | null
   images: string[] | null
+  product_category?: string | null
   gender: string | null
   display_category: string | null
   detail_category: string | null
@@ -42,40 +42,6 @@ export interface AdminProductDetailRow {
   product_info: unknown
   shipping_info: unknown
   return_info: unknown
-}
-
-function asDisplayCategory(value: string | null | undefined): DisplayCategory {
-  const categories: DisplayCategory[] = ['top', 'bottom', 'dress', 'shoes', 'misc']
-  return categories.includes(value as DisplayCategory) ? (value as DisplayCategory) : 'misc'
-}
-
-function asDetailCategory(value: string | null | undefined): DetailCategory {
-  const categories: DetailCategory[] = [
-    'shirt',
-    'knit',
-    'hoodie',
-    'tshirt',
-    'pants',
-    'dress',
-    'sneakers',
-    'loafers',
-    'bag',
-    'belt',
-    'wallet',
-    'cap',
-    'accessory',
-    'skirt',
-    'socks',
-    'etc',
-  ]
-  return categories.includes(value as DetailCategory) ? (value as DetailCategory) : 'accessory'
-}
-
-function asGender(value: string | null | undefined): Gender {
-  if (value === 'women' || value === 'men' || value === 'common') {
-    return value
-  }
-  return 'common'
 }
 
 function asProductStatus(value: string | null | undefined): ProductStatus {
@@ -184,9 +150,7 @@ export function mapRowToAdminProductDetailForm(row: AdminProductDetailRow): Admi
     slug,
     brand: row.brand ?? '',
     sku: row.sku ?? '',
-    display_category: asDisplayCategory(row.display_category),
-    detail_category: asDetailCategory(row.detail_category),
-    gender: asGender(row.gender),
+    product_category: resolveProductCategory(row),
     status: asProductStatus(row.status),
     price: row.price,
     original_price: row.original_price ?? row.price,
@@ -206,14 +170,14 @@ export function mapRowToAdminProductDetailForm(row: AdminProductDetailRow): Admi
 }
 
 export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetailForm) {
+  const categoryFields = buildProductCategoryPayload(form.product_category)
+
   return {
     name: form.name.trim(),
     slug: form.slug.trim(),
     brand: form.brand.trim() || null,
     sku: form.sku.trim() || null,
-    display_category: form.display_category,
-    detail_category: form.detail_category,
-    gender: form.gender,
+    ...categoryFields,
     status: form.status,
     price: form.price,
     original_price: form.original_price,

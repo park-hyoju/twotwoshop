@@ -8,12 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { ADMIN_UNAUTHORIZED_MESSAGE, isAllowedAdminEmail } from '../lib/adminAuthConfig'
+import { ADMIN_UNAUTHORIZED_MESSAGE, isAdminUser } from '../lib/adminAuthConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import {
   AdminAuthError,
-  ensureAllowedAdminSession,
   getAdminSession,
+  resolveAdminSessionState,
   signInAdmin,
   signOutAdmin,
 } from '../services/adminAuthService'
@@ -77,7 +77,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
       void (async () => {
         const { session: validatedSession, unauthorized } =
-          await ensureAllowedAdminSession(nextSession)
+          resolveAdminSessionState(nextSession)
 
         if (!cancelled) {
           setSession(validatedSession)
@@ -110,7 +110,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       isLoading,
-      isAuthenticated: Boolean(session && isAllowedAdminEmail(session.user.email)),
+      isAuthenticated: Boolean(session && isAdminUser(session.user)),
       unauthorizedMessage,
       signIn,
       signOut,

@@ -1,37 +1,10 @@
-import type { DetailCategory } from '../../../../../types/detailCategory'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
-import type { Gender } from '../../../../../types/gender'
 import {
   adminInputClassName,
   adminLabelClassName,
   adminTextareaClassName,
 } from '../adminFormStyles'
 import { ProductInfoTab } from '../ProductInfoTab'
-
-const DETAIL_CATEGORY_OPTIONS: DetailCategory[] = [
-  'shirt',
-  'knit',
-  'hoodie',
-  'tshirt',
-  'pants',
-  'dress',
-  'sneakers',
-  'loafers',
-  'bag',
-  'belt',
-  'wallet',
-  'cap',
-  'accessory',
-  'skirt',
-  'socks',
-  'etc',
-]
-
-const GENDER_OPTIONS: Array<{ value: Gender; label: string }> = [
-  { value: 'women', label: '여성' },
-  { value: 'men', label: '남성' },
-  { value: 'common', label: '공통' },
-]
 
 interface ProductAdvancedSettingsSectionProps {
   form: AdminProductDetailForm
@@ -54,24 +27,6 @@ export function ProductAdvancedSettingsSection({
       </p>
 
       <div className="grid gap-8 sm:grid-cols-2">
-        <div>
-          <label htmlFor="advanced-gender" className={adminLabelClassName}>
-            성별
-          </label>
-          <select
-            id="advanced-gender"
-            value={form.gender}
-            onChange={(event) => onChange('gender', event.target.value as Gender)}
-            className={adminInputClassName}
-          >
-            {GENDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="sm:col-span-2">
           <label htmlFor="advanced-meta-title" className={adminLabelClassName}>
             검색 제목
@@ -122,24 +77,6 @@ export function ProductAdvancedSettingsSection({
             onChange={(event) => onChange('sku', event.target.value)}
             className={adminInputClassName}
           />
-        </div>
-
-        <div className="sm:col-span-2">
-          <label htmlFor="advanced-detail-category" className={adminLabelClassName}>
-            세부 분류
-          </label>
-          <select
-            id="advanced-detail-category"
-            value={form.detail_category}
-            onChange={(event) => onChange('detail_category', event.target.value as DetailCategory)}
-            className={adminInputClassName}
-          >
-            {DETAIL_CATEGORY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AdminToastProvider } from '../components/admin/AdminToast'
+import { AdminToastProvider, useAdminToast } from '../components/admin/AdminToast'
 import { useAdminAuth } from '../contexts/AdminAuthProvider'
+import { AdminInquiryRealtimeProvider, useAdminInquiryRealtime } from '../contexts/AdminInquiryRealtimeContext'
+import { AdminInquirySoundProvider } from '../contexts/AdminInquirySoundContext'
+import { useAdminInquiryTabTitleReset } from '../hooks/useAdminInquiryRealtimeHub'
 import { ADMIN_ROUTES } from '../lib/adminRoutes'
 import { ROUTES } from '../lib/routes'
 
@@ -17,6 +20,9 @@ const navItems: AdminNavItem[] = [
   { to: ADMIN_ROUTES.dashboard, label: '대시보드', icon: '📊', end: true },
   { to: ADMIN_ROUTES.orders, label: '주문관리', icon: '📦' },
   { to: ADMIN_ROUTES.products, label: '상품관리', icon: '🏷️' },
+  { to: ADMIN_ROUTES.banners, label: '배너관리', icon: '📢' },
+  { to: ADMIN_ROUTES.notices, label: '공지관리', icon: '📋' },
+  { to: ADMIN_ROUTES.restockNotifications, label: '재입고 알림', icon: '🔔' },
   { to: ADMIN_ROUTES.customers, label: '고객관리', icon: '👥' },
   { to: ADMIN_ROUTES.chat, label: '상담관리', icon: '💬' },
   { to: ADMIN_ROUTES.live, label: '라이브 준비중', icon: '📺', disabled: true },
@@ -53,9 +59,10 @@ function MenuIcon({ isOpen }: { isOpen: boolean }) {
 
 interface AdminSidebarProps {
   onNavigate?: () => void
+  chatUnreadCount: number
 }
 
-function AdminSidebar({ onNavigate }: AdminSidebarProps) {
+function AdminSidebar({ onNavigate, chatUnreadCount }: AdminSidebarProps) {
   return (
     <>
       <div className="border-b border-white/10 px-6 py-5">
@@ -64,13 +71,19 @@ function AdminSidebar({ onNavigate }: AdminSidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-1 px-4 py-6" aria-label="관리자 메뉴">
-        {navItems.map((item) =>
-          item.disabled ? (
-            <div key={item.to} className={getNavLinkClassName(false, true)} aria-disabled="true">
-              <span aria-hidden="true">{item.icon}</span>
-              {item.label}
-            </div>
-          ) : (
+        {navItems.map((item) => {
+          const showUnreadBadge = item.to === ADMIN_ROUTES.chat && chatUnreadCount > 0
+
+          if (item.disabled) {
+            return (
+              <div key={item.to} className={getNavLinkClassName(false, true)} aria-disabled="true">
+                <span aria-hidden="true">{item.icon}</span>
+                {item.label}
+              </div>
+            )
+          }
+
+          return (
             <NavLink
               key={item.to}
               to={item.to}
@@ -79,22 +92,30 @@ function AdminSidebar({ onNavigate }: AdminSidebarProps) {
               className={({ isActive }) => getNavLinkClassName(isActive)}
             >
               <span aria-hidden="true">{item.icon}</span>
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showUnreadBadge && (
+                <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                </span>
+              )}
             </NavLink>
-          ),
-        )}
+          )
+        })}
       </nav>
     </>
   )
 }
 
-export function AdminLayout() {
+function AdminLayoutShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { signOut } = useAdminAuth()
+  const { unreadCount } = useAdminInquiryRealtime()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+
+  useAdminInquiryTabTitleReset(location.pathname.startsWith(ADMIN_ROUTES.chat))
 
   const currentPageLabel =
     navItems.find((item) =>
@@ -120,8 +141,7 @@ export function AdminLayout() {
   }
 
   return (
-    <AdminToastProvider>
-      <div className="min-h-screen bg-neutral-100 lg:flex">
+    <div className="min-h-screen bg-neutral-100 lg:flex">
       {isSidebarOpen && (
         <button
           type="button"
@@ -136,7 +156,7 @@ export function AdminLayout() {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <AdminSidebar onNavigate={closeSidebar} />
+        <AdminSidebar onNavigate={closeSidebar} chatUnreadCount={unreadCount} />
 
         <div className="space-y-1 border-t border-white/10 px-4 py-4">
           <NavLink
@@ -184,7 +204,30 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
-      </div>
+    </div>
+  )
+}
+
+function AdminLayoutRealtimeRoot() {
+  const { showToast } = useAdminToast()
+  const { isAuthenticated } = useAdminAuth()
+
+  return (
+    <AdminInquiryRealtimeProvider
+      enabled={isAuthenticated}
+      onNotify={(message) => showToast(message, { durationMs: 5000 })}
+    >
+      <AdminLayoutShell />
+    </AdminInquiryRealtimeProvider>
+  )
+}
+
+export function AdminLayout() {
+  return (
+    <AdminToastProvider>
+      <AdminInquirySoundProvider>
+        <AdminLayoutRealtimeRoot />
+      </AdminInquirySoundProvider>
     </AdminToastProvider>
   )
 }

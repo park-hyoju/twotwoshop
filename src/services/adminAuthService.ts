@@ -1,7 +1,7 @@
 import {
   ADMIN_INVALID_CREDENTIALS_MESSAGE,
   ADMIN_UNAUTHORIZED_MESSAGE,
-  isAllowedAdminEmail,
+  isAdminUser,
   resolveAdminLoginId,
 } from '../lib/adminAuthConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
@@ -37,6 +37,25 @@ function mapAuthErrorMessage(message: string): string {
   return message
 }
 
+/**
+ * Reads admin session state without mutating the shared Supabase auth session.
+ * Storefront customer sessions must NOT trigger a global signOut here.
+ */
+export function resolveAdminSessionState(session: Session | null): {
+  session: Session | null
+  unauthorized: boolean
+} {
+  if (!session) {
+    return { session: null, unauthorized: false }
+  }
+
+  if (isAdminUser(session.user)) {
+    return { session, unauthorized: false }
+  }
+
+  return { session: null, unauthorized: false }
+}
+
 async function rejectUnauthorizedSession(): Promise<void> {
   if (!supabase) {
     return
@@ -45,19 +64,18 @@ async function rejectUnauthorizedSession(): Promise<void> {
   await supabase.auth.signOut()
 }
 
+/** @deprecated Prefer resolveAdminSessionState for passive session reads. */
 export async function ensureAllowedAdminSession(
   session: Session | null,
 ): Promise<{ session: Session | null; unauthorized: boolean }> {
-  if (!session) {
-    return { session: null, unauthorized: false }
+  const resolved = resolveAdminSessionState(session)
+
+  if (session && !resolved.session) {
+    await rejectUnauthorizedSession()
+    return { session: null, unauthorized: true }
   }
 
-  if (isAllowedAdminEmail(session.user.email)) {
-    return { session, unauthorized: false }
-  }
-
-  await rejectUnauthorizedSession()
-  return { session: null, unauthorized: true }
+  return resolved
 }
 
 export async function getAdminSession(): Promise<{
@@ -74,7 +92,7 @@ export async function getAdminSession(): Promise<{
     throw new AdminAuthError('로그인 상태를 확인하지 못했습니다.', error)
   }
 
-  return ensureAllowedAdminSession(data.session)
+  return resolveAdminSessionState(data.session)
 }
 
 export async function signInAdmin(loginId: string, password: string): Promise<Session> {
@@ -101,17 +119,12 @@ export async function signInAdmin(loginId: string, password: string): Promise<Se
     throw new AdminAuthError('로그인에 실패했습니다.')
   }
 
-  const { session, unauthorized } = await ensureAllowedAdminSession(data.session)
-
-  if (unauthorized) {
+  if (!isAdminUser(data.session.user)) {
+    await rejectUnauthorizedSession()
     throw new AdminAuthError(ADMIN_UNAUTHORIZED_MESSAGE)
   }
 
-  if (!session) {
-    throw new AdminAuthError('로그인에 실패했습니다.')
-  }
-
-  return session
+  return data.session
 }
 
 export async function signOutAdmin(): Promise<void> {

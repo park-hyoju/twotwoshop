@@ -1,6 +1,7 @@
 import type { DetailCategory } from './detailCategory'
 import type { DisplayCategory } from './displayCategory'
 import type { Gender } from './gender'
+import type { ProductCategoryId } from '../constants/productCategories'
 import type {
   ProductInfoFields,
   ProductReturnInfo,
@@ -20,6 +21,7 @@ export interface Product {
   discountRate: number
   thumbnail: string
   images: string[]
+  productCategory: ProductCategoryId
   gender: Gender
   displayCategory: DisplayCategory
   detailCategory: DetailCategory

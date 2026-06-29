@@ -1,1 +1,1 @@
-export type Gender = 'women' | 'men' | 'common'
+export type Gender = 'women' | 'men' | 'common' | 'perfume'

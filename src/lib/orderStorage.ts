@@ -1,4 +1,5 @@
-import type { Order, OrderItem, ShippingInfo } from '../types/order'
+import type { Order, OrderItem, PaymentMethod, ShippingInfo } from '../types/order'
+import { normalizePaymentStatus } from './adminOrderStatus'
 
 const ORDER_STORAGE_KEY = 'twotwoshop-latest-order'
 
@@ -34,26 +35,71 @@ function isShippingInfo(value: unknown): value is ShippingInfo {
   )
 }
 
+function normalizeLegacyOrder(order: Record<string, unknown>): Order | null {
+  if (
+    typeof order.orderNumber !== 'string' ||
+    typeof order.productTotal !== 'number' ||
+    typeof order.shippingFee !== 'number' ||
+    typeof order.totalAmount !== 'number' ||
+    typeof order.createdAt !== 'string' ||
+    !isShippingInfo(order.shipping) ||
+    !Array.isArray(order.items) ||
+    order.items.length === 0 ||
+    !order.items.every(isOrderItem)
+  ) {
+    return null
+  }
+
+  const customerName =
+    typeof order.customerName === 'string'
+      ? order.customerName
+      : typeof order.customer_name === 'string'
+        ? order.customer_name
+        : ''
+
+  const customerPhone =
+    typeof order.customerPhone === 'string'
+      ? order.customerPhone
+      : typeof order.phone === 'string'
+        ? order.phone
+        : ''
+
+  return {
+    id: typeof order.id === 'string' ? order.id : undefined,
+    orderNumber: order.orderNumber,
+    customerName,
+    customerPhone,
+    customerEmail: typeof order.customerEmail === 'string' ? order.customerEmail : '',
+    recipientName:
+      typeof order.recipientName === 'string' ? order.recipientName : customerName,
+    recipientPhone:
+      typeof order.recipientPhone === 'string' ? order.recipientPhone : customerPhone,
+    depositorName:
+      typeof order.depositorName === 'string' ? order.depositorName : customerName,
+    shipping: order.shipping,
+    items: order.items,
+    productTotal: order.productTotal,
+    couponDiscount:
+      typeof order.couponDiscount === 'number' ? order.couponDiscount : 0,
+    shippingFee: order.shippingFee,
+    totalAmount: order.totalAmount,
+    paymentMethod: (order.paymentMethod as PaymentMethod) ?? 'bank_transfer',
+    paymentStatus: normalizePaymentStatus(
+      typeof order.paymentStatus === 'string' ? order.paymentStatus : 'waiting_deposit',
+    ),
+    memberCouponId:
+      typeof order.memberCouponId === 'string' ? order.memberCouponId : null,
+    isMember: order.isMember === true,
+    createdAt: order.createdAt,
+  }
+}
+
 export function isValidOrder(value: unknown): value is Order {
   if (typeof value !== 'object' || value === null) {
     return false
   }
 
-  const order = value as Record<string, unknown>
-
-  return (
-    typeof order.orderNumber === 'string' &&
-    typeof order.customerName === 'string' &&
-    typeof order.phone === 'string' &&
-    typeof order.productTotal === 'number' &&
-    typeof order.shippingFee === 'number' &&
-    typeof order.totalAmount === 'number' &&
-    typeof order.createdAt === 'string' &&
-    isShippingInfo(order.shipping) &&
-    Array.isArray(order.items) &&
-    order.items.length > 0 &&
-    order.items.every(isOrderItem)
-  )
+  return normalizeLegacyOrder(value as Record<string, unknown>) !== null
 }
 
 export function saveLatestOrder(order: Order): void {
@@ -68,7 +114,11 @@ export function loadLatestOrder(): Order | null {
     }
 
     const parsed: unknown = JSON.parse(raw)
-    return isValidOrder(parsed) ? parsed : null
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null
+    }
+
+    return normalizeLegacyOrder(parsed as Record<string, unknown>)
   } catch {
     return null
   }
