@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { MapPin, Pencil, Star, Trash2 } from 'lucide-react'
 import { MyPageEmptyState } from '../../components/mypage/MyPageEmptyState'
 import { MyPageShell } from '../../components/mypage/MyPageShell'
+import { AddressSearchFields } from '../../components/address/AddressSearchFields'
 import {
   createCustomerAddress,
   CustomerAddressRepositoryError,
@@ -227,35 +228,19 @@ export function MyAddressesPage() {
                 required
               />
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-neutral-700">우편번호</span>
-              <input
-                value={form.zipcode}
-                onChange={(event) => setForm((prev) => ({ ...prev, zipcode: event.target.value }))}
-                className="mt-1.5 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
-                required
-              />
-            </label>
           </div>
 
-          <label className="block text-sm">
-            <span className="font-medium text-neutral-700">주소</span>
-            <input
-              value={form.address1}
-              onChange={(event) => setForm((prev) => ({ ...prev, address1: event.target.value }))}
-              className="mt-1.5 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
-              required
-            />
-          </label>
-
-          <label className="block text-sm">
-            <span className="font-medium text-neutral-700">상세주소</span>
-            <input
-              value={form.address2}
-              onChange={(event) => setForm((prev) => ({ ...prev, address2: event.target.value }))}
-              className="mt-1.5 w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-400"
-            />
-          </label>
+          <AddressSearchFields
+            variant="mypage"
+            postalCode={form.zipcode}
+            address={form.address1}
+            addressDetail={form.address2 ?? ''}
+            onPostalCodeChange={(value) => setForm((prev) => ({ ...prev, zipcode: value }))}
+            onAddressChange={(value) => setForm((prev) => ({ ...prev, address1: value }))}
+            onAddressDetailChange={(value) => setForm((prev) => ({ ...prev, address2: value }))}
+            disabled={isSubmitting}
+            addressDetailRequired={false}
+          />
 
           <label className="flex items-center gap-2 text-sm text-neutral-700">
             <input

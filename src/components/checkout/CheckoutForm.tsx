@@ -2,6 +2,7 @@ import { formatPrice } from '../../lib/formatPrice'
 import type { MemberCoupon } from '../../types/coupon'
 import type { CheckoutFormData, CheckoutFormErrors } from '../../types/order'
 import { DepositAccountInfo } from '../deposit/DepositAccountInfo'
+import { AddressSearchFields } from '../address/AddressSearchFields'
 import { ShippingFeeRow } from '../orders/ShippingFeeRow'
 import { CheckoutCouponSection } from './CheckoutCouponSection'
 
@@ -195,43 +196,21 @@ export function CheckoutForm({
             </>
           ) : null}
 
-          <div>
-            <label htmlFor="postalCode" className={labelClassName}>
-              우편번호 <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="postalCode"
-              inputMode="numeric"
-              value={form.postalCode}
-              onChange={(e) => onChange('postalCode', e.target.value)}
-              className={getInputClassName(Boolean(fieldErrors.postalCode))}
-            />
-            <FieldError message={fieldErrors.postalCode} />
-          </div>
-          <div>
-            <label htmlFor="address" className={labelClassName}>
-              기본주소 <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="address"
-              value={form.address}
-              onChange={(e) => onChange('address', e.target.value)}
-              className={getInputClassName(Boolean(fieldErrors.address))}
-            />
-            <FieldError message={fieldErrors.address} />
-          </div>
-          <div>
-            <label htmlFor="addressDetail" className={labelClassName}>
-              상세주소 <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="addressDetail"
-              value={form.addressDetail}
-              onChange={(e) => onChange('addressDetail', e.target.value)}
-              className={getInputClassName(Boolean(fieldErrors.addressDetail))}
-            />
-            <FieldError message={fieldErrors.addressDetail} />
-          </div>
+          <AddressSearchFields
+            variant="checkout"
+            postalCode={form.postalCode}
+            address={form.address}
+            addressDetail={form.addressDetail}
+            onPostalCodeChange={(value) => onChange('postalCode', value)}
+            onAddressChange={(value) => onChange('address', value)}
+            onAddressDetailChange={(value) => onChange('addressDetail', value)}
+            fieldErrors={{
+              postalCode: fieldErrors.postalCode,
+              address: fieldErrors.address,
+              addressDetail: fieldErrors.addressDetail,
+            }}
+            disabled={isSubmitting}
+          />
           <div>
             <label htmlFor="memo" className={labelClassName}>
               배송메모
