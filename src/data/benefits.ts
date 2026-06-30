@@ -1,4 +1,5 @@
 import { SUPPORT_HOURS_LABEL } from '../lib/supportHours'
+import { SHIPPING_POLICY_SUMMARY } from '../lib/orderConstants'
 import type { Benefit } from '../types/benefit'
 
 export const benefits: Benefit[] = [
@@ -6,7 +7,7 @@ export const benefits: Benefit[] = [
     id: 'shipping',
     icon: 'truck',
     title: '배송 안내',
-    description: '전 상품 배송비 4,000원',
+    description: SHIPPING_POLICY_SUMMARY,
     ctaLabel: '자세히 보기',
     action: 'shipping-modal',
   },

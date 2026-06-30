@@ -39,15 +39,13 @@ export function ProductDetailShippingSection({ shippingInfo }: ProductDetailShip
         <p>{resolved.shipping_fee}</p>
       </PolicyBlock>
 
+      <PolicyBlock title="무료배송 안내">
+        <p>{resolved.free_shipping_threshold}</p>
+      </PolicyBlock>
+
       <PolicyBlock title="배송기간">
         <p className="whitespace-pre-wrap">{resolved.delivery_period}</p>
       </PolicyBlock>
-
-      {resolved.free_shipping_threshold ? (
-        <PolicyBlock title="무료배송 안내">
-          <p>{resolved.free_shipping_threshold}</p>
-        </PolicyBlock>
-      ) : null}
 
       <PolicyBlock title="추가 안내">
         <p className="whitespace-pre-wrap">{resolved.additional_notes}</p>

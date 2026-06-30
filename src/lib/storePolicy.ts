@@ -4,6 +4,11 @@ import {
   type ProductReturnInfo,
   type ProductShippingInfo,
 } from '../types/productDetail'
+import {
+  SHIPPING_POLICY_ADDITIONAL_NOTES,
+  SHIPPING_POLICY_FREE_DETAIL,
+  SHIPPING_POLICY_PAID_DETAIL,
+} from './orderConstants'
 
 export interface StorePolicy {
   shipping: ProductShippingInfo
@@ -33,12 +38,47 @@ interface LegacyShippingInfo {
   additional_notes?: string
 }
 
+function isLegacyShippingFeeCopy(value: string): boolean {
+  const trimmed = value.trim()
+  return (
+    trimmed.includes('전 상품 배송비') ||
+    trimmed === '4,000원' ||
+    (trimmed.includes('4,000원') && !trimmed.includes('70,000원'))
+  )
+}
+
+function migrateLegacyShippingInfo(shipping: LegacyShippingInfo): LegacyShippingInfo {
+  const migrated: LegacyShippingInfo = { ...shipping }
+  const fee = migrated.shipping_fee?.trim() ?? ''
+  const threshold = migrated.free_shipping_threshold?.trim() ?? ''
+  const notes = migrated.additional_notes?.trim() ?? ''
+
+  if (!fee || isLegacyShippingFeeCopy(fee)) {
+    migrated.shipping_fee = SHIPPING_POLICY_PAID_DETAIL
+  }
+
+  if (!threshold) {
+    migrated.free_shipping_threshold = SHIPPING_POLICY_FREE_DETAIL
+  }
+
+  if (!notes || notes.includes('전 상품 배송비')) {
+    migrated.additional_notes = SHIPPING_POLICY_ADDITIONAL_NOTES
+  }
+
+  return migrated
+}
+
 function normalizeShippingInfo(shipping: LegacyShippingInfo): ProductShippingInfo {
+  const migrated = migrateLegacyShippingInfo(shipping)
+
   return {
     ...DEFAULT_STORE_POLICY.shipping,
-    ...shipping,
+    ...migrated,
     additional_notes:
-      shipping.additional_notes?.trim() || DEFAULT_STORE_POLICY.shipping.additional_notes,
+      migrated.additional_notes?.trim() || DEFAULT_STORE_POLICY.shipping.additional_notes,
+    free_shipping_threshold:
+      migrated.free_shipping_threshold?.trim() ||
+      DEFAULT_STORE_POLICY.shipping.free_shipping_threshold,
   }
 }
 

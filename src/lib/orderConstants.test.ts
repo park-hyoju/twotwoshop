@@ -39,8 +39,10 @@ describe('orderConstants', () => {
 
   it('applies free shipping at 70000 subtotal or above', () => {
     expect(calculateShippingFee(70000)).toBe(0)
+    expect(calculateShippingFee(108000)).toBe(0)
     expect(getShippingPolicyHint(70000)).toBe('70,000원 이상 무료배송')
     expect(calculateOrderTotal(70000)).toBe(70000)
+    expect(calculateOrderTotal(108000)).toBe(108000)
   })
 
   it('rejects coupon use below 70000 subtotal', () => {

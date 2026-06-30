@@ -62,6 +62,17 @@ export function AdminSettingsPage() {
           />
         </div>
         <div>
+          <label htmlFor="policy-free-shipping" className={adminLabelClassName}>
+            무료배송
+          </label>
+          <input
+            id="policy-free-shipping"
+            value={policy.shipping.free_shipping_threshold}
+            onChange={(event) => updateShipping('free_shipping_threshold', event.target.value)}
+            className={adminInputClassName}
+          />
+        </div>
+        <div>
           <label htmlFor="policy-delivery" className={adminLabelClassName}>
             배송기간
           </label>

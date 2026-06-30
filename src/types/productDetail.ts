@@ -1,3 +1,9 @@
+import {
+  SHIPPING_POLICY_ADDITIONAL_NOTES,
+  SHIPPING_POLICY_FREE_DETAIL,
+  SHIPPING_POLICY_PAID_DETAIL,
+} from '../lib/orderConstants'
+
 export interface ProductSizeGuideRow {
   size: string
   total_length: string
@@ -88,13 +94,13 @@ export const EMPTY_PRODUCT_RETURN_INFO: ProductReturnInfo = {
   shipping_fee_notes: '',
 }
 
+
 export const DEFAULT_PRODUCT_SHIPPING_INFO: ProductShippingInfo = {
-  shipping_fee: '4,000원',
+  shipping_fee: SHIPPING_POLICY_PAID_DETAIL,
   delivery_period:
     '결제 완료 후 평균 3~5일 이내 발송됩니다.\n주말·공휴일은 배송 기간에서 제외됩니다.',
-  free_shipping_threshold: '',
-  additional_notes:
-    '전 상품 배송비 4,000원이 적용됩니다.\n제주 및 도서산간 지역은 추가 배송비가 발생할 수 있습니다.\n배송 관련 문의는 고객센터 또는 1:1 상담을 이용해 주세요.',
+  free_shipping_threshold: SHIPPING_POLICY_FREE_DETAIL,
+  additional_notes: SHIPPING_POLICY_ADDITIONAL_NOTES,
 }
 
 export const DEFAULT_PRODUCT_RETURN_INFO: ProductReturnInfo = {

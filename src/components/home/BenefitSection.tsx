@@ -89,9 +89,7 @@ export function BenefitSection({ benefits }: BenefitSectionProps) {
         onClose={closeModal}
       >
         <PolicyBlock title="배송비" content={shippingPolicy.shipping_fee} />
-        {shippingPolicy.free_shipping_threshold ? (
-          <PolicyBlock title="무료배송" content={shippingPolicy.free_shipping_threshold} />
-        ) : null}
+        <PolicyBlock title="무료배송" content={shippingPolicy.free_shipping_threshold} />
         <PolicyBlock title="배송 기간" content={shippingPolicy.delivery_period} />
         <PolicyBlock title="안내 사항" content={shippingPolicy.additional_notes} />
         <p className="text-xs text-[#999]">{SUPPORT_HOURS_LABEL}</p>
