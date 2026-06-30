@@ -8,21 +8,38 @@ import {
   authSubmitButtonClassName,
 } from '../../components/customer/AuthFormCard'
 import { getCustomerAuthErrorMessage } from '../../contexts/CustomerAuthProvider'
+import {
+  formatPasswordResetCooldownButtonLabel,
+  PASSWORD_RESET_RATE_LIMIT_MESSAGE,
+  usePasswordResetCooldown,
+} from '../../lib/passwordResetCooldown'
 import { PASSWORD_RESET_EMAIL_SENT_MESSAGE } from '../../lib/passwordResetConfig'
 import { ROUTES } from '../../lib/routes'
 import { isSupabaseConfigured } from '../../lib/supabase'
-import { requestPasswordResetEmail } from '../../services/customerAuthService'
+import {
+  isPasswordResetRateLimitError,
+  requestPasswordResetEmail,
+} from '../../services/customerAuthService'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const {
+    remainingSeconds,
+    isCooldownActive,
+    startSuccessCooldown,
+    startRateLimitCooldown,
+  } = usePasswordResetCooldown()
+
+  const isSubmitDisabled =
+    isSubmitting || isCooldownActive || !isSupabaseConfigured
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (isSubmitting) {
+    if (isSubmitDisabled) {
       return
     }
 
@@ -32,9 +49,15 @@ export function ForgotPasswordPage() {
 
     try {
       await requestPasswordResetEmail(email)
+      startSuccessCooldown()
       setSuccessMessage(PASSWORD_RESET_EMAIL_SENT_MESSAGE)
     } catch (error) {
-      setErrorMessage(getCustomerAuthErrorMessage(error))
+      if (isPasswordResetRateLimitError(error)) {
+        startRateLimitCooldown()
+        setErrorMessage(PASSWORD_RESET_RATE_LIMIT_MESSAGE)
+      } else {
+        setErrorMessage(getCustomerAuthErrorMessage(error))
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -70,6 +93,11 @@ export function ForgotPasswordPage() {
           <p className="text-sm leading-relaxed text-neutral-600">
             메일이 보이지 않으면 스팸함도 확인해주세요. 링크는 일정 시간이 지나면 만료될 수 있습니다.
           </p>
+          {isCooldownActive ? (
+            <p className="text-sm text-neutral-500">
+              {formatPasswordResetCooldownButtonLabel(remainingSeconds)}
+            </p>
+          ) : null}
           <Link
             to={ROUTES.signin}
             className="flex min-h-12 w-full items-center justify-center rounded-xl border border-neutral-300 bg-white text-base font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
@@ -105,10 +133,12 @@ export function ForgotPasswordPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting || !isSupabaseConfigured}
+            disabled={isSubmitDisabled}
             className={authSubmitButtonClassName}
           >
-            {isSubmitting ? '메일 보내는 중...' : '재설정 메일 보내기'}
+            {isSubmitting
+              ? '메일 보내는 중...'
+              : formatPasswordResetCooldownButtonLabel(remainingSeconds)}
           </button>
         </form>
       )}

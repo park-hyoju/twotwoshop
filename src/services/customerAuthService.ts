@@ -20,9 +20,10 @@ import {
 } from '../lib/customerAuthValidation'
 import { isAdminUser } from '../lib/adminAuthConfig'
 import {
-  getPasswordResetRedirectUrl,
   PASSWORD_RESET_INVALID_LINK_MESSAGE,
+  getPasswordResetRedirectUrl,
 } from '../lib/passwordResetConfig'
+import { PASSWORD_RESET_RATE_LIMIT_MESSAGE } from '../lib/passwordResetCooldown'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { UserProfile } from '../types/userProfile'
 import { issueWelcomeCoupon } from './couponRepository'
@@ -32,7 +33,7 @@ import {
   upsertCustomerProfile,
 } from './userProfileRepository'
 
-export type CustomerAuthErrorCode = 'signup_rate_limit'
+export type CustomerAuthErrorCode = 'signup_rate_limit' | 'password_reset_rate_limit'
 
 export interface CustomerSignUpResult {
   successMessage: string
@@ -77,6 +78,10 @@ function throwSignupRateLimitError(cause: unknown): never {
 
 export function isSignupRateLimitError(error: unknown): boolean {
   return error instanceof CustomerAuthError && error.code === 'signup_rate_limit'
+}
+
+export function isPasswordResetRateLimitError(error: unknown): boolean {
+  return error instanceof CustomerAuthError && error.code === 'password_reset_rate_limit'
 }
 
 async function ensureCustomerSession(session: Session | null): Promise<Session> {
@@ -304,7 +309,11 @@ export async function requestPasswordResetEmail(email: string): Promise<void> {
 
   if (error) {
     if (isAuthRateLimitError(error)) {
-      throw new CustomerAuthError(CUSTOMER_RATE_LIMIT_MESSAGE, error)
+      throw new CustomerAuthError(
+        PASSWORD_RESET_RATE_LIMIT_MESSAGE,
+        error,
+        'password_reset_rate_limit',
+      )
     }
 
     if (import.meta.env.DEV) {
