@@ -1,4 +1,4 @@
-import { SHIPPING_FEE, calculateOrderTotal } from '../lib/orderConstants'
+import { calculateOrderTotal, calculateShippingFee } from '../lib/orderConstants'
 import { resolveDepositorName, resolveRecipientFields } from '../lib/checkoutAddress'
 import {
   hasCheckoutFormErrors,
@@ -51,6 +51,7 @@ export function createOrder(
     0,
   )
   const couponDiscount = options?.selectedCoupon?.discountAmount ?? 0
+  const shippingFee = calculateShippingFee(productTotal)
 
   return {
     orderNumber: generateOrderNumber(),
@@ -69,7 +70,7 @@ export function createOrder(
     items: orderItems,
     productTotal,
     couponDiscount,
-    shippingFee: SHIPPING_FEE,
+    shippingFee,
     totalAmount: calculateOrderTotal(productTotal, couponDiscount),
     paymentMethod: 'bank_transfer',
     paymentStatus: 'waiting_deposit',

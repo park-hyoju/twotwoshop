@@ -1,5 +1,5 @@
 import type { Order, OrderItem } from '../types/order'
-import { SHIPPING_FEE } from '../lib/orderConstants'
+import { calculateShippingFee } from '../lib/orderConstants'
 
 export interface CustomerInsert {
   name: string
@@ -80,7 +80,7 @@ export function mapOrderToOrderInsert(
     payment_method: order.paymentMethod,
     subtotal: order.productTotal,
     coupon_discount_amount: order.couponDiscount,
-    shipping_fee: SHIPPING_FEE,
+    shipping_fee: calculateShippingFee(order.productTotal),
     total_amount: order.totalAmount,
     payment_status: 'waiting_deposit',
     status: 'pending_payment',
@@ -125,6 +125,6 @@ export function mapOrderToRpcPayload(order: Order) {
     depositor_name: order.depositorName,
     payment_method: order.paymentMethod,
     subtotal: order.productTotal,
-    shipping_fee: SHIPPING_FEE,
+    shipping_fee: calculateShippingFee(order.productTotal),
   }
 }

@@ -1,4 +1,4 @@
-import { formatPrice } from '../../lib/formatPrice'
+import { formatCouponUsageHint } from '../../lib/orderConstants'
 import type { MemberCoupon } from '../../types/coupon'
 
 interface CheckoutCouponSectionProps {
@@ -75,8 +75,7 @@ export function CheckoutCouponSection({
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-neutral-900">{coupon.title}</span>
                   <span className="mt-1 block text-sm text-neutral-600">
-                    {formatPrice(coupon.discountAmount)} 할인 ·{' '}
-                    {formatPrice(coupon.minOrderAmount)} 이상 주문 시 사용 가능
+                    {formatCouponUsageHint(coupon.minOrderAmount)}
                   </span>
                   {!isApplicable ? (
                     <span className="mt-1 block text-xs text-red-600">

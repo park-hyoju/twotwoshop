@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Copy, CheckCircle2 } from 'lucide-react'
 import { DepositAccountInfo } from '../../components/deposit/DepositAccountInfo'
+import { ShippingFeeRow } from '../../components/orders/ShippingFeeRow'
 import { formatPrice } from '../../lib/formatPrice'
 import { isValidOrder } from '../../lib/orderStorage'
 import { ROUTES } from '../../lib/routes'
@@ -84,6 +85,21 @@ export function OrderCompletePage() {
             <dd className="font-mono text-lg font-bold text-neutral-900">{order.orderNumber}</dd>
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+            <dt className="font-semibold text-neutral-600">상품금액</dt>
+            <dd className="text-lg font-semibold text-neutral-900">{formatPrice(order.productTotal)}</dd>
+          </div>
+          {order.couponDiscount > 0 ? (
+            <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
+              <dt className="font-semibold text-neutral-600">쿠폰 할인</dt>
+              <dd className="text-lg font-semibold text-red-600">-{formatPrice(order.couponDiscount)}</dd>
+            </div>
+          ) : null}
+          <ShippingFeeRow
+            subtotal={order.productTotal}
+            shippingFee={order.shippingFee}
+            hintClassName="text-sm text-neutral-500"
+          />
+          <div className="flex flex-col gap-1 border-t border-neutral-200 pt-4 sm:flex-row sm:justify-between">
             <dt className="font-semibold text-neutral-600">최종 입금금액</dt>
             <dd className="text-2xl font-bold text-neutral-900">{formatPrice(order.totalAmount)}</dd>
           </div>

@@ -1,4 +1,5 @@
 import { formatPrice } from '../../../lib/formatPrice'
+import { ShippingFeeRow } from '../../orders/ShippingFeeRow'
 import { getOrderStatusLabel, getPaymentStatusLabel } from '../../../lib/adminOrderStatus'
 import { formatAdminOrderDate, getOrderProductSummary } from './adminOrderDisplay'
 import { AdminOrderFulfillmentPanel } from './AdminOrderFulfillmentPanel'
@@ -168,10 +169,10 @@ export function AdminOrderDetailModal({
                 </dd>
               </div>
             ) : null}
-            <div className="flex justify-between gap-4 text-neutral-600">
-              <dt>배송비</dt>
-              <dd className="font-semibold text-neutral-900">{formatPrice(order.shipping_fee)}</dd>
-            </div>
+            <ShippingFeeRow
+              subtotal={order.subtotal}
+              shippingFee={order.shipping_fee}
+            />
             <div className="flex justify-between gap-4 border-t border-neutral-100 pt-3 text-base">
               <dt className="font-semibold text-neutral-900">최종 입금금액</dt>
               <dd className="font-bold text-neutral-900">{formatPrice(order.total_amount)}</dd>

@@ -10,7 +10,7 @@ import {
   mapAddressToCheckoutForm,
   mapCheckoutFormToAddressInput,
 } from '../../lib/checkoutAddress'
-import { SHIPPING_FEE, calculateOrderTotal } from '../../lib/orderConstants'
+import { calculateOrderTotal, calculateShippingFee } from '../../lib/orderConstants'
 import { INSUFFICIENT_STOCK_ORDER_MESSAGE } from '../../lib/productStock'
 import { ROUTES } from '../../lib/routes'
 import {
@@ -113,6 +113,7 @@ export function CheckoutPage() {
   const productTotal = getCartTotal()
   const selectedCoupon = findSelectedCoupon(coupons, form.selectedCouponId)
   const couponDiscount = selectedCoupon?.discountAmount ?? 0
+  const shippingFee = calculateShippingFee(productTotal)
   const totalAmount = calculateOrderTotal(productTotal, couponDiscount)
   const applicableCoupons = getApplicableCoupons(coupons, productTotal)
   const soldOutIncluded = hasSoldOutItems()
@@ -266,7 +267,7 @@ export function CheckoutPage() {
           applicableCoupons={applicableCoupons}
           productTotal={productTotal}
           couponDiscount={couponDiscount}
-          shippingFee={SHIPPING_FEE}
+          shippingFee={shippingFee}
           totalAmount={totalAmount}
           canSubmit={canSubmit}
           onChange={handleChange}
@@ -277,7 +278,7 @@ export function CheckoutPage() {
           items={items}
           productTotal={productTotal}
           couponDiscount={couponDiscount}
-          shippingFee={SHIPPING_FEE}
+          shippingFee={shippingFee}
           totalAmount={totalAmount}
         />
       </div>

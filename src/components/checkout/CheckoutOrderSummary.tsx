@@ -1,4 +1,5 @@
 import { isCartItemAvailable } from '../../lib/cartItem'
+import { ShippingFeeRow } from '../orders/ShippingFeeRow'
 import { formatPrice } from '../../lib/formatPrice'
 import type { CartItem } from '../../types/cart'
 
@@ -44,10 +45,7 @@ export function CheckoutOrderSummary({
             {couponDiscount > 0 ? `-${formatPrice(couponDiscount)}` : formatPrice(0)}
           </dd>
         </div>
-        <div className="flex justify-between text-neutral-600">
-          <dt>배송비</dt>
-          <dd>{formatPrice(shippingFee)}</dd>
-        </div>
+        <ShippingFeeRow subtotal={productTotal} shippingFee={shippingFee} />
         <div className="flex justify-between border-t border-neutral-200 pt-3 text-base font-bold text-neutral-900">
           <dt>최종 입금금액</dt>
           <dd>{formatPrice(totalAmount)}</dd>

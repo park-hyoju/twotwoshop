@@ -136,11 +136,13 @@ create policy "member_coupons_update_own"
   with check (user_id = auth.uid());
 
 -- Seed coupons (idempotent)
-insert into public.coupons (code, title, discount_amount, min_order_amount)
-values
-  ('WELCOME3000', '신규 회원 3,000원 할인', 3000, 20000),
-  ('SAVE5000', '5,000원 할인 쿠폰', 5000, 50000)
-on conflict (code) do nothing;
+insert into public.coupons (code, title, discount_amount, min_order_amount, is_active)
+values ('WELCOME5000', '신규회원 5,000원 할인', 5000, 70000, true)
+on conflict (code) do update
+  set title = excluded.title,
+      discount_amount = excluded.discount_amount,
+      min_order_amount = excluded.min_order_amount,
+      is_active = true;
 
 -- -----------------------------------------------------------------------------
 -- 3) RPC: member coupons
@@ -205,13 +207,16 @@ begin
     return;
   end if;
 
-  select id into v_coupon_id from public.coupons where code = 'WELCOME3000' limit 1;
+  select id into v_coupon_id
+    from public.coupons
+   where code = 'WELCOME5000' and is_active = true
+   limit 1;
   if v_coupon_id is null then
     return;
   end if;
 
   insert into public.member_coupons (user_id, coupon_id, expires_at)
-  values (v_user_id, v_coupon_id, now() + interval '30 days')
+  values (v_user_id, v_coupon_id, null)
   on conflict (user_id, coupon_id) do nothing;
 end;
 $$;

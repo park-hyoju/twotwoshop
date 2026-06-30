@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { SHIPPING_FEE, calculateOrderTotal } from '../../lib/orderConstants'
+import { ShippingFeeRow } from '../orders/ShippingFeeRow'
+import { calculateOrderTotal, calculateShippingFee } from '../../lib/orderConstants'
 import { formatPrice } from '../../lib/formatPrice'
 import { ROUTES } from '../../lib/routes'
 
@@ -18,6 +19,7 @@ export function CartSummary({
   hasSoldOutItems,
   canCheckout,
 }: CartSummaryProps) {
+  const shippingFee = calculateShippingFee(productTotal)
   const totalAmount = calculateOrderTotal(productTotal)
 
   return (
@@ -36,10 +38,11 @@ export function CartSummary({
           <dt>총 상품 금액</dt>
           <dd className="font-semibold text-neutral-900">{formatPrice(productTotal)}</dd>
         </div>
-        <div className="flex items-center justify-between text-neutral-600">
-          <dt>배송비</dt>
-          <dd className="font-semibold text-neutral-900">{formatPrice(SHIPPING_FEE)}</dd>
-        </div>
+        <ShippingFeeRow
+          subtotal={productTotal}
+          shippingFee={shippingFee}
+          hintClassName="text-sm text-neutral-500"
+        />
         <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
           <dt className="font-semibold text-neutral-900">총 결제 예정 금액</dt>
           <dd className="text-2xl font-bold text-neutral-900 sm:text-3xl">{formatPrice(totalAmount)}</dd>

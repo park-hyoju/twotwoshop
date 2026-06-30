@@ -20,6 +20,7 @@ import {
 import { isAdminUser } from '../lib/adminAuthConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { UserProfile } from '../types/userProfile'
+import { issueWelcomeCoupon } from './couponRepository'
 import {
   fetchCurrentUserProfile,
   resolveLoginEmail,
@@ -214,6 +215,7 @@ export async function signUpCustomer(input: CustomerSignUpInput): Promise<Custom
       email: authEmail,
       phone: sanitized.phone,
     })
+    await issueWelcomeCoupon()
   } finally {
     const { error: signOutError } = await supabase!.auth.signOut()
     if (signOutError && import.meta.env.DEV) {

@@ -2,6 +2,7 @@ import { formatPrice } from '../../lib/formatPrice'
 import type { MemberCoupon } from '../../types/coupon'
 import type { CheckoutFormData, CheckoutFormErrors } from '../../types/order'
 import { DepositAccountInfo } from '../deposit/DepositAccountInfo'
+import { ShippingFeeRow } from '../orders/ShippingFeeRow'
 import { CheckoutCouponSection } from './CheckoutCouponSection'
 
 interface CheckoutFormProps {
@@ -313,10 +314,7 @@ export function CheckoutForm({
               {couponDiscount > 0 ? `-${formatPrice(couponDiscount)}` : formatPrice(0)}
             </dd>
           </div>
-          <div className="flex justify-between text-neutral-600">
-            <dt>배송비</dt>
-            <dd className="font-semibold text-neutral-900">{formatPrice(shippingFee)}</dd>
-          </div>
+          <ShippingFeeRow subtotal={productTotal} shippingFee={shippingFee} />
           <div className="flex justify-between border-t border-neutral-200 pt-3">
             <dt className="font-semibold text-neutral-900">최종 입금금액</dt>
             <dd className="text-xl font-bold text-neutral-900">{formatPrice(totalAmount)}</dd>

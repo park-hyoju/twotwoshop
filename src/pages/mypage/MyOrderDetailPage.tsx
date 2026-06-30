@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { DepositAccountInfo } from '../../components/deposit/DepositAccountInfo'
+import { ShippingFeeRow } from '../../components/orders/ShippingFeeRow'
 import { MyPageShell } from '../../components/mypage/MyPageShell'
 import { OrderShippingTracking } from '../../components/orders/OrderShippingTracking'
 import { OrderStatusTimeline } from '../../components/orders/OrderStatusTimeline'
@@ -120,10 +121,10 @@ export function MyOrderDetailPage() {
                   <dd className="font-medium text-red-600">-{formatPrice(order.couponDiscountAmount)}</dd>
                 </div>
               ) : null}
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-neutral-500">배송비</dt>
-                <dd className="font-medium text-neutral-900">{formatPrice(order.shippingFee)}</dd>
-              </div>
+              <ShippingFeeRow
+                subtotal={order.subtotal}
+                shippingFee={order.shippingFee}
+              />
               <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-3">
                 <dt className="font-semibold text-neutral-900">최종 입금금액</dt>
                 <dd className="text-lg font-bold text-neutral-900">{formatPrice(order.totalAmount)}</dd>

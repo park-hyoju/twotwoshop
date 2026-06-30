@@ -41,13 +41,25 @@ function parseMemberCouponRow(item: unknown): MemberCoupon | null {
   }
 }
 
+export async function issueWelcomeCoupon(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    return
+  }
+
+  const { error } = await supabase.rpc('ensure_welcome_coupon')
+
+  if (error) {
+    logSupabaseError('couponRepository.ensure_welcome_coupon', error)
+  }
+}
+
 export async function fetchMemberCoupons(): Promise<MemberCoupon[]> {
   if (!isSupabaseConfigured || !supabase) {
     return []
   }
 
   try {
-    await supabase.rpc('ensure_welcome_coupon')
+    await issueWelcomeCoupon()
   } catch {
     // optional bootstrap
   }

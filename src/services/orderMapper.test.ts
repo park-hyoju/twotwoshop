@@ -43,4 +43,12 @@ describe('mapOrderToOrderInsert', () => {
 
     expect(payload.user_id).toBeNull()
   })
+
+  it('derives free shipping fee from subtotal in RPC payload', () => {
+    const freeShippingOrder: Order = { ...sampleOrder, productTotal: 70000, shippingFee: 0, totalAmount: 65000, couponDiscount: 5000 }
+    const payload = mapOrderToOrderInsert(freeShippingOrder, 'customer-1', 'user-1')
+
+    expect(payload.shipping_fee).toBe(0)
+    expect(payload.subtotal).toBe(70000)
+  })
 })
