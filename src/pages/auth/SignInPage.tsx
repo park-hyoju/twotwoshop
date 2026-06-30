@@ -111,9 +111,17 @@ export function SignInPage() {
         </div>
 
         <div>
-          <label htmlFor="signin-password" className={authLabelClassName}>
-            비밀번호
-          </label>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label htmlFor="signin-password" className={authLabelClassName}>
+              비밀번호
+            </label>
+            <Link
+              to={ROUTES.forgotPassword}
+              className="text-sm font-medium text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline"
+            >
+              비밀번호를 잊으셨나요?
+            </Link>
+          </div>
           <input
             id="signin-password"
             type="password"

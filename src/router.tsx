@@ -39,7 +39,7 @@ import {
   MyProfileEditPage,
   MyRecentProductsPage,
 } from './pages/mypage'
-import { SignInPage, SignUpPage } from './pages/auth'
+import { SignInPage, SignUpPage, ForgotPasswordPage, ResetPasswordPage } from './pages/auth'
 import { NoticesListPage, NoticeDetailPage } from './pages/notices/NoticesPages'
 import { PrivacyPage } from './pages/legal/PrivacyPage'
 import { TermsPage } from './pages/legal/TermsPage'
@@ -110,6 +110,12 @@ export const router = createBrowserRouter([
         element: <CustomerGuestOnly />,
         children: [{ index: true, element: <SignUpPage /> }],
       },
+      {
+        path: 'forgot-password',
+        element: <CustomerGuestOnly />,
+        children: [{ index: true, element: <ForgotPasswordPage /> }],
+      },
+      { path: 'reset-password', element: <ResetPasswordPage /> },
       {
         path: 'mypage',
         element: <CustomerAuthGate />,

@@ -40,6 +40,8 @@ export const ROUTES = {
   orderComplete: '/order-complete',
   signin: '/signin',
   signup: '/signup',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
   mypage: '/mypage',
   mypageOrders: '/mypage/orders',
   mypageAddresses: '/mypage/addresses',

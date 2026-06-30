@@ -15,9 +15,14 @@ import {
   sanitizeMemberProfileInput,
   validateCustomerSignUpInput,
   validatePassword,
+  validatePasswordConfirm,
   type CustomerSignUpInput,
 } from '../lib/customerAuthValidation'
 import { isAdminUser } from '../lib/adminAuthConfig'
+import {
+  getPasswordResetRedirectUrl,
+  PASSWORD_RESET_INVALID_LINK_MESSAGE,
+} from '../lib/passwordResetConfig'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { UserProfile } from '../types/userProfile'
 import { issueWelcomeCoupon } from './couponRepository'
@@ -280,6 +285,74 @@ export async function signInCustomer(email: string, password: string): Promise<S
   await syncCustomerProfileIfMissing(verifiedSession)
 
   return verifiedSession
+}
+
+export async function requestPasswordResetEmail(email: string): Promise<void> {
+  assertSupabaseReady()
+
+  const normalizedInput = normalizeLoginEmail(email)
+
+  if (!normalizedInput) {
+    throw new CustomerAuthError('이메일을 입력해주세요.')
+  }
+
+  const authEmail = await resolveLoginEmail(normalizedInput)
+
+  const { error } = await supabase!.auth.resetPasswordForEmail(authEmail, {
+    redirectTo: getPasswordResetRedirectUrl(),
+  })
+
+  if (error) {
+    if (isAuthRateLimitError(error)) {
+      throw new CustomerAuthError(CUSTOMER_RATE_LIMIT_MESSAGE, error)
+    }
+
+    if (import.meta.env.DEV) {
+      console.warn('[customerAuthService] resetPasswordForEmail:', error.message)
+    }
+  }
+}
+
+export async function completePasswordReset(
+  newPassword: string,
+  confirmPassword: string,
+): Promise<void> {
+  assertSupabaseReady()
+
+  const passwordError = validatePassword(newPassword) ?? validatePasswordConfirm(newPassword, confirmPassword)
+  if (passwordError) {
+    throw new CustomerAuthError(passwordError)
+  }
+
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase!.auth.getSession()
+
+  if (sessionError || !session) {
+    throw new CustomerAuthError(PASSWORD_RESET_INVALID_LINK_MESSAGE, sessionError)
+  }
+
+  if (isAdminUser(session.user)) {
+    await supabase!.auth.signOut()
+    throw new CustomerAuthError(PASSWORD_RESET_INVALID_LINK_MESSAGE)
+  }
+
+  const { error } = await supabase!.auth.updateUser({ password: newPassword })
+
+  if (error) {
+    if (isAuthRateLimitError(error)) {
+      throw new CustomerAuthError(CUSTOMER_RATE_LIMIT_MESSAGE, error)
+    }
+
+    throw mapAuthError(error.message, 'signin', error)
+  }
+
+  const { error: signOutError } = await supabase!.auth.signOut()
+
+  if (signOutError && import.meta.env.DEV) {
+    console.warn('[customerAuthService] post-reset signOut failed:', signOutError.message)
+  }
 }
 
 export async function signOutCustomer(): Promise<void> {
