@@ -1,4 +1,5 @@
-import { getProductById } from '../services/productService'
+import { productRepository } from '../services/productRepository'
+import type { Product } from '../types/product'
 import type { CartItem, CartSyncNoticeType, CartSyncOutcome } from '../types/cart'
 import { createCartItemFromProduct, normalizeCartItems } from './cartStore'
 
@@ -9,65 +10,89 @@ export const CART_SYNC_MESSAGES: Record<CartSyncNoticeType, string> = {
   unavailableRemoved: '판매 중이 아닌 상품이 장바구니에서 제외되었습니다.',
 }
 
+export type ResolveProductForCartSync = (slug: string) => Promise<Product | undefined>
+
 export function getSyncNoticeMessages(notices: CartSyncNoticeType[]): string[] {
   return notices.map((notice) => CART_SYNC_MESSAGES[notice])
 }
 
-export function syncCartItems(items: CartItem[]): CartSyncOutcome {
+function syncSingleCartItem(
+  item: CartItem,
+  product: Product,
+  notices: Set<CartSyncNoticeType>,
+): CartItem {
+  const isSoldOut = product.stock === 0 || product.status === 'soldout'
+  const priceChanged = item.price !== product.price
+  const productIdChanged = item.productId !== product.id
+  const infoChanged =
+    priceChanged ||
+    productIdChanged ||
+    item.name !== product.name ||
+    item.slug !== product.slug ||
+    item.thumbnail !== product.thumbnail
+
+  if (infoChanged) {
+    notices.add('infoChanged')
+  }
+
+  if (isSoldOut) {
+    if (item.stock > 0) {
+      notices.add('soldOutDetected')
+    }
+
+    return {
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      price: product.price,
+      thumbnail: product.thumbnail,
+      stock: 0,
+      quantity: item.quantity,
+    }
+  }
+
+  let quantity = item.quantity
+  if (quantity > product.stock) {
+    quantity = product.stock
+    notices.add('quantityAdjusted')
+  }
+
+  return createCartItemFromProduct(product, quantity)
+}
+
+export async function syncCartItemsWithResolver(
+  items: CartItem[],
+  resolveProduct: ResolveProductForCartSync,
+): Promise<CartSyncOutcome> {
   const normalized = normalizeCartItems(items)
   const notices = new Set<CartSyncNoticeType>()
   const syncedItems: CartItem[] = []
 
   for (const item of normalized) {
-    const product = getProductById(item.productId)
+    const slug = item.slug?.trim()
+    if (!slug) {
+      notices.add('unavailableRemoved')
+      continue
+    }
+
+    const product = await resolveProduct(slug)
 
     if (!product || product.status === 'hidden') {
       notices.add('unavailableRemoved')
       continue
     }
 
-    const isSoldOut = product.stock === 0
-    const priceChanged = item.price !== product.price
-    const infoChanged =
-      priceChanged ||
-      item.name !== product.name ||
-      item.slug !== product.slug ||
-      item.thumbnail !== product.thumbnail
-
-    if (infoChanged) {
-      notices.add('infoChanged')
-    }
-
-    if (isSoldOut) {
-      if (item.stock > 0) {
-        notices.add('soldOutDetected')
-      }
-
-      syncedItems.push({
-        productId: product.id,
-        slug: product.slug,
-        name: product.name,
-        price: product.price,
-        thumbnail: product.thumbnail,
-        stock: 0,
-        quantity: item.quantity,
-      })
-      continue
-    }
-
-    let quantity = item.quantity
-    if (quantity > product.stock) {
-      quantity = product.stock
-      notices.add('quantityAdjusted')
-    }
-
-    syncedItems.push(
-      createCartItemFromProduct(product, quantity),
-    )
+    syncedItems.push(syncSingleCartItem(item, product, notices))
   }
 
   return {
     items: syncedItems,
     notices: [...notices],
   }
+}
+
+export async function syncCartItems(items: CartItem[]): Promise<CartSyncOutcome> {
+  return syncCartItemsWithResolver(items, (slug) =>
+    productRepository.findProductBySlugForCartSync(slug),
+  )
 }

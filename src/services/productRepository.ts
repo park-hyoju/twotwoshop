@@ -22,6 +22,7 @@ import {
   getNewProducts,
   getPerfumeProducts,
   getProductsByCategoryGroup,
+  getProductBySlug,
   getProductsByProductCategory,
   getSaleProducts,
 } from './productService'
@@ -29,6 +30,7 @@ import {
 export interface ProductRepository {
   findAllProducts(): Promise<Product[]>
   findProductBySlug(slug: string): Promise<Product | undefined>
+  findProductBySlugForCartSync(slug: string): Promise<Product | undefined>
   findProductsByProductCategory(categoryId: ProductCategoryId): Promise<Product[]>
   findProductsByCategoryGroup(group: ProductCategoryGroup): Promise<Product[]>
   findBestProducts(): Promise<Product[]>
@@ -159,6 +161,28 @@ async function fetchActiveProductRowBySlug(
   return (data as ProductRow | null) ?? null
 }
 
+async function fetchProductRowBySlugForCartSync(
+  slug: string,
+): Promise<ProductRow | null> {
+  if (!isSupabaseConfigured || !supabase) {
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_COLUMNS)
+    .eq('slug', slug)
+    .neq('status', 'hidden')
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[productRepository] Supabase cart-sync slug fetch failed:', error.message)
+    return null
+  }
+
+  return (data as ProductRow | null) ?? null
+}
+
 async function fetchRelatedProductRows(productId: string): Promise<ProductRow[] | null> {
   if (!isSupabaseConfigured || !supabase) {
     return null
@@ -231,7 +255,14 @@ export const productRepository: ProductRepository = {
       const row = await fetchActiveProductRowBySlug(slug)
       if (!row) return null
       return mapProductRowToProduct(row)
-    }, () => getAllProducts().find((product) => product.slug === slug)),
+    }, () => getProductBySlug(slug)),
+
+  findProductBySlugForCartSync: (slug) =>
+    withSupabaseFallback(async () => {
+      const row = await fetchProductRowBySlugForCartSync(slug)
+      if (!row) return null
+      return mapProductRowToProduct(row)
+    }, () => getProductBySlug(slug)),
 
   findProductsByProductCategory: (categoryId) =>
     withSupabaseFallback(async () => {

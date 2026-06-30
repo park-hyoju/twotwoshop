@@ -3,7 +3,7 @@
  *
  * - Reads from `src/data/products.ts` only.
  * - Used as fallback when Supabase is unavailable (`productRepository`).
- * - Cart sync (`cartSync`) still resolves products by id here — not migrated in v0.8 Step 4.
+ * - Cart sync (`cartSync`) resolves products by slug via `productRepository`.
  *
  * For storefront UI, prefer `productRepository` (async, Supabase + fallback to this module).
  */

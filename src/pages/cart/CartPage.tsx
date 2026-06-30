@@ -6,6 +6,7 @@ export function CartPage() {
   const {
     items,
     syncNotices,
+    isCartSyncing,
     removeFromCart,
     updateQuantity,
     clearCart,
@@ -18,13 +19,21 @@ export function CartPage() {
   } = useCart()
 
   useEffect(() => {
-    syncCart()
+    void syncCart()
   }, [syncCart])
 
   const productTotal = getCartTotal()
   const itemCount = getCartCount()
   const totalQuantity = getCartTotalQuantity()
   const soldOutIncluded = hasSoldOutItems()
+
+  if (isCartSyncing) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <p className="text-lg text-neutral-600">장바구니를 불러오는 중입니다...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">

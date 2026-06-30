@@ -17,11 +17,12 @@ import type { Product } from '../types/product'
 interface CartContextValue {
   items: CartItem[]
   syncNotices: string[]
+  isCartSyncing: boolean
   addToCart: (product: Product) => AddToCartResult
   removeFromCart: (productId: string) => void
   updateQuantity: (productId: string, quantity: number) => void
   clearCart: () => void
-  syncCart: () => void
+  syncCart: () => Promise<void>
   clearSyncNotices: () => void
   getCartTotal: () => number
   getCartCount: () => number
@@ -31,24 +32,48 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-function initializeCartState(): { items: CartItem[]; syncNotices: string[] } {
-  const loaded = cartStore.normalizeCartItems(loadCartFromStorage())
-  const synced = syncCartItems(loaded)
-
-  return {
-    items: synced.items,
-    syncNotices: getSyncNoticeMessages(synced.notices),
-  }
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
-  const initialState = useRef(initializeCartState()).current
-  const [items, setItems] = useState<CartItem[]>(initialState.items)
-  const [syncNotices, setSyncNotices] = useState<string[]>(initialState.syncNotices)
+  const [items, setItems] = useState<CartItem[]>(() =>
+    cartStore.normalizeCartItems(loadCartFromStorage()),
+  )
+  const [syncNotices, setSyncNotices] = useState<string[]>([])
+  const [isCartSyncing, setIsCartSyncing] = useState(true)
   const [isReady, setIsReady] = useState(false)
+  const itemsRef = useRef(items)
+  const syncRequestIdRef = useRef(0)
+
+  itemsRef.current = items
 
   useEffect(() => {
-    setIsReady(true)
+    let cancelled = false
+    const requestId = ++syncRequestIdRef.current
+
+    async function initializeCart() {
+      setIsCartSyncing(true)
+
+      try {
+        const loaded = cartStore.normalizeCartItems(loadCartFromStorage())
+        const synced = await syncCartItems(loaded)
+
+        if (cancelled || requestId !== syncRequestIdRef.current) {
+          return
+        }
+
+        setItems(synced.items)
+        setSyncNotices(getSyncNoticeMessages(synced.notices))
+      } finally {
+        if (!cancelled && requestId === syncRequestIdRef.current) {
+          setIsCartSyncing(false)
+          setIsReady(true)
+        }
+      }
+    }
+
+    void initializeCart()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -59,26 +84,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
     saveCartToStorage(items)
   }, [items, isReady])
 
-  const applySync = useCallback((nextItems: CartItem[]) => {
-    const synced = syncCartItems(nextItems)
+  const syncCart = useCallback(async () => {
+    const requestId = ++syncRequestIdRef.current
+    setIsCartSyncing(true)
 
-    setSyncNotices(getSyncNoticeMessages(synced.notices))
-    return synced.items
+    try {
+      const synced = await syncCartItems(
+        cartStore.normalizeCartItems(itemsRef.current),
+      )
+
+      if (requestId !== syncRequestIdRef.current) {
+        return
+      }
+
+      setItems(synced.items)
+      setSyncNotices(getSyncNoticeMessages(synced.notices))
+    } finally {
+      if (requestId === syncRequestIdRef.current) {
+        setIsCartSyncing(false)
+      }
+    }
   }, [])
-
-  const syncCart = useCallback(() => {
-    setItems((prev) => applySync(prev))
-  }, [applySync])
 
   const clearSyncNotices = useCallback(() => {
     setSyncNotices([])
   }, [])
 
   const addToCart = useCallback((product: Product): AddToCartResult => {
-    const outcome = cartStore.addToCart(items, product)
+    const outcome = cartStore.addToCart(itemsRef.current, product)
+    itemsRef.current = outcome.items
     setItems(outcome.items)
     return outcome.result
-  }, [items])
+  }, [])
 
   const removeFromCart = useCallback((productId: string) => {
     setItems((prev) => cartStore.removeFromCart(prev, productId))
@@ -108,6 +145,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => ({
       items,
       syncNotices,
+      isCartSyncing,
       addToCart,
       removeFromCart,
       updateQuantity,
@@ -122,6 +160,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [
       items,
       syncNotices,
+      isCartSyncing,
       addToCart,
       removeFromCart,
       updateQuantity,

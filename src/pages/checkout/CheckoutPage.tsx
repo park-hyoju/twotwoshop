@@ -36,7 +36,7 @@ import type { MemberCoupon } from '../../types/coupon'
 export function CheckoutPage() {
   const navigate = useNavigate()
   const { isMember, isLoading: isAuthLoading, profile, user } = useCustomerAuth()
-  const { items, syncCart, clearCart, getCartTotal, hasSoldOutItems } = useCart()
+  const { items, syncCart, clearCart, getCartTotal, hasSoldOutItems, isCartSyncing } = useCart()
   const [form, setForm] = useState<CheckoutFormData>(INITIAL_CHECKOUT_FORM)
   const [fieldErrors, setFieldErrors] = useState<CheckoutFormErrors>({})
   const [submitError, setSubmitError] = useState('')
@@ -51,7 +51,7 @@ export function CheckoutPage() {
   const hasInitializedMemberRef = useRef(false)
 
   useEffect(() => {
-    syncCart()
+    void syncCart()
   }, [syncCart])
 
   useEffect(() => {
@@ -121,6 +121,14 @@ export function CheckoutPage() {
     !hasCheckoutFormErrors(validateCheckoutForm(form)) &&
     canSubmitOrder(orderableItems, soldOutIncluded) &&
     productTotal > 0
+
+  if (isCartSyncing) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
+        <p className="text-lg text-neutral-600">주문 정보를 불러오는 중입니다...</p>
+      </div>
+    )
+  }
 
   if (orderableItems.length === 0 && !isSubmittingRef.current) {
     return <Navigate to={ROUTES.cart} replace />
@@ -205,7 +213,7 @@ export function CheckoutPage() {
 
       if (error instanceof OrderStockError) {
         setSubmitError(INSUFFICIENT_STOCK_ORDER_MESSAGE)
-        syncCart()
+        void syncCart()
         return
       }
 

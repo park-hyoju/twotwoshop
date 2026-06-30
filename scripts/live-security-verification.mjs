@@ -271,15 +271,26 @@ async function main() {
     .from('consultation_status_settings')
     .update({ status: 'closed' })
     .eq('id', 'default')
-  results.push(
+    .select('id')
+  const consultationUpdateBlocked =
     consultationUpdate.error &&
-      (consultationUpdate.error.code === '42501' ||
-        consultationUpdate.error.message?.toLowerCase().includes('permission denied') ||
-        consultationUpdate.error.message?.toLowerCase().includes('row-level security'))
+    (consultationUpdate.error.code === '42501' ||
+      consultationUpdate.error.message?.toLowerCase().includes('permission denied') ||
+      consultationUpdate.error.message?.toLowerCase().includes('row-level security'))
+  results.push(
+    consultationUpdateBlocked
       ? pass('hardening.v4.anon.consultation_update_blocked', consultationUpdate.error.message)
       : consultationUpdate.error?.code === '42P01'
         ? skip('hardening.v4.anon.consultation_update_blocked', 'table missing')
-        : fail('hardening.v4.anon.consultation_update_blocked', 'anon updated consultation status'),
+        : (consultationUpdate.data?.length ?? 0) === 0
+          ? pass(
+              'hardening.v4.anon.consultation_update_blocked',
+              '0 rows updated (RLS or privilege block)',
+            )
+          : fail('hardening.v4.anon.consultation_update_blocked', 'anon updated consultation status', {
+              data: consultationUpdate.data,
+              error: consultationUpdate.error?.message,
+            }),
   )
 
   // -------------------------------------------------------------------------
