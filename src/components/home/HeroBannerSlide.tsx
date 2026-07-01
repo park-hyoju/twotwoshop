@@ -9,9 +9,22 @@ interface HeroBannerSlideProps {
 const NO_IMAGE_BACKGROUND_CLASS =
   'bg-[linear-gradient(135deg,#f3eee7_0%,#d8cec2_100%)]'
 
+const MOBILE_TEXT_COLOR = {
+  onImage: {
+    eyebrow: 'text-white/85',
+    headline: 'text-white',
+    description: 'text-white/90',
+  },
+  onFallback: {
+    eyebrow: 'text-neutral-600',
+    headline: 'text-neutral-900',
+    description: 'text-neutral-700',
+  },
+} as const
+
 function HeroBannerCta({ slide }: HeroBannerSlideProps) {
   const className =
-    'mt-6 inline-flex items-center justify-center rounded-full bg-[#111111] px-8 py-3 text-base font-semibold text-white transition-all duration-[250ms] ease-in-out hover:-translate-y-0.5 hover:bg-[#222222] md:mt-8 md:px-10 md:py-4'
+    'mt-6 inline-flex items-center justify-center rounded-full bg-[#111111] px-8 py-3 text-[16px] font-semibold text-white transition-all duration-[250ms] ease-in-out hover:-translate-y-0.5 hover:bg-[#222222] md:mt-8 md:px-10 md:py-4 md:text-base'
 
   if (slide.buttonText.trim().length === 0) {
     return null
@@ -36,6 +49,7 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
   const desktopSrc = slide.desktopImage ?? slide.mobileImage
   const mobileSrc = slide.mobileImage ?? slide.desktopImage
   const hasImage = Boolean(desktopSrc || mobileSrc)
+  const colors = hasImage ? MOBILE_TEXT_COLOR.onImage : MOBILE_TEXT_COLOR.onFallback
 
   return (
     <div className={`relative w-full overflow-hidden ${HERO_BANNER_HEIGHT_CLASS}`}>
@@ -65,27 +79,22 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
         </>
       ) : null}
 
-      <div className="relative flex h-full flex-col justify-end px-6 pb-20 md:justify-center md:px-12 md:pb-0 lg:px-16">
-        <div className="max-w-[280px] md:max-w-[600px]">
+      {/* Mobile (<768px): absolute bottom-aligned. md+: centered PC layout */}
+      <div className="absolute inset-0 flex flex-col justify-end px-6 pb-16 md:static md:inset-auto md:flex md:h-full md:justify-center md:px-12 md:pb-0 lg:px-16">
+        <div className="w-full md:max-w-[600px]">
           <p
-            className={`text-sm font-semibold uppercase tracking-[0.25em] md:text-xs md:tracking-[0.28em] ${
-              hasImage ? 'text-white/85' : 'text-neutral-600'
-            }`}
+            className={`text-[13px] font-semibold uppercase tracking-[0.28em] md:text-xs ${colors.eyebrow}`}
           >
             {slide.eyebrow}
           </p>
           <h2
-            className={`mt-3 line-clamp-4 whitespace-pre-line text-3xl font-bold leading-tight md:mt-4 md:line-clamp-none md:text-4xl md:font-semibold lg:text-[2.75rem] ${
-              hasImage ? 'text-white' : 'text-neutral-900'
-            }`}
+            className={`mt-3 max-w-[310px] whitespace-pre-line text-[34px] font-bold leading-[1.12] md:mt-4 md:max-w-[600px] md:text-4xl md:font-semibold md:leading-tight lg:text-[2.75rem] ${colors.headline}`}
           >
             {slide.headline}
           </h2>
           {slide.description.trim().length > 0 && (
             <p
-              className={`mt-4 line-clamp-3 max-w-[280px] whitespace-pre-line text-sm leading-relaxed md:mt-5 md:line-clamp-none md:max-w-[520px] md:text-base lg:text-lg ${
-                hasImage ? 'text-white/90' : 'text-neutral-700'
-              }`}
+              className={`mt-4 max-w-[300px] whitespace-pre-line text-[16px] leading-[1.5] md:mt-5 md:max-w-[520px] md:text-base md:leading-relaxed lg:text-lg ${colors.description}`}
             >
               {slide.description}
             </p>
