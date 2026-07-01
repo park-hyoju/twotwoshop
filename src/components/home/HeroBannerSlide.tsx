@@ -11,7 +11,7 @@ const NO_IMAGE_BACKGROUND_CLASS =
 
 function HeroBannerCta({ slide }: HeroBannerSlideProps) {
   const className =
-    'mt-8 inline-flex items-center justify-center rounded-full bg-[#111111] px-10 py-4 text-base font-semibold text-white transition-all duration-[250ms] ease-in-out hover:-translate-y-0.5 hover:bg-[#222222]'
+    'mt-6 inline-flex items-center justify-center rounded-full bg-[#111111] px-8 py-3 text-base font-semibold text-white transition-all duration-[250ms] ease-in-out hover:-translate-y-0.5 hover:bg-[#222222] md:mt-8 md:px-10 md:py-4'
 
   if (slide.buttonText.trim().length === 0) {
     return null
@@ -56,20 +56,26 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
       )}
 
       {hasImage ? (
-        <div className="absolute inset-0 bg-[rgba(0,0,0,0.25)]" aria-hidden="true" />
+        <>
+          <div
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.15)_0%,rgba(0,0,0,0.25)_100%)] md:hidden"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 hidden bg-[rgba(0,0,0,0.25)] md:block" aria-hidden="true" />
+        </>
       ) : null}
 
-      <div className="relative flex h-full items-center px-6 sm:px-10 lg:px-16">
-        <div className="max-w-[600px]">
+      <div className="relative flex h-full flex-col justify-end px-6 pb-20 md:justify-center md:px-12 md:pb-0 lg:px-16">
+        <div className="max-w-[280px] md:max-w-[600px]">
           <p
-            className={`text-[11px] font-semibold uppercase tracking-[0.28em] sm:text-xs ${
+            className={`text-sm font-semibold uppercase tracking-[0.25em] md:text-xs md:tracking-[0.28em] ${
               hasImage ? 'text-white/85' : 'text-neutral-600'
             }`}
           >
             {slide.eyebrow}
           </p>
           <h2
-            className={`mt-4 whitespace-pre-line text-[1.75rem] font-semibold leading-[1.15] tracking-tight sm:text-4xl lg:text-[2.75rem] ${
+            className={`mt-3 line-clamp-4 whitespace-pre-line text-3xl font-bold leading-tight md:mt-4 md:line-clamp-none md:text-4xl md:font-semibold lg:text-[2.75rem] ${
               hasImage ? 'text-white' : 'text-neutral-900'
             }`}
           >
@@ -77,7 +83,7 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
           </h2>
           {slide.description.trim().length > 0 && (
             <p
-              className={`mt-5 whitespace-pre-line text-sm leading-relaxed sm:text-base ${
+              className={`mt-4 line-clamp-3 max-w-[280px] whitespace-pre-line text-sm leading-relaxed md:mt-5 md:line-clamp-none md:max-w-[520px] md:text-base lg:text-lg ${
                 hasImage ? 'text-white/90' : 'text-neutral-700'
               }`}
             >
