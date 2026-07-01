@@ -145,7 +145,7 @@ export function AdminBannersPage() {
       return
     }
 
-    const confirmed = window.confirm(`"${target.title}" 배너를 삭제할까요?`)
+    const confirmed = window.confirm(`"${target.headline ?? target.title}" 배너를 삭제할까요?`)
     if (!confirmed) {
       return
     }

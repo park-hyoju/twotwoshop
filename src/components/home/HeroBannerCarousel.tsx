@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react'
-import type { StorefrontBanner } from '../../types/banner'
-import { HeroBannerPlaceholder, HeroBannerSlide } from './HeroBannerSlide'
+import { HERO_AUTO_PLAY_MS } from '../../lib/bannerConstants'
+import type { HeroSlide } from '../../types/heroBanner'
+import { HeroBannerSlide } from './HeroBannerSlide'
 
 interface HeroBannerCarouselProps {
-  banners: StorefrontBanner[]
+  slides: HeroSlide[]
 }
 
 const SWIPE_THRESHOLD_PX = 48
-const AUTO_PLAY_MS = 6000
 
-export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
+export function HeroBannerCarousel({ slides }: HeroBannerCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const touchStartX = useRef<number | null>(null)
   const touchDeltaX = useRef(0)
-  const total = banners.length
+  const total = slides.length
   const hasMultiple = total > 1
 
   useEffect(() => {
     setCurrentIndex(0)
-  }, [banners])
+  }, [slides])
 
   const goTo = useCallback(
     (index: number) => {
@@ -42,7 +42,7 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
 
     const timer = window.setInterval(() => {
       goNext()
-    }, AUTO_PLAY_MS)
+    }, HERO_AUTO_PLAY_MS)
 
     return () => window.clearInterval(timer)
   }, [currentIndex, goNext, hasMultiple, isPaused])
@@ -76,17 +76,9 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
     touchDeltaX.current = 0
   }
 
-  if (total === 0) {
-    return <HeroBannerPlaceholder />
-  }
-
-  if (total === 1) {
-    return <HeroBannerSlide banner={banners[0]!} />
-  }
-
   return (
     <div
-      className="relative"
+      className="relative w-full"
       aria-roledescription="carousel"
       aria-label="메인 배너"
       onMouseEnter={() => setIsPaused(true)}
@@ -99,55 +91,55 @@ export function HeroBannerCarousel({ banners }: HeroBannerCarouselProps) {
         onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-500 ease-out"
+          className="flex transition-transform duration-700 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {banners.map((banner) => (
-            <div key={banner.id} className="w-full shrink-0">
-              <HeroBannerSlide banner={banner} />
+          {slides.map((slide) => (
+            <div key={slide.id} className="w-full shrink-0">
+              <HeroBannerSlide slide={slide} />
             </div>
           ))}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={goPrev}
-        className="absolute left-0 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-sm transition hover:bg-white lg:flex"
-        aria-label="이전 배너"
-      >
-        <span aria-hidden className="text-xl leading-none">
-          ‹
-        </span>
-      </button>
-
-      <button
-        type="button"
-        onClick={goNext}
-        className="absolute right-0 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white/95 text-neutral-800 shadow-sm transition hover:bg-white lg:flex"
-        aria-label="다음 배너"
-      >
-        <span aria-hidden className="text-xl leading-none">
-          ›
-        </span>
-      </button>
-
-      <div className="mt-8 flex items-center justify-center gap-2">
-        {banners.map((banner, index) => (
+      {hasMultiple ? (
+        <>
           <button
-            key={banner.id}
             type="button"
-            onClick={() => goTo(index)}
-            className={`rounded-full transition-all ${
-              index === currentIndex
-                ? 'h-2.5 w-6 bg-neutral-900'
-                : 'h-2.5 w-2.5 bg-neutral-300 hover:bg-neutral-400'
-            }`}
-            aria-label={`${index + 1}번째 배너 보기`}
-            aria-current={index === currentIndex}
-          />
-        ))}
-      </div>
+            onClick={goPrev}
+            className="absolute left-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/20 text-2xl leading-none text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-black/35 md:flex lg:left-8"
+            aria-label="이전 배너"
+          >
+            <span aria-hidden>‹</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={goNext}
+            className="absolute right-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/20 text-2xl leading-none text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-black/35 md:flex lg:right-8"
+            aria-label="다음 배너"
+          >
+            <span aria-hidden>›</span>
+          </button>
+
+          <div className="absolute bottom-5 left-0 right-0 z-10 flex items-center justify-center gap-2.5 md:bottom-6">
+            {slides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => goTo(index)}
+                className={`rounded-full transition-all duration-300 ${
+                  index === currentIndex
+                    ? 'h-2 w-8 bg-white'
+                    : 'h-2 w-2 bg-white/45 hover:bg-white/75'
+                }`}
+                aria-label={`${index + 1}번째 배너 보기`}
+                aria-current={index === currentIndex}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

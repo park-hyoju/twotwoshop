@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { resolveBannerImages, withImageCacheBust } from '../lib/bannerImageResolver'
 import type { BannerRow, StorefrontBanner } from '../types/banner'
 
 export class BannerRepositoryError extends Error {
@@ -12,14 +13,22 @@ export class BannerRepositoryError extends Error {
 }
 
 function mapRow(row: BannerRow): StorefrontBanner {
+  const images = resolveBannerImages({
+    desktop_image: row.desktop_image,
+    mobile_image: row.mobile_image,
+  })
+  const cacheVersion = row.updated_at ?? row.created_at ?? null
+
   return {
     id: row.id,
-    title: row.title,
+    eyebrow: row.eyebrow,
+    headline: row.headline ?? row.title,
     description: row.description,
     buttonText: row.button_text,
     buttonLink: row.button_link,
-    desktopImage: row.desktop_image,
-    mobileImage: row.mobile_image,
+    desktopImage: withImageCacheBust(images.desktopImage, cacheVersion),
+    mobileImage: withImageCacheBust(images.mobileImage, cacheVersion),
+    updatedAt: row.updated_at ?? null,
   }
 }
 
@@ -32,7 +41,7 @@ export const bannerRepository = {
     const { data, error } = await supabase
       .from('banners')
       .select(
-        'id, title, description, button_text, button_link, desktop_image, mobile_image, sort_order, is_active, created_at, updated_at',
+        'id, title, eyebrow, headline, description, button_text, button_link, desktop_image, mobile_image, sort_order, is_active, created_at, updated_at',
       )
       .eq('is_active', true)
       .order('sort_order', { ascending: true })

@@ -1,6 +1,8 @@
 export interface BannerRow {
   id: string
   title: string
+  eyebrow: string | null
+  headline: string | null
   description: string
   button_text: string
   button_link: string
@@ -14,16 +16,19 @@ export interface BannerRow {
 
 export interface StorefrontBanner {
   id: string
-  title: string
-  description: string
-  buttonText: string
-  buttonLink: string
+  eyebrow: string | null
+  headline: string | null
+  description: string | null
+  buttonText: string | null
+  buttonLink: string | null
   desktopImage: string | null
   mobileImage: string | null
+  updatedAt: string | null
 }
 
 export interface AdminBannerFormInput {
-  title: string
+  eyebrow: string
+  headline: string
   description: string
   button_text: string
   button_link: string

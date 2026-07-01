@@ -4,15 +4,25 @@ import {
   adminInputClassName,
   adminLabelClassName,
 } from '../products/detail/adminFormStyles'
+import {
+  DEFAULT_HERO_BUTTON_LINK,
+  DEFAULT_HERO_BUTTON_TEXT,
+  DEFAULT_HERO_DESCRIPTION,
+  DEFAULT_HERO_EYEBROW,
+  DEFAULT_HERO_HEADLINE,
+} from '../../../data/heroBannerSlides'
+import { formatBannerImageSizeGuide } from '../../../lib/bannerConstants'
 import { ROUTES } from '../../../lib/routes'
 import type { AdminBannerFormInput, BannerRow } from '../../../types/banner'
+import { validateAdminBannerInput } from '../../../utils/validators'
 import { BannerStorefrontPreview } from './BannerStorefrontPreview'
 
 const EMPTY_FORM: AdminBannerFormInput = {
-  title: '',
-  description: '',
-  button_text: '',
-  button_link: ROUTES.productsNew,
+  eyebrow: DEFAULT_HERO_EYEBROW,
+  headline: DEFAULT_HERO_HEADLINE,
+  description: DEFAULT_HERO_DESCRIPTION,
+  button_text: DEFAULT_HERO_BUTTON_TEXT,
+  button_link: DEFAULT_HERO_BUTTON_LINK,
   desktop_image: '',
   mobile_image: '',
   is_active: true,
@@ -51,6 +61,7 @@ export function AdminBannerFormModal({
   const [localPreviewDesktop, setLocalPreviewDesktop] = useState<string | null>(null)
   const [localPreviewMobile, setLocalPreviewMobile] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [headlineError, setHeadlineError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -59,7 +70,8 @@ export function AdminBannerFormModal({
 
     if (banner) {
       setForm({
-        title: banner.title,
+        eyebrow: banner.eyebrow ?? DEFAULT_HERO_EYEBROW,
+        headline: banner.headline ?? banner.title,
         description: banner.description,
         button_text: banner.button_text,
         button_link: banner.button_link,
@@ -76,6 +88,7 @@ export function AdminBannerFormModal({
     setLocalPreviewDesktop(null)
     setLocalPreviewMobile(null)
     setShowPreview(false)
+    setHeadlineError(null)
   }, [open, banner])
 
   useEffect(() => {
@@ -122,9 +135,15 @@ export function AdminBannerFormModal({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
 
-    if (form.title.trim().length === 0) {
+    const validationError = validateAdminBannerInput(form)
+    if (validationError) {
+      if (form.headline.trim().length === 0) {
+        setHeadlineError('메인 제목을 입력해주세요.')
+      }
       return
     }
+
+    setHeadlineError(null)
 
     await onSubmit(form, {
       desktop: pendingDesktopFile,
@@ -163,22 +182,46 @@ export function AdminBannerFormModal({
             )}
 
             <div>
-              <label htmlFor="banner-title" className={adminLabelClassName}>
-                배너 제목
+              <label htmlFor="banner-eyebrow" className={adminLabelClassName}>
+                작은 제목 (eyebrow)
               </label>
               <input
-                id="banner-title"
-                value={form.title}
-                onChange={(event) => updateField('title', event.target.value)}
+                id="banner-eyebrow"
+                value={form.eyebrow}
+                onChange={(event) => updateField('eyebrow', event.target.value)}
                 className={adminInputClassName}
-                placeholder="여름 신상품 입고"
-                required
+                placeholder="2026 SUMMER COLLECTION"
               />
             </div>
 
             <div>
+              <label htmlFor="banner-headline" className={adminLabelClassName}>
+                메인 제목 (headline)
+              </label>
+              <textarea
+                id="banner-headline"
+                value={form.headline}
+                onChange={(event) => {
+                  updateField('headline', event.target.value)
+                  if (headlineError) {
+                    setHeadlineError(null)
+                  }
+                }}
+                rows={2}
+                className={`${adminInputClassName} resize-y`}
+                placeholder={'감각적인 데일리 룩,\nTWOTWOSHOP'}
+                required
+              />
+              {headlineError ? (
+                <p role="alert" className="mt-2 text-sm text-red-600">
+                  {headlineError}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
               <label htmlFor="banner-description" className={adminLabelClassName}>
-                배너 설명
+                설명 (description)
               </label>
               <textarea
                 id="banner-description"
@@ -186,7 +229,7 @@ export function AdminBannerFormModal({
                 onChange={(event) => updateField('description', event.target.value)}
                 rows={3}
                 className={`${adminInputClassName} resize-y`}
-                placeholder="매일 새로운 상품을 만나보세요."
+                placeholder="신규 회원 가입 시 5,000원 쿠폰 지급"
               />
             </div>
 
@@ -200,7 +243,7 @@ export function AdminBannerFormModal({
                   value={form.button_text}
                   onChange={(event) => updateField('button_text', event.target.value)}
                   className={adminInputClassName}
-                  placeholder="상품 보러가기"
+                  placeholder="지금 쇼핑하기"
                 />
               </div>
 
@@ -231,10 +274,21 @@ export function AdminBannerFormModal({
               ))}
             </div>
 
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+              <p className="font-semibold text-neutral-800">이미지 권장 사이즈</p>
+              <ul className="mt-2 space-y-1">
+                <li>{formatBannerImageSizeGuide('desktop')}</li>
+                <li>{formatBannerImageSizeGuide('mobile')}</li>
+              </ul>
+              <p className="mt-2 text-xs text-neutral-500">
+                이미지 없이도 저장할 수 있습니다. 등록 후 메인 Hero에 문구와 버튼이 표시됩니다.
+              </p>
+            </div>
+
             <div className="grid gap-4 lg:grid-cols-2">
               <ProductImageUploadZone
                 title="PC 배너 이미지"
-                description="데스크톱 화면용 가로 이미지"
+                description={formatBannerImageSizeGuide('desktop')}
                 compact
                 disabled={isSaving}
                 previewUrl={(localPreviewDesktop ?? form.desktop_image) || undefined}
@@ -242,7 +296,7 @@ export function AdminBannerFormModal({
               />
               <ProductImageUploadZone
                 title="모바일 배너 이미지"
-                description="모바일 화면용 이미지"
+                description={formatBannerImageSizeGuide('mobile')}
                 compact
                 disabled={isSaving}
                 previewUrl={(localPreviewMobile ?? form.mobile_image) || undefined}
@@ -284,7 +338,7 @@ export function AdminBannerFormModal({
               </button>
               <button
                 type="submit"
-                disabled={isSaving || form.title.trim().length === 0}
+                disabled={isSaving || form.headline.trim().length === 0}
                 className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-60"
               >
                 {isSaving ? '저장 중...' : banner ? '수정 저장' : '배너 등록'}

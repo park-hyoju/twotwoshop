@@ -1,7 +1,7 @@
 import {
   BenefitSection,
   CategoryShortcutSection,
-  HeroSection,
+  HeroBanner,
   HomeProductSection,
   LiveSection,
 } from '../components/home'
@@ -20,8 +20,8 @@ export function Home() {
 
   return (
     <>
-      <HeroSection banners={banners} isLoading={isLoadingBanners} />
-      <CategoryShortcutSection categories={categoryShortcuts} />
+      <HeroBanner banners={banners} isLoading={isLoadingBanners} />
+      <CategoryShortcutSection categories={categoryShortcuts} className="!pt-10 sm:!pt-12" />
       {homeProductSections.map((section) => (
         <HomeProductSection
           key={section.id}

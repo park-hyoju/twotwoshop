@@ -16,6 +16,8 @@ export class AdminBannerRepositoryError extends Error {
 const BANNER_SELECT = `
   id,
   title,
+  eyebrow,
+  headline,
   description,
   button_text,
   button_link,
@@ -41,9 +43,12 @@ function mapRow(row: BannerRow): BannerRow {
 
 function buildPayload(input: AdminBannerFormInput) {
   const sanitized = sanitizeAdminBannerInput(input)
+  const headline = sanitized.headline
 
   return {
-    title: sanitized.title,
+    title: headline,
+    eyebrow: sanitized.eyebrow,
+    headline,
     description: sanitized.description,
     button_text: sanitized.button_text,
     button_link: sanitized.button_link || '/products',

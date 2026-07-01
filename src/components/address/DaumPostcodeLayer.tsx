@@ -18,6 +18,19 @@ export function DaumPostcodeLayer({ isOpen, onClose, onComplete }: DaumPostcodeL
 
   useEffect(() => {
     if (!isOpen) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) {
       setErrorMessage(null)
       return
     }

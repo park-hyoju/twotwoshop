@@ -8,6 +8,7 @@ import {
   MAX_ADMIN_REPLY_LENGTH,
   MAX_BANNER_BUTTON_TEXT_LENGTH,
   MAX_BANNER_DESCRIPTION_LENGTH,
+  MAX_BANNER_EYEBROW_LENGTH,
   MAX_BANNER_TITLE_LENGTH,
   MAX_INQUIRY_MESSAGE_LENGTH,
   MAX_MEMO_LENGTH,
@@ -584,14 +585,20 @@ export function validateAdminNoticeInput(input: {
 }
 
 export function validateAdminBannerInput(input: {
-  title: string
+  eyebrow: string
+  headline: string
   description: string
   button_text: string
   button_link: string
 }): ValidationResult {
   return (
-    validateTextContent(input.title, {
-      fieldLabel: '배너 제목',
+    validateTextContent(input.eyebrow, {
+      fieldLabel: '작은 제목',
+      maxLength: MAX_BANNER_EYEBROW_LENGTH,
+      required: false,
+    }) ??
+    validateTextContent(input.headline, {
+      fieldLabel: '메인 제목',
       maxLength: MAX_BANNER_TITLE_LENGTH,
     }) ??
     validateTextContent(input.description, {
@@ -703,13 +710,15 @@ export function sanitizeAdminNoticeInput(input: { title: string; content: string
 }
 
 export function sanitizeAdminBannerInput(input: {
-  title: string
+  eyebrow: string
+  headline: string
   description: string
   button_text: string
   button_link: string
 }) {
   return {
-    title: sanitizeText(input.title, { maxLength: MAX_BANNER_TITLE_LENGTH }),
+    eyebrow: sanitizeText(input.eyebrow, { maxLength: MAX_BANNER_EYEBROW_LENGTH }),
+    headline: sanitizeText(input.headline, { maxLength: MAX_BANNER_TITLE_LENGTH }),
     description: sanitizeText(input.description, { maxLength: MAX_BANNER_DESCRIPTION_LENGTH }),
     button_text: sanitizeText(input.button_text, { maxLength: MAX_BANNER_BUTTON_TEXT_LENGTH }),
     button_link: sanitizeText(input.button_link, { maxLength: 500 }),

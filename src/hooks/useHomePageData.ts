@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { benefits, liveBanner } from '../data'
 import { buildHomeCategoryShortcuts } from '../constants/productCategories'
 import { ROUTES } from '../lib/routes'
@@ -8,6 +8,10 @@ import { productRepository } from '../services/productRepository'
 import type { StorefrontBanner } from '../types/banner'
 import type { Product } from '../types/product'
 
+async function loadActiveBanners(): Promise<StorefrontBanner[]> {
+  return bannerRepository.findActiveBanners()
+}
+
 export function useHomePageData() {
   const [banners, setBanners] = useState<StorefrontBanner[]>([])
   const [isLoadingBanners, setIsLoadingBanners] = useState(isSupabaseConfigured)
@@ -16,29 +20,42 @@ export function useHomePageData() {
   const [saleProducts, setSaleProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(isSupabaseConfigured)
 
-  useEffect(() => {
-    let cancelled = false
-    setIsLoadingBanners(isSupabaseConfigured)
+  const refreshBanners = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setBanners([])
+      setIsLoadingBanners(false)
+      return
+    }
 
-    void bannerRepository
-      .findActiveBanners()
-      .then((rows) => {
-        if (!cancelled) {
-          setBanners(rows)
-          setIsLoadingBanners(false)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBanners([])
-          setIsLoadingBanners(false)
-        }
-      })
+    setIsLoadingBanners(true)
 
-    return () => {
-      cancelled = true
+    try {
+      const rows = await loadActiveBanners()
+      setBanners(rows)
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('[hero-banner] failed to load banners', error)
+      }
+      setBanners([])
+    } finally {
+      setIsLoadingBanners(false)
     }
   }, [])
+
+  useEffect(() => {
+    void refreshBanners()
+  }, [refreshBanners])
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void refreshBanners()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [refreshBanners])
 
   useEffect(() => {
     let cancelled = false
