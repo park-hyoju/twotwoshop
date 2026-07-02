@@ -23,7 +23,7 @@ const TEXT_COLOR = {
 } as const
 
 const MOBILE_BUTTON =
-  'inline-flex items-center justify-center rounded-full bg-[#111111] px-6 py-3 text-[14px] font-semibold text-white transition-all duration-[250ms] ease-in-out hover:bg-[#222222]'
+  'mt-4 inline-flex w-fit items-center justify-center rounded-full bg-[#111111] px-4 py-2 text-[11px] font-semibold text-white transition-all duration-[250ms] ease-in-out hover:bg-[#222222]'
 
 const DESKTOP_BUTTON =
   'mt-8 inline-flex items-center justify-center rounded-full bg-[#111111] px-10 py-4 text-[18px] font-semibold text-white transition-all duration-[250ms] ease-in-out hover:-translate-y-0.5 hover:bg-[#222222]'
@@ -113,26 +113,28 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
 
       {/* Mobile (<768px) */}
       <div
-        className="absolute inset-0 z-10 flex flex-col justify-end px-6 pb-24 md:hidden"
+        className="absolute inset-0 z-10 flex flex-col justify-end px-6 pb-36 md:hidden"
         data-hero-text-wrapper="mobile"
       >
-        <div className="max-w-[220px]">
-          <p className={`text-[12px] font-semibold uppercase tracking-[0.26em] ${colors.eyebrow}`}>
-            {slide.eyebrow}
-          </p>
-          <h2
-            className={`mt-2 whitespace-pre-line text-[22px] font-bold leading-[1.15] ${colors.headline}`}
-          >
-            {slide.headline}
-          </h2>
-          <div className="mt-2 flex flex-col gap-3">
+        <div className="max-w-[160px]">
+          <div className="flex flex-col gap-2">
+            <p
+              className={`text-[11px] font-semibold uppercase tracking-[0.35em] ${colors.eyebrow}`}
+            >
+              {slide.eyebrow}
+            </p>
+            <h2
+              className={`whitespace-pre-line text-[16px] font-bold leading-[1.1] ${colors.headline}`}
+            >
+              {slide.headline}
+            </h2>
             {slide.description.trim().length > 0 && (
-              <p className={`whitespace-pre-line text-[13px] leading-[1.4] ${colors.description}`}>
+              <p className={`whitespace-pre-line text-[10px] leading-[1.3] ${colors.description}`}>
                 {slide.description}
               </p>
             )}
-            <HeroBannerCta slide={slide} variant="mobile" />
           </div>
+          <HeroBannerCta slide={slide} variant="mobile" />
         </div>
       </div>
 
