@@ -113,7 +113,7 @@ export function HeroBannerSlide({ slide }: HeroBannerSlideProps) {
 
       {/* Mobile (<768px) */}
       <div
-        className="absolute inset-0 z-10 flex flex-col justify-end px-6 pb-36 md:hidden"
+        className="absolute inset-0 z-10 flex flex-col justify-end px-6 pb-20 md:hidden"
         data-hero-text-wrapper="mobile"
       >
         <div className="max-w-[160px]">
