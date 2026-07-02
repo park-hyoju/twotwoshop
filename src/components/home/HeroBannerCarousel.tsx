@@ -95,7 +95,7 @@ export function HeroBannerCarousel({ slides }: HeroBannerCarouselProps) {
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
           {slides.map((slide) => (
-            <div key={slide.id} className="w-full shrink-0">
+            <div key={slide.id} className="relative w-full shrink-0">
               <HeroBannerSlide slide={slide} />
             </div>
           ))}
