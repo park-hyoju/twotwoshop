@@ -56,7 +56,7 @@ describe('passwordResetCooldown', () => {
   })
 
   it('formats button labels for default and cooldown states', () => {
-    expect(formatPasswordResetCooldownButtonLabel(0)).toBe('재설정 메일 보내기')
+    expect(formatPasswordResetCooldownButtonLabel(0)).toBe('인증번호 받기')
     expect(formatPasswordResetCooldownButtonLabel(59)).toBe('59초 후 다시 요청 가능')
   })
 

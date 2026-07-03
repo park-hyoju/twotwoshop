@@ -1,23 +1,26 @@
 import type { Session } from '@supabase/supabase-js'
 import {
   CUSTOMER_INVALID_CREDENTIALS_MESSAGE,
+  CUSTOMER_LOGIN_ID_TAKEN_MESSAGE,
   CUSTOMER_RATE_LIMIT_MESSAGE,
   CUSTOMER_SIGNUP_BLOCKED_MESSAGE,
-  CUSTOMER_SIGNUP_EMAIL_CONFIRMATION_MESSAGE,
   CUSTOMER_SIGNUP_SUCCESS_MESSAGE,
   extractUsernameFromAuthEmail,
   isAuthRateLimitError,
   isCustomerAuthEmail,
+  isVirtualCustomerAuthEmail,
   mapCustomerAuthErrorMessage,
   normalizeLoginEmail,
 } from '../lib/customerAuthConfig'
 import {
   sanitizeMemberProfileInput,
   validateCustomerSignUpInput,
+  validateLoginInput,
   validatePassword,
   validatePasswordConfirm,
   type CustomerSignUpInput,
 } from '../lib/customerAuthValidation'
+import { sanitizeEmail, sanitizeUsernameInput } from '../utils/sanitize'
 import { isAdminUser } from '../lib/adminAuthConfig'
 import {
   PASSWORD_RESET_INVALID_LINK_MESSAGE,
@@ -25,8 +28,8 @@ import {
 } from '../lib/passwordResetConfig'
 import { PASSWORD_RESET_RATE_LIMIT_MESSAGE } from '../lib/passwordResetCooldown'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { EDGE_FUNCTION_CUSTOMER_SIGNUP } from '../lib/supabaseEdgeFunctions'
 import type { UserProfile } from '../types/userProfile'
-import { issueWelcomeCoupon } from './couponRepository'
 import {
   fetchCurrentUserProfile,
   resolveLoginEmail,
@@ -72,10 +75,6 @@ function mapAuthError(
   return new CustomerAuthError(mapCustomerAuthErrorMessage(message, context), cause)
 }
 
-function throwSignupRateLimitError(cause: unknown): never {
-  throw new CustomerAuthError(CUSTOMER_RATE_LIMIT_MESSAGE, cause, 'signup_rate_limit')
-}
-
 export function isSignupRateLimitError(error: unknown): boolean {
   return error instanceof CustomerAuthError && error.code === 'signup_rate_limit'
 }
@@ -106,27 +105,36 @@ async function ensureCustomerSession(session: Session | null): Promise<Session> 
 }
 
 function buildProfileInputFromSession(session: Session): {
+  loginId: string
   name: string
   email: string
+  optionalEmail?: string | null
   phone?: string
 } {
   const metadata = session.user.user_metadata
   const usernameFromMeta =
-    metadata && typeof metadata.username === 'string' ? metadata.username.trim() : ''
+    (metadata && typeof metadata.login_id === 'string' ? metadata.login_id.trim() : '') ||
+    (metadata && typeof metadata.username === 'string' ? metadata.username.trim() : '')
   const displayNameFromMeta =
-    metadata && typeof metadata.display_name === 'string'
-      ? metadata.display_name.trim()
-      : ''
+    (metadata && typeof metadata.name === 'string' ? metadata.name.trim() : '') ||
+    (metadata && typeof metadata.display_name === 'string' ? metadata.display_name.trim() : '')
   const phoneFromMeta =
     metadata && typeof metadata.phone === 'string' ? metadata.phone.replace(/\D/g, '') : ''
+  const optionalEmailFromMeta =
+    metadata && typeof metadata.optional_email === 'string'
+      ? sanitizeEmail(metadata.optional_email)
+      : null
 
-  const username = usernameFromMeta || extractUsernameFromAuthEmail(session.user.email) || 'member'
-  const name = displayNameFromMeta || username
+  const loginId =
+    usernameFromMeta || extractUsernameFromAuthEmail(session.user.email) || 'member'
+  const name = displayNameFromMeta || loginId
   const email = session.user.email ?? ''
 
   return {
+    loginId,
     name,
     email,
+    optionalEmail: optionalEmailFromMeta,
     phone: phoneFromMeta || undefined,
   }
 }
@@ -146,26 +154,50 @@ export async function syncCustomerProfileIfMissing(session: Session): Promise<Us
   return profile
 }
 
-async function createProfileForUser(
-  userId: string,
-  input: { name: string; email: string; phone: string },
-): Promise<void> {
-  if (import.meta.env.DEV) {
-    console.log('[customerAuthService] creating profile for auth user:', userId)
+async function invokeCustomerSignupFunction(body: Record<string, unknown>): Promise<{
+  ok: true
+  userId: string
+  message: string
+}> {
+  const { data, error } = await supabase!.functions.invoke(EDGE_FUNCTION_CUSTOMER_SIGNUP, { body })
+
+  if (error) {
+    let message = CUSTOMER_SIGNUP_BLOCKED_MESSAGE
+
+    const context = (error as { context?: Response }).context
+    if (context) {
+      try {
+        const payload = (await context.json()) as { message?: string }
+        if (typeof payload.message === 'string') {
+          message = payload.message
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+    }
+
+    throw new CustomerAuthError(message, error)
   }
 
-  const profile = await upsertCustomerProfile({
-    name: input.name,
-    email: input.email,
-    phone: input.phone,
-  })
+  const payload = data as { ok?: boolean; message?: string; userId?: string }
 
-  if (!profile) {
-    throw new CustomerAuthError('회원 정보를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.')
+  if (!payload || payload.ok !== true) {
+    const message =
+      payload && typeof payload.message === 'string'
+        ? payload.message
+        : CUSTOMER_SIGNUP_BLOCKED_MESSAGE
+
+    if (message.includes('이미 사용 중인 아이디')) {
+      throw new CustomerAuthError(CUSTOMER_LOGIN_ID_TAKEN_MESSAGE)
+    }
+
+    throw new CustomerAuthError(message)
   }
 
-  if (profile.id !== userId) {
-    throw new CustomerAuthError('회원 정보를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.')
+  return {
+    ok: true,
+    userId: payload.userId ?? '',
+    message: payload.message ?? CUSTOMER_SIGNUP_SUCCESS_MESSAGE,
   }
 }
 
@@ -177,84 +209,44 @@ export async function signUpCustomer(input: CustomerSignUpInput): Promise<Custom
     throw new CustomerAuthError(validationError)
   }
 
+  const loginId = sanitizeUsernameInput(input.loginId)
+  const optionalEmail = input.optionalEmail?.trim()
+    ? sanitizeEmail(input.optionalEmail)
+    : null
   const sanitized = sanitizeMemberProfileInput({
     name: input.name,
     phone: input.phone,
   })
-  const authEmail = normalizeLoginEmail(input.email)
-  const marketingConsent = Boolean(input.agreedMarketing)
 
-  const { data, error } = await supabase!.auth.signUp({
-    email: authEmail,
+  const result = await invokeCustomerSignupFunction({
+    loginId,
     password: input.password,
-    options: {
-      data: {
-        display_name: sanitized.name,
-        phone: sanitized.phone,
-        marketing_consent: marketingConsent,
-      },
-    },
+    passwordConfirm: input.passwordConfirm,
+    name: sanitized.name,
+    phone: sanitized.phone,
+    optionalEmail,
+    marketingConsent: Boolean(input.agreedMarketing),
+    agreedTerms: input.agreedTerms,
+    agreedPrivacy: input.agreedPrivacy,
   })
 
-  if (error) {
-    console.error('[customerAuthService] signUp failed:', error.message)
-
-    if (isAuthRateLimitError(error)) {
-      throwSignupRateLimitError(error)
-    }
-
-    throw mapAuthError(error.message, 'signup', error)
-  }
-
-  if (!data.user) {
-    throw new CustomerAuthError(CUSTOMER_SIGNUP_BLOCKED_MESSAGE)
-  }
-
-  if (!data.session) {
-    return {
-      successMessage: CUSTOMER_SIGNUP_EMAIL_CONFIRMATION_MESSAGE,
-      requiresEmailConfirmation: true,
-    }
-  }
-
-  const verifiedSession = await ensureCustomerSession(data.session)
-
-  try {
-    await createProfileForUser(verifiedSession.user.id, {
-      name: sanitized.name,
-      email: authEmail,
-      phone: sanitized.phone,
-    })
-    await issueWelcomeCoupon()
-  } finally {
-    const { error: signOutError } = await supabase!.auth.signOut()
-    if (signOutError && import.meta.env.DEV) {
-      console.warn('[customerAuthService] post-signup signOut failed:', signOutError.message)
-    }
-  }
-
   return {
-    successMessage: CUSTOMER_SIGNUP_SUCCESS_MESSAGE,
+    successMessage: result.message || CUSTOMER_SIGNUP_SUCCESS_MESSAGE,
     requiresEmailConfirmation: false,
   }
 }
 
-export async function signInCustomer(email: string, password: string): Promise<Session> {
+export async function signInCustomer(loginId: string, password: string): Promise<Session> {
   assertSupabaseReady()
 
-  const normalizedInput = normalizeLoginEmail(email)
+  const normalizedInput = normalizeLoginEmail(loginId)
 
-  if (!normalizedInput) {
-    throw new CustomerAuthError('이메일을 입력해주세요.')
-  }
-
-  if (!password) {
-    throw new CustomerAuthError('비밀번호를 입력해주세요.')
-  }
-
-  const passwordError = validatePassword(password)
-  if (passwordError) {
-    throw new CustomerAuthError(passwordError)
+  const validationError = validateLoginInput({
+    loginId: normalizedInput,
+    password,
+  })
+  if (validationError) {
+    throw new CustomerAuthError(validationError)
   }
 
   const authEmail = await resolveLoginEmail(normalizedInput)
@@ -292,16 +284,26 @@ export async function signInCustomer(email: string, password: string): Promise<S
   return verifiedSession
 }
 
-export async function requestPasswordResetEmail(email: string): Promise<void> {
+export async function requestPasswordResetEmail(identifier: string): Promise<void> {
   assertSupabaseReady()
 
-  const normalizedInput = normalizeLoginEmail(email)
+  const normalizedInput = normalizeLoginEmail(identifier)
 
   if (!normalizedInput) {
-    throw new CustomerAuthError('이메일을 입력해주세요.')
+    throw new CustomerAuthError('아이디 또는 이메일을 입력해주세요.')
   }
 
   const authEmail = await resolveLoginEmail(normalizedInput)
+
+  if (!authEmail) {
+    throw new CustomerAuthError('아이디 또는 이메일을 입력해주세요.')
+  }
+
+  if (isVirtualCustomerAuthEmail(authEmail)) {
+    throw new CustomerAuthError(
+      '비밀번호 재설정을 위해 가입 시 등록한 이메일(선택)이 필요합니다. 고객센터로 문의해주세요.',
+    )
+  }
 
   const { error } = await supabase!.auth.resetPasswordForEmail(authEmail, {
     redirectTo: getPasswordResetRedirectUrl(),
@@ -377,6 +379,10 @@ export async function signOutCustomer(): Promise<void> {
 export function getCustomerDisplayName(session: Session | null): string | null {
   const metadata = session?.user.user_metadata
 
+  if (metadata && typeof metadata.name === 'string' && metadata.name.trim()) {
+    return metadata.name.trim()
+  }
+
   if (metadata && typeof metadata.display_name === 'string' && metadata.display_name.trim()) {
     return metadata.display_name.trim()
   }
@@ -386,6 +392,10 @@ export function getCustomerDisplayName(session: Session | null): string | null {
 
 export function getCustomerUsername(session: Session | null): string | null {
   const metadata = session?.user.user_metadata
+
+  if (metadata && typeof metadata.login_id === 'string' && metadata.login_id.trim()) {
+    return metadata.login_id.trim()
+  }
 
   if (metadata && typeof metadata.username === 'string' && metadata.username.trim()) {
     return metadata.username.trim()

@@ -1,0 +1,14 @@
+# Supabase local / deploy config
+# Function folder names under supabase/functions/ must match deploy slugs exactly.
+
+[functions.phone-password-reset-send]
+verify_jwt = false
+
+[functions.phone-password-reset-verify]
+verify_jwt = false
+
+[functions.phone-password-reset-complete]
+verify_jwt = false
+
+[functions.customer-signup]
+verify_jwt = false

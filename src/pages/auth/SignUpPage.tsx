@@ -38,7 +38,8 @@ export function SignUpPage() {
   const navigate = useNavigate()
   const { signUp } = useCustomerAuth()
   const submitLockRef = useRef(false)
-  const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState('')
+  const [optionalEmail, setOptionalEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [name, setName] = useState('')
@@ -88,7 +89,8 @@ export function SignUpPage() {
 
     try {
       const result = await signUp({
-        email,
+        loginId,
+        optionalEmail: optionalEmail || undefined,
         password,
         passwordConfirm,
         name,
@@ -116,7 +118,7 @@ export function SignUpPage() {
   return (
     <AuthFormCard
       title="회원가입"
-      description="이메일과 비밀번호로 간편하게 가입하세요."
+      description="아이디와 비밀번호로 간편하게 가입하세요."
       footer={
         <p className="text-center text-sm text-neutral-600">
           이미 계정이 있으신가요?{' '}
@@ -139,21 +141,40 @@ export function SignUpPage() {
         aria-busy={isSubmitting}
       >
         <div>
-          <label htmlFor="signup-email" className={authLabelClassName}>
-            이메일
+          <label htmlFor="signup-login-id" className={authLabelClassName}>
+            아이디 <span className="text-red-600">*</span>
           </label>
           <input
-            id="signup-email"
+            id="signup-login-id"
             type="text"
-            inputMode="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="username"
+            value={loginId}
+            onChange={(event) => setLoginId(event.target.value)}
             disabled={isSubmitDisabled}
-            placeholder="example@test.com"
+            placeholder="영문 소문자와 숫자 4~20자"
             className={authInputClassName}
             required
           />
+        </div>
+
+        <div>
+          <label htmlFor="signup-optional-email" className={authLabelClassName}>
+            이메일 <span className="text-neutral-400">(선택)</span>
+          </label>
+          <input
+            id="signup-optional-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={optionalEmail}
+            onChange={(event) => setOptionalEmail(event.target.value)}
+            disabled={isSubmitDisabled}
+            placeholder="example@test.com"
+            className={authInputClassName}
+          />
+          <p className="mt-1.5 text-xs text-neutral-500">
+            비밀번호 찾기 등 안내 메일 수신에 사용됩니다.
+          </p>
         </div>
 
         <div>

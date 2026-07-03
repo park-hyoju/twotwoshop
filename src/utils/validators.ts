@@ -347,7 +347,8 @@ export function validateDisplayName(displayName: string): ValidationResult {
 }
 
 export interface CustomerSignUpInput {
-  email: string
+  loginId: string
+  optionalEmail?: string
   password: string
   passwordConfirm: string
   name: string
@@ -359,7 +360,8 @@ export interface CustomerSignUpInput {
 
 export function validateCustomerSignUpInput(input: CustomerSignUpInput): ValidationResult {
   return (
-    validateEmail(input.email, { required: true }) ??
+    validateUsername(input.loginId) ??
+    validateEmail(input.optionalEmail ?? '', { required: false }) ??
     validateSignupPassword(input.password) ??
     validatePasswordConfirm(input.password, input.passwordConfirm) ??
     validateName(input.name, { fieldLabel: '이름' }) ??

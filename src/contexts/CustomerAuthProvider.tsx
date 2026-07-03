@@ -32,7 +32,7 @@ interface CustomerAuthContextValue {
   isLoading: boolean
   isMember: boolean
   refreshProfile: () => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (loginId: string, password: string) => Promise<void>
   signUp: (input: CustomerSignUpInput) => Promise<CustomerSignUpResult>
   signOut: () => Promise<void>
 }
@@ -151,8 +151,8 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const nextSession = await signInCustomer(email, password)
+  const signIn = useCallback(async (loginId: string, password: string) => {
+    const nextSession = await signInCustomer(loginId, password)
     setSession(nextSession)
 
     const nextProfile = await loadProfileForSession(nextSession)

@@ -1,20 +1,28 @@
 import { normalizeUsername } from './customerAuthValidation'
 
-export const CUSTOMER_AUTH_EMAIL_DOMAIN = 'example.com'
+export const CUSTOMER_AUTH_EMAIL_DOMAIN = 'twotwoshop.app'
+
+/** Legacy virtual-email domain for accounts created before login-id migration. */
+export const LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN = 'example.com'
+
+/** Rejected by Supabase Auth; kept for duplicate-check / virtual-email detection only. */
+export const DEPRECATED_CUSTOMER_AUTH_EMAIL_DOMAIN = 'twotwoshop.local'
 
 export const CUSTOMER_INVALID_CREDENTIALS_MESSAGE =
-  '이메일 또는 비밀번호가 올바르지 않습니다.'
+  '아이디 또는 비밀번호가 올바르지 않습니다.'
 
 export const CUSTOMER_INVALID_USERNAME_FORMAT_MESSAGE = '아이디 형식이 올바르지 않습니다.'
 
 export const CUSTOMER_SIGNUP_BLOCKED_MESSAGE =
   '지금은 회원가입을 완료할 수 없습니다. 잠시 후 다시 시도해주세요.'
 
+export const CUSTOMER_LOGIN_ID_TAKEN_MESSAGE = '이미 사용 중인 아이디입니다.'
+
 export const CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE =
   '이미 가입된 이메일입니다. 로그인해주세요.'
 
-/** @deprecated Use CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE */
-export const CUSTOMER_USERNAME_TAKEN_MESSAGE = CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE
+/** @deprecated Use CUSTOMER_LOGIN_ID_TAKEN_MESSAGE */
+export const CUSTOMER_USERNAME_TAKEN_MESSAGE = CUSTOMER_LOGIN_ID_TAKEN_MESSAGE
 
 export const CUSTOMER_SIGNUP_SUCCESS_MESSAGE = '가입이 완료되었습니다. 로그인해주세요.'
 
@@ -48,13 +56,17 @@ export function normalizeLoginEmail(value: string): string {
 /** @deprecated Use createAuthEmail instead. */
 export const resolveCustomerAuthEmail = createAuthEmail
 
-/** Virtual-email signup users (@example.com). */
 export function isVirtualCustomerAuthEmail(email: string | null | undefined): boolean {
   if (!email) {
     return false
   }
 
-  return email.trim().toLowerCase().endsWith(`@${CUSTOMER_AUTH_EMAIL_DOMAIN}`)
+  const normalized = email.trim().toLowerCase()
+  return (
+    normalized.endsWith(`@${CUSTOMER_AUTH_EMAIL_DOMAIN}`) ||
+    normalized.endsWith(`@${LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN}`) ||
+    normalized.endsWith(`@${DEPRECATED_CUSTOMER_AUTH_EMAIL_DOMAIN}`)
+  )
 }
 
 /** Any valid non-admin auth email is treated as a storefront customer session. */
@@ -174,7 +186,9 @@ export function mapCustomerAuthErrorMessage(
     normalized.includes('already been registered') ||
     normalized.includes('already exists')
   ) {
-    return CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE
+    return context === 'signup'
+      ? CUSTOMER_LOGIN_ID_TAKEN_MESSAGE
+      : CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE
   }
 
   if (

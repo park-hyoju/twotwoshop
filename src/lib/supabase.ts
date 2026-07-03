@@ -1,7 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+/** Trailing slash breaks `/functions/v1/{name}` resolution in some clients. */
+const supabaseUrl =
+  typeof rawSupabaseUrl === 'string' ? rawSupabaseUrl.trim().replace(/\/+$/, '') : rawSupabaseUrl
 
 export const isSupabaseConfigured =
   typeof supabaseUrl === 'string' &&

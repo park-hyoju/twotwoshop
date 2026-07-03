@@ -27,7 +27,7 @@ export function SignInPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { signIn } = useCustomerAuth()
-  const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -57,7 +57,7 @@ export function SignInPage() {
     setIsSubmitting(true)
 
     try {
-      await signIn(normalizeLoginEmail(email), password)
+      await signIn(normalizeLoginEmail(loginId), password)
       navigate(redirectPath, { replace: true })
     } catch (error) {
       setErrorMessage(getCustomerAuthErrorMessage(error))
@@ -69,7 +69,7 @@ export function SignInPage() {
   return (
     <AuthFormCard
       title="로그인"
-      description="이메일과 비밀번호로 로그인해주세요."
+      description="아이디와 비밀번호로 로그인해주세요."
       footer={
         <p className="text-center text-sm text-neutral-600">
           아직 회원이 아니신가요?{' '}
@@ -93,18 +93,17 @@ export function SignInPage() {
 
       <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
         <div>
-          <label htmlFor="signin-email" className={authLabelClassName}>
-            아이디/이메일
+          <label htmlFor="signin-login-id" className={authLabelClassName}>
+            아이디
           </label>
           <input
-            id="signin-email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            id="signin-login-id"
+            type="text"
+            autoComplete="username"
+            value={loginId}
+            onChange={(event) => setLoginId(event.target.value)}
             disabled={isSubmitting || !isSupabaseConfigured}
-            placeholder="example@test.com"
+            placeholder="영문 소문자와 숫자 4~20자"
             className={authInputClassName}
             required
           />

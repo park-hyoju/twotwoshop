@@ -7,7 +7,8 @@ import {
 } from './customerAuthValidation'
 
 const validSignupInput = {
-  email: 'user01@test.com',
+  loginId: 'user01',
+  optionalEmail: 'user01@test.com',
   password: 'password123',
   passwordConfirm: 'password123',
   name: '홍길동',
@@ -41,9 +42,23 @@ describe('customerAuthValidation', () => {
     expect(
       validateCustomerSignUpInput({
         ...validSignupInput,
-        email: 'invalid-email',
+        loginId: 'ab',
+      }),
+    ).toMatch(/4~20/)
+
+    expect(
+      validateCustomerSignUpInput({
+        ...validSignupInput,
+        optionalEmail: 'invalid-email',
       }),
     ).toMatch(/이메일/)
+
+    expect(
+      validateCustomerSignUpInput({
+        ...validSignupInput,
+        optionalEmail: undefined,
+      }),
+    ).toBeNull()
 
     expect(
       validateCustomerSignUpInput({

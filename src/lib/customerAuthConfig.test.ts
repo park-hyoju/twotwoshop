@@ -4,6 +4,7 @@ import {
   CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE,
   CUSTOMER_EMAIL_NOT_CONFIRMED_MESSAGE,
   CUSTOMER_INVALID_CREDENTIALS_MESSAGE,
+  CUSTOMER_LOGIN_ID_TAKEN_MESSAGE,
   CUSTOMER_RATE_LIMIT_MESSAGE,
   CUSTOMER_SIGNUP_EMAIL_CONFIRMATION_MESSAGE,
   extractUsernameFromAuthEmail,
@@ -11,16 +12,17 @@ import {
   isAuthRateLimitMessage,
   isCustomerAuthEmail,
   isVirtualCustomerAuthEmail,
+  LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN,
   mapCustomerAuthErrorMessage,
   normalizeLoginEmail,
   parseRateLimitCooldownSeconds,
 } from './customerAuthConfig'
 
 describe('customerAuthConfig', () => {
-  it('creates virtual auth email from username', () => {
-    expect(createAuthEmail('juju123')).toBe('juju123@example.com')
-    expect(createAuthEmail('JuJu123')).toBe('juju123@example.com')
-    expect(createAuthEmail('testuser01')).toBe('testuser01@example.com')
+  it('creates virtual auth email from login id', () => {
+    expect(createAuthEmail('juju123')).toBe('juju123@twotwoshop.app')
+    expect(createAuthEmail('JuJu123')).toBe('juju123@twotwoshop.app')
+    expect(createAuthEmail('testuser01')).toBe('testuser01@twotwoshop.app')
   })
 
   it('normalizes login email input', () => {
@@ -37,18 +39,20 @@ describe('customerAuthConfig', () => {
     expect(value.includes('-')).toBe(true)
   })
 
-  it('extracts username local-part from any customer email', () => {
-    expect(extractUsernameFromAuthEmail('juju123@example.com')).toBe('juju123')
+  it('extracts login id local-part from any customer email', () => {
+    expect(extractUsernameFromAuthEmail('juju123@twotwoshop.app')).toBe('juju123')
     expect(extractUsernameFromAuthEmail('testuser02@test.com')).toBe('testuser02')
     expect(extractUsernameFromAuthEmail('admin@twotwoshop.com')).toBe('admin')
   })
 
   it('identifies customer auth emails including real domains', () => {
     expect(isCustomerAuthEmail('admin@twotwoshop.com')).toBe(true)
-    expect(isCustomerAuthEmail('member01@example.com')).toBe(true)
+    expect(isCustomerAuthEmail(`member01@${LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN}`)).toBe(true)
     expect(isCustomerAuthEmail('testuser02@test.com')).toBe(true)
     expect(isVirtualCustomerAuthEmail('testuser02@test.com')).toBe(false)
-    expect(isVirtualCustomerAuthEmail('testuser01@example.com')).toBe(true)
+    expect(isVirtualCustomerAuthEmail('testuser01@twotwoshop.app')).toBe(true)
+    expect(isVirtualCustomerAuthEmail('testuser01@twotwoshop.local')).toBe(true)
+    expect(isVirtualCustomerAuthEmail(`testuser01@${LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN}`)).toBe(true)
   })
 
   it('detects auth rate limit messages', () => {
@@ -76,6 +80,9 @@ describe('customerAuthConfig', () => {
       CUSTOMER_RATE_LIMIT_MESSAGE,
     )
     expect(mapCustomerAuthErrorMessage('User already registered', 'signup')).toBe(
+      CUSTOMER_LOGIN_ID_TAKEN_MESSAGE,
+    )
+    expect(mapCustomerAuthErrorMessage('User already registered', 'signin')).toBe(
       CUSTOMER_EMAIL_ALREADY_REGISTERED_MESSAGE,
     )
     expect(mapCustomerAuthErrorMessage('Email not confirmed', 'signin')).toBe(

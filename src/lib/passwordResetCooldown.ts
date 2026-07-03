@@ -7,7 +7,7 @@ export const PASSWORD_RESET_SUCCESS_COOLDOWN_SECONDS = 60
 export const PASSWORD_RESET_RATE_LIMIT_COOLDOWN_SECONDS = 5 * 60
 
 export const PASSWORD_RESET_RATE_LIMIT_MESSAGE =
-  '재설정 메일 요청이 잠시 제한되었습니다. 5분 뒤 다시 시도해주세요.'
+  '인증번호 요청이 잠시 제한되었습니다. 잠시 후 다시 시도해주세요.'
 
 function getLocalStorage(): Storage | null {
   try {
@@ -78,9 +78,12 @@ export function clearPasswordResetCooldown(): void {
   }
 }
 
-export function formatPasswordResetCooldownButtonLabel(remainingSeconds: number): string {
+export function formatPasswordResetCooldownButtonLabel(
+  remainingSeconds: number,
+  idleLabel = '인증번호 받기',
+): string {
   if (remainingSeconds <= 0) {
-    return '재설정 메일 보내기'
+    return idleLabel
   }
 
   return `${remainingSeconds}초 후 다시 요청 가능`

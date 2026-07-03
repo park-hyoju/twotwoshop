@@ -50,7 +50,7 @@ export async function updateMemberProfile(input: {
       phone: sanitized.phone || null,
     })
     .eq('id', userData.user.id)
-    .select('id, name, phone, email, created_at, updated_at')
+    .select('id, login_id, name, phone, email, optional_email, created_at, updated_at')
     .maybeSingle()
 
   if (error) {
@@ -61,9 +61,11 @@ export async function updateMemberProfile(input: {
   if (data) {
     return {
       id: data.id,
+      loginId: data.login_id,
       name: data.name,
       phone: data.phone,
       email: data.email,
+      optionalEmail: data.optional_email,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
@@ -77,7 +79,7 @@ export async function updateMemberProfile(input: {
       phone: sanitized.phone || null,
       email: userData.user.email ?? null,
     })
-    .select('id, name, phone, email, created_at, updated_at')
+    .select('id, login_id, name, phone, email, optional_email, created_at, updated_at')
     .single()
 
   if (insertError) {
@@ -87,9 +89,11 @@ export async function updateMemberProfile(input: {
 
   return {
     id: inserted.id,
+    loginId: inserted.login_id,
     name: inserted.name,
     phone: inserted.phone,
     email: inserted.email,
+    optionalEmail: inserted.optional_email,
     createdAt: inserted.created_at,
     updatedAt: inserted.updated_at,
   }

@@ -7,6 +7,7 @@ export {
   sanitizeMemberProfileInput,
   validateCustomerSignUpInput,
   validateDisplayName,
+  validateLoginInput,
   validatePassword,
   validatePasswordConfirm,
   validateSignupPassword,

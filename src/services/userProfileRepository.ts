@@ -3,9 +3,10 @@ import {
   createAuthEmail,
   extractUsernameFromAuthEmail,
   isCustomerAuthEmail,
+  isVirtualCustomerAuthEmail,
   normalizeLoginEmail,
 } from '../lib/customerAuthConfig'
-import { normalizeUsername } from '../lib/customerAuthValidation'
+import { normalizeUsername, sanitizeUsernameInput } from '../lib/customerAuthValidation'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { UserProfile } from '../types/userProfile'
 
@@ -40,9 +41,11 @@ export function isStorefrontMember(
 
 interface UserProfileRow {
   id: string
+  login_id: string | null
   name: string | null
   phone: string | null
   email: string | null
+  optional_email: string | null
   created_at: string
   updated_at: string
 }
@@ -50,13 +53,18 @@ interface UserProfileRow {
 function mapUserProfileRow(row: UserProfileRow): UserProfile {
   return {
     id: row.id,
+    loginId: row.login_id,
     name: row.name,
     phone: row.phone,
     email: row.email,
+    optionalEmail: row.optional_email,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
+
+const PROFILE_SELECT =
+  'id, login_id, name, phone, email, optional_email, created_at, updated_at'
 
 export async function fetchCurrentUserProfile(userId: string): Promise<UserProfile | null> {
   if (!isSupabaseConfigured || !supabase) {
@@ -65,7 +73,7 @@ export async function fetchCurrentUserProfile(userId: string): Promise<UserProfi
 
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, name, phone, email, created_at, updated_at')
+    .select(PROFILE_SELECT)
     .eq('id', userId)
     .maybeSingle()
 
@@ -77,9 +85,34 @@ export async function fetchCurrentUserProfile(userId: string): Promise<UserProfi
   return data ? mapUserProfileRow(data as UserProfileRow) : null
 }
 
+export async function isLoginIdAvailable(loginId: string): Promise<boolean> {
+  const normalized = sanitizeUsernameInput(loginId)
+
+  if (!normalized) {
+    return false
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return true
+  }
+
+  const { data, error } = await supabase.rpc('is_login_id_available', {
+    p_login_id: normalized,
+  })
+
+  if (error) {
+    console.warn('[userProfileRepository] is_login_id_available failed:', error.message)
+    return true
+  }
+
+  return data === true
+}
+
 export async function upsertCustomerProfile(input: {
+  loginId: string
   name: string
   email: string
+  optionalEmail?: string | null
   phone?: string
 }): Promise<UserProfile | null> {
   if (!isSupabaseConfigured || !supabase) {
@@ -101,13 +134,22 @@ export async function upsertCustomerProfile(input: {
 
   const payload: {
     id: string
+    login_id: string
     name: string
     email: string
+    optional_email?: string | null
     phone?: string
   } = {
     id: user.id,
+    login_id: sanitizeUsernameInput(input.loginId),
     name: input.name.trim(),
     email: input.email.trim(),
+  }
+
+  if (input.optionalEmail) {
+    payload.optional_email = input.optionalEmail.trim()
+  } else if (input.optionalEmail === null) {
+    payload.optional_email = null
   }
 
   if (input.phone) {
@@ -125,7 +167,7 @@ export async function upsertCustomerProfile(input: {
   const { data, error } = await supabase
     .from('user_profiles')
     .upsert(payload, { onConflict: 'id' })
-    .select('id, name, phone, email, created_at, updated_at')
+    .select(PROFILE_SELECT)
     .single()
 
   if (error) {
@@ -142,7 +184,7 @@ export async function upsertCustomerProfile(input: {
 /**
  * Resolves the Supabase Auth email for sign-in.
  * - Contains @ → use as email (trim + lowercase)
- * - Otherwise → RPC lookup by username, then legacy username@example.com
+ * - Otherwise → RPC lookup by login id, then loginId@twotwoshop.app
  */
 export async function resolveLoginEmail(identifier: string): Promise<string> {
   const normalized = normalizeLoginEmail(identifier)
@@ -168,6 +210,41 @@ export async function resolveLoginEmail(identifier: string): Promise<string> {
   }
 
   return createAuthEmail(normalizeUsername(normalized))
+}
+
+/**
+ * Resolves the email address that can receive a password reset link.
+ * Virtual auth emails cannot receive mail; uses optional_email when available.
+ */
+export async function resolvePasswordResetDeliveryEmail(identifier: string): Promise<string> {
+  const normalized = normalizeLoginEmail(identifier)
+
+  if (!normalized) {
+    return ''
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.rpc('resolve_customer_password_reset_email', {
+      p_identifier: normalized,
+    })
+
+    if (error) {
+      console.warn(
+        '[userProfileRepository] resolve_customer_password_reset_email failed:',
+        error.message,
+      )
+    } else if (typeof data === 'string' && data.trim()) {
+      return normalizeLoginEmail(data)
+    }
+  }
+
+  const authEmail = await resolveLoginEmail(normalized)
+
+  if (!authEmail || isVirtualCustomerAuthEmail(authEmail)) {
+    return ''
+  }
+
+  return authEmail
 }
 
 export function getUsernameFromProfileEmail(email: string | null | undefined): string | null {
