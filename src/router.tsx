@@ -1,4 +1,4 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom'
+import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom'
 import { AdminAuthGate } from './components/admin/AdminAuthGate'
 import { AdminGuestOnly } from './components/admin/AdminGuestOnly'
 import { CustomerAuthGate } from './components/customer/CustomerAuthGate'
@@ -19,6 +19,7 @@ import {
   AdminSettingsPage,
 } from './pages/admin'
 import { Home } from './pages/Home'
+import { ForbiddenPage } from './pages/ForbiddenPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ProductDetailPage } from './pages/products/ProductDetailPage'
 import {
@@ -53,28 +54,33 @@ import {
 
 export const router = createBrowserRouter([
   {
-    path: '/admin/login',
-    element: <AdminGuestOnly />,
-    children: [{ index: true, element: <AdminLoginPage /> }],
-  },
-  {
     path: '/admin',
-    element: <AdminAuthGate />,
+    element: <Outlet />,
     children: [
       {
-        element: <AdminLayout />,
+        path: 'login',
+        element: <AdminGuestOnly />,
+        children: [{ index: true, element: <AdminLoginPage /> }],
+      },
+      {
+        element: <AdminAuthGate />,
         children: [
-          { index: true, element: <Navigate to="dashboard" replace /> },
-          { path: 'dashboard', element: <AdminDashboardPage /> },
-          { path: 'orders', element: <AdminOrdersPage /> },
-          { path: 'products', element: <AdminProductsPage /> },
-          { path: 'banners', element: <AdminBannersPage /> },
-          { path: 'notices', element: <AdminNoticesPage /> },
-          { path: 'restock-notifications', element: <AdminRestockNotificationsPage /> },
-          { path: 'customers', element: <AdminCustomersPage /> },
-          { path: 'live', element: <AdminLivePage /> },
-          { path: 'chat', element: <AdminChatPage /> },
-          { path: 'settings', element: <AdminSettingsPage /> },
+          {
+            element: <AdminLayout />,
+            children: [
+              { index: true, element: <Navigate to="dashboard" replace /> },
+              { path: 'dashboard', element: <AdminDashboardPage /> },
+              { path: 'orders', element: <AdminOrdersPage /> },
+              { path: 'products', element: <AdminProductsPage /> },
+              { path: 'banners', element: <AdminBannersPage /> },
+              { path: 'notices', element: <AdminNoticesPage /> },
+              { path: 'restock-notifications', element: <AdminRestockNotificationsPage /> },
+              { path: 'customers', element: <AdminCustomersPage /> },
+              { path: 'live', element: <AdminLivePage /> },
+              { path: 'chat', element: <AdminChatPage /> },
+              { path: 'settings', element: <AdminSettingsPage /> },
+            ],
+          },
         ],
       },
     ],
@@ -136,6 +142,7 @@ export const router = createBrowserRouter([
       { path: 'notices/:id', element: <NoticeDetailPage /> },
       { path: 'terms', element: <TermsPage /> },
       { path: 'privacy', element: <PrivacyPage /> },
+      { path: '403', element: <ForbiddenPage /> },
       { path: '404', element: <NotFoundPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

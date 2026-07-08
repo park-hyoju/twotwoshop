@@ -62,14 +62,18 @@ export function AdminNoticesPage() {
     setIsFormOpen(true)
   }
 
+  function resetFormState() {
+    setIsFormOpen(false)
+    setEditingNotice(null)
+    setFormError(null)
+  }
+
   function closeForm() {
     if (isSaving) {
       return
     }
 
-    setIsFormOpen(false)
-    setEditingNotice(null)
-    setFormError(null)
+    resetFormState()
   }
 
   async function handleSubmit(input: AdminNoticeFormInput) {
@@ -85,7 +89,7 @@ export function AdminNoticesPage() {
         showToast('공지사항이 등록되었습니다.')
       }
 
-      closeForm()
+      resetFormState()
       await loadNotices()
     } catch (error) {
       setFormError(getErrorMessage(error))

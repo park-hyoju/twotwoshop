@@ -1,5 +1,6 @@
 import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import type { AdminBannerFormInput, BannerRow } from '../types/banner'
 import { sanitizeAdminBannerInput, validateAdminBannerInput } from '../utils/validators'
 
@@ -29,12 +30,8 @@ const BANNER_SELECT = `
   updated_at
 `
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminBannerRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminBannerRepositoryError)
 }
 
 function mapRow(row: BannerRow): BannerRow {
@@ -67,7 +64,7 @@ function assertValidBannerInput(input: AdminBannerFormInput): void {
 }
 
 export async function fetchAdminBanners(): Promise<BannerRow[]> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('banners')
@@ -86,7 +83,7 @@ export async function createAdminBanner(
   input: AdminBannerFormInput,
   sortOrder: number,
 ): Promise<BannerRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
   assertValidBannerInput(input)
 
   const { data, error } = await supabase!
@@ -110,7 +107,7 @@ export async function updateAdminBanner(
   bannerId: string,
   input: AdminBannerFormInput,
 ): Promise<BannerRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
   assertValidBannerInput(input)
 
   const { data, error } = await supabase!
@@ -129,7 +126,7 @@ export async function updateAdminBanner(
 }
 
 export async function deleteAdminBanner(bannerId: string): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { error } = await supabase!.from('banners').delete().eq('id', bannerId)
 
@@ -142,7 +139,7 @@ export async function setAdminBannerActive(
   bannerId: string,
   isActive: boolean,
 ): Promise<BannerRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('banners')
@@ -162,7 +159,7 @@ export async function setAdminBannerActive(
 export async function updateAdminBannerSortOrders(
   orderedIds: string[],
 ): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const updates = orderedIds.map((id, index) =>
     supabase!.from('banners').update({ sort_order: index + 1 }).eq('id', id),

@@ -84,7 +84,7 @@ export function AdminLoginPage() {
         <form onSubmit={(event) => void handleSubmit(event)} className="mt-6 space-y-4">
           <div>
             <label htmlFor="admin-login-id" className="block text-sm font-medium text-neutral-700">
-              아이디
+              관리자 아이디
             </label>
             <input
               id="admin-login-id"
@@ -93,7 +93,7 @@ export function AdminLoginPage() {
               value={loginId}
               onChange={(event) => setLoginId(event.target.value)}
               disabled={isSubmitting || !isSupabaseConfigured}
-              placeholder="admin"
+              placeholder="관리자 아이디"
               className="mt-1.5 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 disabled:bg-neutral-50"
               required
             />

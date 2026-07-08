@@ -67,11 +67,16 @@ export function createEmptyProductDetailForm(id: string): AdminProductDetailForm
     images: [],
     short_description: '',
     description: '',
+    detail_media: [],
     size_guide: { ...EMPTY_SIZE_GUIDE, rows: [] },
     product_info: { ...EMPTY_PRODUCT_INFO },
     shipping_info: { ...EMPTY_SHIPPING_INFO },
     return_info: { ...EMPTY_RETURN_INFO },
     meta_title: '',
     meta_description: '',
+    isNew: false,
+    isBest: false,
+    isSale: false,
+    variants: [],
   }
 }

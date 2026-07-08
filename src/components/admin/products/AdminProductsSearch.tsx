@@ -29,7 +29,7 @@ export function AdminProductsSearch({
       onSubmit={handleSubmit}
       className="rounded-xl border border-neutral-200 bg-white p-4 sm:p-5"
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div>
           <label htmlFor="admin-product-name" className="mb-2 block text-sm font-medium text-neutral-700">
             상품명
@@ -40,20 +40,6 @@ export function AdminProductsSearch({
             value={filters.name}
             onChange={(event) => onChange('name', event.target.value)}
             placeholder="상품명 검색"
-            className={inputClassName}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="admin-product-slug" className="mb-2 block text-sm font-medium text-neutral-700">
-            slug
-          </label>
-          <input
-            id="admin-product-slug"
-            type="search"
-            value={filters.slug}
-            onChange={(event) => onChange('slug', event.target.value)}
-            placeholder="classic-linen-shirt"
             className={inputClassName}
           />
         </div>

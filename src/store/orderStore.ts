@@ -19,6 +19,9 @@ function createOrderItem(item: CartItem): OrderItem {
     price: item.price,
     quantity: item.quantity,
     thumbnail: item.thumbnail,
+    selectedColor: item.selectedColor,
+    selectedSize: item.selectedSize,
+    optionId: item.optionId,
   }
 }
 

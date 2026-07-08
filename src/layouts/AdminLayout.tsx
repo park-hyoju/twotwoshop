@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AdminToastProvider, useAdminToast } from '../components/admin/AdminToast'
+import { AdminAuthLoading } from '../components/admin/AdminAuthLoading'
 import { useAdminAuth } from '../contexts/AdminAuthProvider'
 import { AdminInquiryRealtimeProvider, useAdminInquiryRealtime } from '../contexts/AdminInquiryRealtimeContext'
 import { AdminInquirySoundProvider } from '../contexts/AdminInquirySoundContext'
@@ -109,13 +110,17 @@ function AdminSidebar({ onNavigate, chatUnreadCount }: AdminSidebarProps) {
 function AdminLayoutShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { signOut } = useAdminAuth()
+  const { signOut, authStatus } = useAdminAuth()
   const { unreadCount } = useAdminInquiryRealtime()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
 
   useAdminInquiryTabTitleReset(location.pathname.startsWith(ADMIN_ROUTES.chat))
+
+  if (authStatus !== 'authenticated') {
+    return <AdminAuthLoading />
+  }
 
   const currentPageLabel =
     navItems.find((item) =>
@@ -210,11 +215,11 @@ function AdminLayoutShell() {
 
 function AdminLayoutRealtimeRoot() {
   const { showToast } = useAdminToast()
-  const { isAuthenticated } = useAdminAuth()
+  const { authStatus } = useAdminAuth()
 
   return (
     <AdminInquiryRealtimeProvider
-      enabled={isAuthenticated}
+      enabled={authStatus === 'authenticated'}
       onNotify={(message) => showToast(message, { durationMs: 5000 })}
     >
       <AdminLayoutShell />

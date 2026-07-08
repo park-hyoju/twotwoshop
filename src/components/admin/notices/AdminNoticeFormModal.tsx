@@ -31,6 +31,7 @@ export function AdminNoticeFormModal({
   onSubmit,
 }: AdminNoticeFormModalProps) {
   const [form, setForm] = useState<AdminNoticeFormInput>(EMPTY_FORM)
+  const [localValidationError, setLocalValidationError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -47,6 +48,7 @@ export function AdminNoticeFormModal({
     } else {
       setForm(EMPTY_FORM)
     }
+    setLocalValidationError(null)
   }, [open, notice])
 
   if (!open) {
@@ -64,9 +66,11 @@ export function AdminNoticeFormModal({
     event.preventDefault()
 
     if (form.title.trim().length === 0 || form.content.trim().length === 0) {
+      setLocalValidationError('제목과 내용을 모두 입력해주세요.')
       return
     }
 
+    setLocalValidationError(null)
     await onSubmit(form)
   }
 
@@ -97,6 +101,12 @@ export function AdminNoticeFormModal({
             {errorMessage && (
               <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {errorMessage}
+              </p>
+            )}
+
+            {localValidationError && !errorMessage && (
+              <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {localValidationError}
               </p>
             )}
 

@@ -4,6 +4,7 @@ export interface NoticeRow {
   content: string
   is_pinned: boolean
   is_active: boolean
+  sort_order: number
   created_at: string
   updated_at: string
 }

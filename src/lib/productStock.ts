@@ -27,16 +27,10 @@ export function isProductSoldOut(product: { stock: number }): boolean {
   return product.stock <= 0
 }
 
-/** 고객 화면용 재고 상태 라벨. 정확한 수량은 노출하지 않습니다. */
+/** 고객 화면용 재고 상태 라벨. 수량은 노출하지 않고 품절만 표시합니다. */
 export function getCustomerStockLabel(stock: number): string | null {
-  const status = getCustomerStockStatus(stock)
-
-  if (status === 'soldout') {
+  if (stock <= 0) {
     return '품절'
-  }
-
-  if (status === 'low') {
-    return '품절 임박'
   }
 
   return null

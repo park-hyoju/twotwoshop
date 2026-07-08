@@ -21,7 +21,7 @@ export function ProductEditorScrollNav({
     <aside className="hidden w-56 shrink-0 border-r border-neutral-200 bg-white lg:block xl:w-64">
       <nav aria-label="상품 등록 단계" className="sticky top-0 px-4 py-6">
         <p className="mb-4 px-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-          상품 등록
+          상세 수정
         </p>
         <ul className="space-y-1">
           {PRODUCT_EDITOR_SECTIONS.map((section) => {

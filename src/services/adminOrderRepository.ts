@@ -6,7 +6,8 @@ import {
   validateSaveShipping,
   resolveOrderShipping,
 } from '../lib/adminOrderFulfillment'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import type {
   AdminOrderFulfillmentAction,
   AdminOrderItemRow,
@@ -237,7 +238,7 @@ async function fetchOrderCount(options?: {
 }
 
 export async function fetchAdminOrderSummary(): Promise<AdminOrderSummaryStats> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { todayStart, tomorrowStart } = getTodayBoundaries()
 
@@ -267,12 +268,8 @@ export class AdminOrderRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminOrderRepositoryError(
-      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminOrderRepositoryError)
 }
 
 function logAdminOrdersDebug(message: string, payload?: unknown): void {
@@ -414,7 +411,7 @@ async function fetchOrderItemsByOrderId(orderId: string): Promise<AdminOrderItem
 export async function fetchAdminOrders(
   params: AdminOrdersQueryParams,
 ): Promise<AdminOrdersQueryResult> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   let result: { orders: OrderListRow[]; totalCount: number }
 
@@ -458,7 +455,7 @@ export async function fetchAdminOrders(
 }
 
 export async function fetchAdminOrderById(orderId: string): Promise<AdminOrderRow | null> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   async function loadHeader(select: string): Promise<OrderDetailRow | null> {
     const { data, error } = await supabase!
@@ -506,7 +503,7 @@ export async function updateAdminOrderStatus(
   orderId: string,
   status: AdminOrderRow['status'],
 ): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
   await performOrderUpdate(orderId, buildStatusPayload(status), 'updateAdminOrderStatus')
 }
 
@@ -619,7 +616,7 @@ export async function saveAdminOrderShippingInfo(
   order: AdminOrderRow,
   shipping: AdminOrderShippingUpdate,
 ): Promise<AdminOrderRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const validationError = validateSaveShipping(order, {
     courier: shipping.courier,
@@ -657,7 +654,7 @@ export async function applyAdminOrderAction(
   action: AdminOrderFulfillmentAction,
   shipping?: AdminOrderShippingUpdate,
 ): Promise<AdminOrderRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const now = new Date().toISOString()
   let payload: Record<string, string | null> = {}
@@ -724,6 +721,35 @@ export async function applyAdminOrderAction(
   }
 
   return updated
+}
+
+export async function deleteAllAdminOrders(): Promise<number> {
+  await ensureAdminAccess()
+
+  const { data: rpcCount, error: rpcError } = await supabase!.rpc('admin_delete_all_orders')
+
+  if (!rpcError && typeof rpcCount === 'number') {
+    return rpcCount
+  }
+
+  if (rpcError && import.meta.env.DEV) {
+    console.warn('[adminOrderRepository] admin_delete_all_orders RPC failed, falling back to delete', rpcError)
+  }
+
+  const { count, error } = await supabase!
+    .from('orders')
+    .delete({ count: 'exact' })
+    .gte('created_at', '1970-01-01T00:00:00.000Z')
+
+  if (error) {
+    console.error('[adminOrderRepository] deleteAllAdminOrders failed', error)
+    throw new AdminOrderRepositoryError(
+      '주문 데이터를 삭제하지 못했습니다. 관리자 권한과 RLS 정책(admin-orders-security-rls.sql)을 확인해주세요.',
+      error,
+    )
+  }
+
+  return count ?? 0
 }
 
 export function summarizeOrderItems(

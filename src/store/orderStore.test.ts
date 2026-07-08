@@ -13,6 +13,7 @@ import type { CartItem } from '../types/cart'
 import type { MemberCoupon } from '../types/coupon'
 
 const sampleItem: CartItem = {
+  cartLineId: 'product-1',
   productId: 'product-1',
   slug: 'sample-product',
   name: '샘플 상품',

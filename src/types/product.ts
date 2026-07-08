@@ -8,7 +8,15 @@ import type {
   ProductShippingInfo,
   ProductSizeGuide,
 } from './productDetail'
+import type { DetailMediaItem } from './detailMedia'
 import type { ProductStatus } from './status'
+
+export interface ProductVariant {
+  id: string
+  color: string
+  size: string
+  stock: number
+}
 
 export interface Product {
   id: string
@@ -16,6 +24,7 @@ export interface Product {
   name: string
   shortDescription: string
   description: string
+  detailMedia: DetailMediaItem[]
   price: number
   originalPrice: number
   discountRate: number
@@ -38,4 +47,5 @@ export interface Product {
   productInfo: ProductInfoFields
   shippingInfo: ProductShippingInfo
   returnInfo: ProductReturnInfo
+  variants: ProductVariant[]
 }

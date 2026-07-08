@@ -1,5 +1,6 @@
 import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import type { AdminNoticeFormInput, NoticeRow } from '../types/notice'
 import { sanitizeAdminNoticeInput, validateAdminNoticeInput } from '../utils/validators'
 
@@ -19,16 +20,13 @@ const NOTICE_SELECT = `
   content,
   is_pinned,
   is_active,
+  sort_order,
   created_at,
   updated_at
 `
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminNoticeRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminNoticeRepositoryError)
 }
 
 function buildPayload(input: AdminNoticeFormInput) {
@@ -51,12 +49,13 @@ function assertValidNoticeInput(input: AdminNoticeFormInput): void {
 }
 
 export async function fetchAdminNotices(): Promise<NoticeRow[]> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('notices')
     .select(NOTICE_SELECT)
     .order('is_pinned', { ascending: false })
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -67,7 +66,7 @@ export async function fetchAdminNotices(): Promise<NoticeRow[]> {
 }
 
 export async function createAdminNotice(input: AdminNoticeFormInput): Promise<NoticeRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
   assertValidNoticeInput(input)
 
   const { data, error } = await supabase!
@@ -88,7 +87,7 @@ export async function updateAdminNotice(
   noticeId: string,
   input: AdminNoticeFormInput,
 ): Promise<NoticeRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
   assertValidNoticeInput(input)
 
   const { data, error } = await supabase!
@@ -107,7 +106,7 @@ export async function updateAdminNotice(
 }
 
 export async function deleteAdminNotice(noticeId: string): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { error } = await supabase!.from('notices').delete().eq('id', noticeId)
 
@@ -120,7 +119,7 @@ export async function setAdminNoticeActive(
   noticeId: string,
   isActive: boolean,
 ): Promise<NoticeRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('notices')
@@ -141,7 +140,7 @@ export async function setAdminNoticePinned(
   noticeId: string,
   isPinned: boolean,
 ): Promise<NoticeRow> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('notices')

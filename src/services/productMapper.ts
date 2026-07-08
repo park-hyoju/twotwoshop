@@ -4,6 +4,7 @@ import {
   type ProductCategoryId,
 } from '../constants/productCategories'
 import { isProductSoldOut } from '../lib/productStock'
+import { resolveProductDetailMedia } from '../lib/detailMedia'
 import type { DetailCategory } from '../types/detailCategory'
 import type { DisplayCategory } from '../types/displayCategory'
 import type { Gender } from '../types/gender'
@@ -16,6 +17,7 @@ import {
   parseProductShippingInfo,
   parseProductSizeGuide,
 } from '../lib/productDetailContent'
+import { parseProductVariants } from '../lib/productVariants'
 
 /** Supabase `public.products` row shape (snake_case). */
 export interface ProductRow {
@@ -46,6 +48,7 @@ export interface ProductRow {
   product_info?: unknown
   shipping_info?: unknown
   return_info?: unknown
+  detail_media?: unknown
 }
 
 function asGender(value: string | null | undefined): Gender {
@@ -107,6 +110,7 @@ export function mapProductRowToProduct(row: ProductRow): Product {
     name: row.name,
     shortDescription: row.short_description ?? '',
     description: row.description ?? '',
+    detailMedia: resolveProductDetailMedia(row.detail_media, row.short_description ?? '', images),
     price: row.price,
     originalPrice: row.original_price ?? row.price,
     discountRate: row.discount_rate ?? 0,
@@ -129,6 +133,7 @@ export function mapProductRowToProduct(row: ProductRow): Product {
     productInfo: parseProductInfoFields(row.product_info),
     shippingInfo: parseProductShippingInfo(row.shipping_info),
     returnInfo: parseProductReturnInfo(row.return_info),
+    variants: parseProductVariants(row.product_info),
   }
 }
 
@@ -175,6 +180,8 @@ export function enrichProduct(product: Product): Product {
   return {
     ...product,
     productCategory,
+    variants: product.variants ?? [],
+    detailMedia: product.detailMedia ?? [],
     soldOut: product.status === 'soldout' || isProductSoldOut({ stock }),
   }
 }

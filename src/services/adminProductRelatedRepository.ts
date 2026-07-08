@@ -1,14 +1,11 @@
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import type { RelatedProductPick } from '../types/adminProductRelated'
 import { MAX_RELATED_PRODUCTS } from '../types/adminProductRelated'
 import { AdminProductRepositoryError } from './adminProductRepository'
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminProductRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminProductRepositoryError)
 }
 
 const RELATED_PRODUCT_SELECT = `
@@ -39,7 +36,7 @@ export async function searchAdminProductsForRelated(
   query: string,
   excludeProductId?: string | null,
 ): Promise<RelatedProductPick[]> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const trimmed = query.trim()
   if (!trimmed) {
@@ -69,7 +66,7 @@ export async function searchAdminProductsForRelated(
 export async function fetchAdminRelatedProducts(
   productId: string,
 ): Promise<RelatedProductPick[]> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data: links, error: linksError } = await supabase!
     .from('product_related')
@@ -109,7 +106,7 @@ export async function saveAdminRelatedProducts(
   productId: string,
   relatedProductIds: string[],
 ): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const uniqueIds = [...new Set(relatedProductIds)].filter((id) => id !== productId)
 

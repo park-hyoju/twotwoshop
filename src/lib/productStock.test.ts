@@ -7,7 +7,7 @@ import {
 } from './productStock'
 
 describe('productStock', () => {
-  it('returns soldout when stock is zero or negative', () => {
+  it('returns soldout label only when stock is zero or negative', () => {
     expect(getCustomerStockStatus(0)).toBe('soldout')
     expect(getCustomerStockStatus(-1)).toBe('soldout')
     expect(getCustomerStockLabel(0)).toBe('품절')
@@ -15,14 +15,15 @@ describe('productStock', () => {
     expect(isProductPurchasable({ stock: 0 })).toBe(false)
   })
 
-  it('returns low stock label without exposing quantity', () => {
+  it('does not expose stock quantity or low-stock labels to customers', () => {
     expect(getCustomerStockStatus(1)).toBe('low')
     expect(getCustomerStockStatus(2)).toBe('low')
-    expect(getCustomerStockLabel(2)).toBe('품절 임박')
-    expect(getCustomerStockLabel(2)).not.toContain('2')
+    expect(getCustomerStockLabel(1)).toBeNull()
+    expect(getCustomerStockLabel(2)).toBeNull()
+    expect(getCustomerStockLabel(10)).toBeNull()
   })
 
-  it('returns available for stock above two without label', () => {
+  it('returns no label for purchasable stock', () => {
     expect(getCustomerStockStatus(3)).toBe('available')
     expect(getCustomerStockLabel(3)).toBeNull()
     expect(isProductPurchasable({ stock: 3, status: 'active' })).toBe(true)

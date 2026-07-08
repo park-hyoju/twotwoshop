@@ -1,6 +1,12 @@
 import { productRepository } from '../services/productRepository'
 import type { Product } from '../types/product'
 import type { CartItem, CartSyncNoticeType, CartSyncOutcome } from '../types/cart'
+import { getCartLineId } from '../lib/cartLine'
+import {
+  findProductVariant,
+  getProductOptionStock,
+  hasProductOptions,
+} from '../lib/productVariants'
 import { createCartItemFromProduct, normalizeCartItems } from './cartStore'
 
 export const CART_SYNC_MESSAGES: Record<CartSyncNoticeType, string> = {
@@ -16,12 +22,21 @@ export function getSyncNoticeMessages(notices: CartSyncNoticeType[]): string[] {
   return notices.map((notice) => CART_SYNC_MESSAGES[notice])
 }
 
+function resolveCartItemStock(product: Product, item: CartItem): number {
+  if (hasProductOptions(product) && (item.selectedColor || item.selectedSize)) {
+    return getProductOptionStock(product, item.selectedColor ?? '', item.selectedSize ?? '')
+  }
+
+  return product.stock
+}
+
 function syncSingleCartItem(
   item: CartItem,
   product: Product,
   notices: Set<CartSyncNoticeType>,
 ): CartItem {
-  const isSoldOut = product.stock === 0 || product.status === 'soldout'
+  const stock = resolveCartItemStock(product, item)
+  const isSoldOut = stock === 0 || product.status === 'soldout'
   const priceChanged = item.price !== product.price
   const productIdChanged = item.productId !== product.id
   const infoChanged =
@@ -41,6 +56,8 @@ function syncSingleCartItem(
     }
 
     return {
+      ...item,
+      cartLineId: getCartLineId(item),
       productId: product.id,
       slug: product.slug,
       name: product.name,
@@ -48,16 +65,26 @@ function syncSingleCartItem(
       thumbnail: product.thumbnail,
       stock: 0,
       quantity: item.quantity,
+      optionId:
+        item.optionId ??
+        findProductVariant(
+          product.variants,
+          item.selectedColor ?? '',
+          item.selectedSize ?? '',
+        )?.id,
     }
   }
 
   let quantity = item.quantity
-  if (quantity > product.stock) {
-    quantity = product.stock
+  if (quantity > stock) {
+    quantity = stock
     notices.add('quantityAdjusted')
   }
 
-  return createCartItemFromProduct(product, quantity)
+  return createCartItemFromProduct(product, quantity, {
+    color: item.selectedColor,
+    size: item.selectedSize,
+  })
 }
 
 export async function syncCartItemsWithResolver(

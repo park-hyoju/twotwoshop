@@ -267,7 +267,7 @@ export function validatePrice(price: number): ValidationResult {
   }
 
   if (price <= 0) {
-    return '가격은 0원보다 커야 합니다.'
+    return '판매가는 0원보다 커야 합니다.'
   }
 
   return null
@@ -639,6 +639,25 @@ export function validateAdminProductInput(input: {
   }
 
   return validatePrice(input.price) ?? validateNonNegativeInteger(input.stock, '재고')
+}
+
+export function validateAdminProductFormInput(input: {
+  name: string
+  price: number
+  stock: number
+  hasThumbnail: boolean
+}): ValidationResult {
+  const name = sanitizeText(input.name, { maxLength: 200 })
+
+  if (!name) {
+    return '상품명을 입력해주세요.'
+  }
+
+  return (
+    validatePrice(input.price) ??
+    validateNonNegativeInteger(input.stock, '재고 수량') ??
+    (input.hasThumbnail ? null : '대표 이미지를 등록해주세요.')
+  )
 }
 
 export function validateAdminReplyMessage(message: string): ValidationResult {

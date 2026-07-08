@@ -1,4 +1,5 @@
 import { normalizeUsername } from './customerAuthValidation'
+import { isAdminAuthEmail } from './adminAuthConfig'
 
 export const CUSTOMER_AUTH_EMAIL_DOMAIN = 'twotwoshop.app'
 
@@ -69,13 +70,18 @@ export function isVirtualCustomerAuthEmail(email: string | null | undefined): bo
   )
 }
 
-/** Any valid non-admin auth email is treated as a storefront customer session. */
+/** Storefront customer auth emails — excludes admin @twotwoshop.com domain. */
 export function isCustomerAuthEmail(email: string | null | undefined): boolean {
   if (!email) {
     return false
   }
 
   const normalized = normalizeLoginEmail(email)
+
+  if (isAdminAuthEmail(normalized)) {
+    return false
+  }
+
   return normalized.includes('@') && normalized.includes('.')
 }
 

@@ -2,7 +2,7 @@
  * Storefront product data entry point (async).
  *
  * - When `VITE_SUPABASE_*` env vars are set: fetches `active` products from Supabase.
- * - On missing env, query error, or empty result: falls back to `productService` (static).
+ * - On missing env or query error: returns empty results (no static catalog fallback).
  * - UI pages should use this repository; do not call Supabase directly from components.
  */
 import {
@@ -16,16 +16,8 @@ import {
   mapProductRowToProduct,
   type ProductRow,
 } from './productMapper'
-import {
-  getAllProducts,
-  getBestProducts,
-  getNewProducts,
-  getPerfumeProducts,
-  getProductsByCategoryGroup,
-  getProductBySlug,
-  getProductsByProductCategory,
-  getSaleProducts,
-} from './productService'
+
+const EMPTY_PRODUCTS: Product[] = []
 
 export interface ProductRepository {
   findAllProducts(): Promise<Product[]>
@@ -236,7 +228,7 @@ async function withSupabaseFallback<T>(
     }
     return result
   } catch (error) {
-    console.warn('[productRepository] Unexpected error, using static fallback:', error)
+    console.warn('[productRepository] Unexpected error, returning empty catalog:', error)
     return fallback()
   }
 }
@@ -248,21 +240,21 @@ export const productRepository: ProductRepository = {
       if (!rows) return null
       if (rows.length === 0) return null
       return mapRows(rows)
-    }, getAllProducts),
+    }, () => EMPTY_PRODUCTS),
 
   findProductBySlug: (slug) =>
     withSupabaseFallback(async () => {
       const row = await fetchActiveProductRowBySlug(slug)
       if (!row) return null
       return mapProductRowToProduct(row)
-    }, () => getProductBySlug(slug)),
+    }, () => undefined),
 
   findProductBySlugForCartSync: (slug) =>
     withSupabaseFallback(async () => {
       const row = await fetchProductRowBySlugForCartSync(slug)
       if (!row) return null
       return mapProductRowToProduct(row)
-    }, () => getProductBySlug(slug)),
+    }, () => undefined),
 
   findProductsByProductCategory: (categoryId) =>
     withSupabaseFallback(async () => {
@@ -270,7 +262,7 @@ export const productRepository: ProductRepository = {
       if (!rows) return null
       if (rows.length === 0) return null
       return mapRows(rows)
-    }, () => getProductsByProductCategory(categoryId)),
+    }, () => EMPTY_PRODUCTS),
 
   findProductsByCategoryGroup: (group) =>
     withSupabaseFallback(async () => {
@@ -279,35 +271,35 @@ export const productRepository: ProductRepository = {
       if (!rows) return null
       if (rows.length === 0) return null
       return mapRows(rows)
-    }, () => getProductsByCategoryGroup(group)),
+    }, () => EMPTY_PRODUCTS),
 
   findBestProducts: () =>
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isBest: true })
       if (!rows) return null
       return mapRows(rows)
-    }, getBestProducts),
+    }, () => EMPTY_PRODUCTS),
 
   findNewProducts: () =>
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isNew: true })
       if (!rows) return null
       return mapRows(rows)
-    }, getNewProducts),
+    }, () => EMPTY_PRODUCTS),
 
   findSaleProducts: () =>
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ isSale: true })
       if (!rows) return null
       return mapRows(rows)
-    }, getSaleProducts),
+    }, () => EMPTY_PRODUCTS),
 
   findPerfumeProducts: () =>
     withSupabaseFallback(async () => {
       const rows = await fetchActiveProductRows({ productCategory: 'perfume' })
       if (!rows) return null
       return mapRows(rows)
-    }, getPerfumeProducts),
+    }, () => EMPTY_PRODUCTS),
 
   findRelatedProducts: (productId) =>
     withSupabaseFallback(async () => {

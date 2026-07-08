@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { CartEmpty, CartItemRow, CartSummary, CartSyncNotices } from '../../components/cart'
+import { getCartLineId } from '../../lib/cartLine'
 import { useCart } from '../../hooks/useCart'
 
 export function CartPage() {
@@ -66,16 +67,20 @@ export function CartPage() {
       ) : (
         <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
           <ul className="flex flex-col gap-4">
-            {items.map((item) => (
-              <li key={item.productId}>
+            {items.map((item) => {
+              const cartLineId = getCartLineId(item)
+
+              return (
+              <li key={cartLineId}>
                 <CartItemRow
                   item={item}
-                  onDecrease={() => updateQuantity(item.productId, item.quantity - 1)}
-                  onIncrease={() => updateQuantity(item.productId, item.quantity + 1)}
-                  onRemove={() => removeFromCart(item.productId)}
+                  onDecrease={() => updateQuantity(cartLineId, item.quantity - 1)}
+                  onIncrease={() => updateQuantity(cartLineId, item.quantity + 1)}
+                  onRemove={() => removeFromCart(cartLineId)}
                 />
               </li>
-            ))}
+              )
+            })}
           </ul>
 
           <CartSummary

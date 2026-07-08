@@ -4,6 +4,11 @@ import {
   saveLatestOrder,
 } from '../lib/orderStorage'
 import { INSUFFICIENT_STOCK_ORDER_MESSAGE } from '../lib/productStock'
+import {
+  findProductVariant,
+  getProductOptionStock,
+  hasProductOptions,
+} from '../lib/productVariants'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { logSupabaseError } from '../utils/errorLog'
 import type { Order } from '../types/order'
@@ -80,7 +85,25 @@ async function validateOrderStockFromRepository(order: Order): Promise<void> {
   for (const item of order.items) {
     const product = await productRepository.findProductBySlug(item.slug)
 
-    if (!product || product.stock < item.quantity) {
+    if (!product) {
+      throw new OrderStockError(INSUFFICIENT_STOCK_ORDER_MESSAGE)
+    }
+
+    const availableStock =
+      hasProductOptions(product) && (item.selectedColor || item.selectedSize)
+        ? getProductOptionStock(product, item.selectedColor ?? '', item.selectedSize ?? '')
+        : product.stock
+
+    if (availableStock < item.quantity) {
+      throw new OrderStockError(INSUFFICIENT_STOCK_ORDER_MESSAGE)
+    }
+
+    if (
+      hasProductOptions(product) &&
+      item.selectedColor &&
+      item.selectedSize &&
+      !findProductVariant(product.variants, item.selectedColor, item.selectedSize)
+    ) {
       throw new OrderStockError(INSUFFICIENT_STOCK_ORDER_MESSAGE)
     }
   }
@@ -102,6 +125,9 @@ async function saveOrderWithStockRpc(order: Order): Promise<void> {
     quantity: item.quantity,
     unit_price: item.price,
     total_price: item.price * item.quantity,
+    selected_color: item.selectedColor ?? null,
+    selected_size: item.selectedSize ?? null,
+    option_id: item.optionId ?? null,
   }))
 
   const { error } = await supabase.rpc('create_shop_order_with_stock', {

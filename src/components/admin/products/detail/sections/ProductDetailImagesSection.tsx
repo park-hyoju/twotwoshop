@@ -134,7 +134,7 @@ export function ProductDetailImagesSection({ form, onChange }: ProductDetailImag
   return (
     <div className="space-y-6">
       <p className="text-sm text-neutral-500">
-        상세 페이지에 위에서 아래 순서로 보여져요. 원하는 만큼 추가할 수 있어요.
+        아래 순서대로 상세페이지에 보여져요. 드래그해서 순서를 바꿀 수 있어요.
       </p>
 
       <input

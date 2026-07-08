@@ -49,6 +49,7 @@ function createProduct(overrides: Partial<Product> = {}): Product {
     name: '클래식 린넨 셔츠',
     shortDescription: '시원한 린넨 데일리 셔츠',
     description: '시원한 린넨 소재의 데일리 셔츠입니다.',
+    detailMedia: [],
     price: 69000,
     originalPrice: 89000,
     discountRate: 22,
@@ -71,6 +72,7 @@ function createProduct(overrides: Partial<Product> = {}): Product {
     productInfo: { ...EMPTY_PRODUCT_INFO },
     shippingInfo: { ...EMPTY_PRODUCT_SHIPPING_INFO },
     returnInfo: { ...EMPTY_PRODUCT_RETURN_INFO },
+    variants: [],
     ...overrides,
   }
 }

@@ -8,12 +8,11 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { ADMIN_UNAUTHORIZED_MESSAGE, isAdminUser } from '../lib/adminAuthConfig'
+import { ADMIN_UNAUTHORIZED_MESSAGE } from '../lib/adminAuthConfig'
+import { type AdminAuthStatus, resolveAdminAuthStatus } from '../lib/adminAccess'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import {
   AdminAuthError,
-  getAdminSession,
-  resolveAdminSessionState,
   signInAdmin,
   signOutAdmin,
 } from '../services/adminAuthService'
@@ -21,8 +20,10 @@ import {
 interface AdminAuthContextValue {
   session: Session | null
   user: User | null
+  authStatus: AdminAuthStatus
   isLoading: boolean
   isAuthenticated: boolean
+  isForbidden: boolean
   unauthorizedMessage: string | null
   signIn: (loginId: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -33,35 +34,63 @@ const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured)
+  const [authStatus, setAuthStatus] = useState<AdminAuthStatus>('loading')
   const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(null)
 
   const clearUnauthorizedMessage = useCallback(() => {
     setUnauthorizedMessage(null)
   }, [])
 
+  const applyResolvedAuth = useCallback(
+    (status: Exclude<AdminAuthStatus, 'loading'>, nextSession: Session | null) => {
+      setAuthStatus(status)
+      setSession(nextSession)
+      setUnauthorizedMessage(status === 'forbidden' ? ADMIN_UNAUTHORIZED_MESSAGE : null)
+    },
+    [],
+  )
+
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
-      setIsLoading(false)
+      applyResolvedAuth('unauthenticated', null)
       return
     }
 
+    const authClient = supabase
     let cancelled = false
 
     async function loadSession() {
+      setAuthStatus('loading')
+
       try {
-        const { session: currentSession, unauthorized } = await getAdminSession()
+        const { data: sessionData, error: sessionError } = await authClient.auth.getSession()
+        if (cancelled) {
+          return
+        }
+
+        if (sessionError || !sessionData.session) {
+          applyResolvedAuth('unauthenticated', null)
+          return
+        }
+
+        const { data: userData, error: userError } = await authClient.auth.getUser()
+        if (cancelled) {
+          return
+        }
+
+        if (userError || !userData.user) {
+          applyResolvedAuth('unauthenticated', null)
+          return
+        }
+
+        const validatedSession = { ...sessionData.session, user: userData.user }
+        const resolved = await resolveAdminAuthStatus(validatedSession)
         if (!cancelled) {
-          setSession(currentSession)
-          setUnauthorizedMessage(unauthorized ? ADMIN_UNAUTHORIZED_MESSAGE : null)
+          applyResolvedAuth(resolved.status, resolved.session)
         }
       } catch {
         if (!cancelled) {
-          setSession(null)
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
+          applyResolvedAuth('unauthenticated', null)
         }
       }
     }
@@ -70,19 +99,34 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = authClient.auth.onAuthStateChange((_event, nextSession) => {
       if (cancelled) {
         return
       }
 
       void (async () => {
-        const { session: validatedSession, unauthorized } =
-          resolveAdminSessionState(nextSession)
+        setAuthStatus('loading')
 
+        if (!nextSession) {
+          if (!cancelled) {
+            applyResolvedAuth('unauthenticated', null)
+          }
+          return
+        }
+
+        const { data: userData, error: userError } = await authClient.auth.getUser()
+        if (cancelled) {
+          return
+        }
+
+        const validatedSession =
+          userError || !userData.user
+            ? null
+            : { ...nextSession, user: userData.user }
+
+        const resolved = await resolveAdminAuthStatus(validatedSession)
         if (!cancelled) {
-          setSession(validatedSession)
-          setUnauthorizedMessage(unauthorized ? ADMIN_UNAUTHORIZED_MESSAGE : null)
-          setIsLoading(false)
+          applyResolvedAuth(resolved.status, resolved.session)
         }
       })()
     })
@@ -91,32 +135,35 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       cancelled = true
       subscription.unsubscribe()
     }
-  }, [])
+  }, [applyResolvedAuth])
 
-  const signIn = useCallback(async (loginId: string, password: string) => {
-    const nextSession = await signInAdmin(loginId, password)
-    setSession(nextSession)
-    setUnauthorizedMessage(null)
-  }, [])
+  const signIn = useCallback(
+    async (loginId: string, password: string) => {
+      const nextSession = await signInAdmin(loginId, password)
+      applyResolvedAuth('authenticated', nextSession)
+    },
+    [applyResolvedAuth],
+  )
 
   const signOut = useCallback(async () => {
     await signOutAdmin()
-    setSession(null)
-    setUnauthorizedMessage(null)
-  }, [])
+    applyResolvedAuth('unauthenticated', null)
+  }, [applyResolvedAuth])
 
   const value = useMemo<AdminAuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
-      isLoading,
-      isAuthenticated: Boolean(session && isAdminUser(session.user)),
+      authStatus,
+      isLoading: authStatus === 'loading',
+      isAuthenticated: authStatus === 'authenticated',
+      isForbidden: authStatus === 'forbidden',
       unauthorizedMessage,
       signIn,
       signOut,
       clearUnauthorizedMessage,
     }),
-    [session, isLoading, unauthorizedMessage, signIn, signOut, clearUnauthorizedMessage],
+    [session, authStatus, unauthorizedMessage, signIn, signOut, clearUnauthorizedMessage],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>

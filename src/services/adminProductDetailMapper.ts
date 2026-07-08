@@ -5,11 +5,13 @@ import {
   EMPTY_SIZE_GUIDE,
   EMPTY_SIZE_GUIDE_ROW,
 } from '../lib/adminProductDetailDefaults'
+import { migrateDetailMedia, serializeDetailMediaForDb } from '../lib/detailMedia'
 import { resolveProductCategory } from '../constants/productCategories'
 import { buildProductCategoryPayload } from './productMapper'
 import type {
   AdminProductDetailForm,
   AdminProductInfoFields,
+  AdminProductVariant,
   AdminReturnInfoFields,
   AdminShippingInfoFields,
   AdminSizeGuide,
@@ -42,6 +44,10 @@ export interface AdminProductDetailRow {
   product_info: unknown
   shipping_info: unknown
   return_info: unknown
+  detail_media?: unknown
+  is_new?: boolean | null
+  is_best?: boolean | null
+  is_sale?: boolean | null
 }
 
 function asProductStatus(value: string | null | undefined): ProductStatus {
@@ -93,6 +99,27 @@ function parseSizeGuide(value: unknown): AdminSizeGuide {
   }
 }
 
+function parseVariants(value: unknown): AdminProductVariant[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item, index) => {
+      if (!isRecord(item)) {
+        return null
+      }
+
+      return {
+        id: asString(item.id, `variant-${index}`),
+        color: asString(item.color),
+        size: asString(item.size),
+        stock: typeof item.stock === 'number' && Number.isFinite(item.stock) ? item.stock : 0,
+      }
+    })
+    .filter((item): item is AdminProductVariant => item !== null)
+}
+
 function parseProductInfo(value: unknown): AdminProductInfoFields {
   if (!isRecord(value)) {
     return { ...EMPTY_PRODUCT_INFO }
@@ -109,6 +136,14 @@ function parseProductInfo(value: unknown): AdminProductInfoFields {
     lining: asString(value.lining),
     fit: asString(value.fit),
   }
+}
+
+function extractVariantsFromProductInfo(value: unknown): AdminProductVariant[] {
+  if (!isRecord(value)) {
+    return []
+  }
+
+  return parseVariants(value.variants)
 }
 
 function parseShippingInfo(value: unknown): AdminShippingInfoFields {
@@ -160,12 +195,17 @@ export function mapRowToAdminProductDetailForm(row: AdminProductDetailRow): Admi
     images,
     short_description: row.short_description ?? '',
     description: row.description ?? '',
+    detail_media: migrateDetailMedia(row.detail_media, row.short_description ?? '', images),
     size_guide: parseSizeGuide(row.size_guide),
     product_info: parseProductInfo(row.product_info),
     shipping_info: parseShippingInfo(row.shipping_info),
     return_info: parseReturnInfo(row.return_info),
     meta_title: row.meta_title ?? '',
     meta_description: row.meta_description ?? '',
+    isNew: row.is_new === true,
+    isBest: row.is_best === true,
+    isSale: row.is_sale === true,
+    variants: extractVariantsFromProductInfo(row.product_info),
   }
 }
 
@@ -187,11 +227,19 @@ export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetai
     images: form.images,
     short_description: form.short_description.trim() || null,
     description: form.description,
+    detail_media: serializeDetailMediaForDb(form.detail_media),
     size_guide: form.size_guide,
-    product_info: form.product_info,
+    product_info: {
+      ...form.product_info,
+      variants: form.variants,
+    },
     shipping_info: form.shipping_info,
     return_info: form.return_info,
     meta_title: form.meta_title.trim() || null,
     meta_description: form.meta_description.trim() || null,
+    is_new: form.isNew === true,
+    is_best: form.isBest === true,
+    is_sale: form.isSale === true,
+    is_admin_registered: true,
   }
 }

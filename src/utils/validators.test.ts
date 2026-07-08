@@ -86,7 +86,7 @@ describe('validators', () => {
 
   it('rejects negative quantity and zero price', () => {
     expect(validateQuantity(-1)).toBe('수량은(는) 0보다 커야 합니다.')
-    expect(validatePrice(0)).toBe('가격은 0원보다 커야 합니다.')
+    expect(validatePrice(0)).toBe('판매가는 0원보다 커야 합니다.')
     expect(parsePrice(0)).toBeNull()
     expect(parsePositiveInteger(-3)).toBeNull()
   })

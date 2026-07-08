@@ -11,16 +11,16 @@ import {
 import { loadCartFromStorage, saveCartToStorage } from '../lib/cartStorage'
 import { getSyncNoticeMessages, syncCartItems } from '../store/cartSync'
 import * as cartStore from '../store/cartStore'
-import type { AddToCartResult, CartItem } from '../types/cart'
+import type { AddToCartInput, AddToCartResult, CartItem } from '../types/cart'
 import type { Product } from '../types/product'
 
 interface CartContextValue {
   items: CartItem[]
   syncNotices: string[]
   isCartSyncing: boolean
-  addToCart: (product: Product) => AddToCartResult
-  removeFromCart: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  addToCart: (product: Product, options?: AddToCartInput) => AddToCartResult
+  removeFromCart: (cartLineId: string) => void
+  updateQuantity: (cartLineId: string, quantity: number) => void
   clearCart: () => void
   syncCart: () => Promise<void>
   clearSyncNotices: () => void
@@ -110,19 +110,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSyncNotices([])
   }, [])
 
-  const addToCart = useCallback((product: Product): AddToCartResult => {
-    const outcome = cartStore.addToCart(itemsRef.current, product)
-    itemsRef.current = outcome.items
-    setItems(outcome.items)
-    return outcome.result
+  const addToCart = useCallback(
+    (product: Product, options?: AddToCartInput): AddToCartResult => {
+      const outcome = cartStore.addToCart(itemsRef.current, product, options)
+      itemsRef.current = outcome.items
+      setItems(outcome.items)
+      return outcome.result
+    },
+    [],
+  )
+
+  const removeFromCart = useCallback((cartLineId: string) => {
+    setItems((prev) => cartStore.removeFromCart(prev, cartLineId))
   }, [])
 
-  const removeFromCart = useCallback((productId: string) => {
-    setItems((prev) => cartStore.removeFromCart(prev, productId))
-  }, [])
-
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
-    setItems((prev) => cartStore.updateQuantity(prev, productId, quantity))
+  const updateQuantity = useCallback((cartLineId: string, quantity: number) => {
+    setItems((prev) => cartStore.updateQuantity(prev, cartLineId, quantity))
   }, [])
 
   const clearCart = useCallback(() => {

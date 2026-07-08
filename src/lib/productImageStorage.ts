@@ -2,11 +2,14 @@ export const PRODUCT_IMAGE_BUCKET = 'product-images'
 
 export const PRODUCT_IMAGE_MAX_ORIGINAL_BYTES = 20 * 1024 * 1024
 
+/** 10MB 이상이면 운영자에게 경고 (업로드는 압축 후 시도). */
+export const PRODUCT_IMAGE_WARN_BYTES = 10 * 1024 * 1024
+
 export const PRODUCT_IMAGE_ACCEPT =
   'image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
 
 export const PRODUCT_IMAGE_UPLOAD_HINT =
-  'JPG, PNG, WEBP · 원본 최대 20MB · 업로드 시 자동 최적화'
+  'JPG, PNG, WEBP · 10MB 이상 자동 압축 · 원본 최대 20MB'
 
 export const PRODUCT_IMAGE_HEIC_MESSAGE =
   '아이폰 HEIC 사진은 JPG로 변환 후 업로드해 주세요.'

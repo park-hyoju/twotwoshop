@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   calculateDiscountRate,
   calculateDiscountRateForStorage,
+  calculateSalePriceFromDiscount,
 } from './calculateDiscountRate'
 
 describe('calculateDiscountRate', () => {
@@ -23,5 +24,22 @@ describe('calculateDiscountRate', () => {
 
   it('returns null when sale price is higher than original', () => {
     expect(calculateDiscountRate(39000, 48000)).toBeNull()
+  })
+
+  it('returns 34% for original 89,000 and sale 59,000', () => {
+    expect(calculateDiscountRate(89000, 59000)).toBe(34)
+    expect(calculateDiscountRateForStorage(89000, 59000)).toBe(34)
+  })
+})
+
+describe('calculateSalePriceFromDiscount', () => {
+  it('derives sale price from original and discount percent', () => {
+    expect(calculateSalePriceFromDiscount(89000, 34)).toBe(58740)
+    expect(calculateSalePriceFromDiscount(48000, 19)).toBe(38880)
+  })
+
+  it('returns original price when discount is zero or invalid', () => {
+    expect(calculateSalePriceFromDiscount(89000, 0)).toBe(89000)
+    expect(calculateSalePriceFromDiscount(0, 20)).toBe(0)
   })
 })

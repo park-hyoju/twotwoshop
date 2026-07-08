@@ -4,6 +4,7 @@ import {
   getInquiryDisplayCode,
   normalizeInquiryStatus,
 } from '../lib/adminInquiryDisplay'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type {
   AdminInquiriesQueryParams,
@@ -200,12 +201,8 @@ export class AdminInquiryRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminInquiryRepositoryError(
-      '문의 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminInquiryRepositoryError)
 }
 
 async function fetchInquiryCount(options?: {
@@ -417,7 +414,7 @@ async function fetchMessagesByInquiryId(inquiryId: string): Promise<AdminInquiry
 }
 
 export async function fetchAdminInquirySummary(): Promise<AdminInquirySummaryStats> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { todayStart, tomorrowStart } = getTodayBoundaries()
 
@@ -461,7 +458,7 @@ async function fetchUnreadInquiryCount(): Promise<number> {
 }
 
 export async function markAdminInquiryAsRead(inquiryId: string): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { error: rpcError } = await supabase!.rpc('mark_admin_inquiry_read', {
     p_inquiry_id: inquiryId,
@@ -489,7 +486,7 @@ export async function markAdminInquiryAsRead(inquiryId: string): Promise<void> {
 export async function fetchAdminInquiries(
   params: AdminInquiriesQueryParams,
 ): Promise<AdminInquiriesQueryResult> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { page, pageSize, filters } = params
   const from = (page - 1) * pageSize
@@ -516,7 +513,7 @@ export async function fetchAdminInquiries(
 }
 
 export async function fetchAdminInquiryById(id: string): Promise<AdminInquiryRow | null> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   try {
     const data = await selectInquiryByIdWithFallback(id)
@@ -539,7 +536,7 @@ export async function fetchAdminInquiryById(id: string): Promise<AdminInquiryRow
 }
 
 export async function sendAdminInquiryMessage(input: AdminInquirySendMessageInput): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const trimmedMessage = sanitizeText(input.message, { maxLength: 5000 })
   const validationError = validateAdminReplyMessage(trimmedMessage)
@@ -575,7 +572,7 @@ export async function sendAdminInquiryMessage(input: AdminInquirySendMessageInpu
 }
 
 export async function updateAdminInquiryMeta(input: AdminInquiryMetaUpdateInput): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const trimmedNote = input.adminNote.trim()
 
@@ -595,7 +592,7 @@ export async function updateAdminInquiryMeta(input: AdminInquiryMetaUpdateInput)
 }
 
 export async function updateAdminInquiry(input: AdminInquiryUpdateInput): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const trimmedReply = input.adminReply.trim()
   const trimmedNote = input.adminNote.trim()
@@ -635,7 +632,7 @@ export async function updateAdminInquiry(input: AdminInquiryUpdateInput): Promis
 }
 
 export async function deleteAdminInquiry(id: string): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { error } = await supabase!.from(CUSTOMER_INQUIRY_TABLE).delete().eq('id', id)
 
@@ -650,7 +647,7 @@ export async function deleteAdminInquiries(ids: string[]): Promise<void> {
     return
   }
 
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { error } = await supabase!.from(CUSTOMER_INQUIRY_TABLE).delete().in('id', ids)
 

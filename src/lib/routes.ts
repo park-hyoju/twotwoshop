@@ -1,5 +1,6 @@
 export const ROUTES = {
   home: '/',
+  forbidden: '/403',
   notFound: '/404',
   products: '/products',
   productsNew: '/products/new',

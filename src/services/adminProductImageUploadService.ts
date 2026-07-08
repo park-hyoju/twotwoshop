@@ -1,4 +1,5 @@
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import { compressProductImage } from '../lib/productImageCompression'
 import {
   PRODUCT_IMAGE_BUCKET,
@@ -20,16 +21,8 @@ export class ProductImageUploadError extends Error {
   }
 }
 
-function assertUploadReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new ProductImageUploadError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
-    )
-  }
-}
-
 async function getAccessToken(): Promise<string> {
-  assertUploadReady()
+  await assertAdminRepositoryAccess(ProductImageUploadError)
 
   const { data, error } = await supabase!.auth.getSession()
   if (error) {
@@ -156,7 +149,7 @@ export async function deleteProductImageByUrl(url: string): Promise<void> {
     return
   }
 
-  assertUploadReady()
+  await assertAdminRepositoryAccess(ProductImageUploadError)
 
   const { error } = await supabase!.storage.from(PRODUCT_IMAGE_BUCKET).remove([path])
   if (error) {

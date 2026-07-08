@@ -1,25 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useAdminToast } from '../../components/admin/AdminToast'
 import { AdminOrdersPagination } from '../../components/admin/orders/AdminOrdersPagination'
-import {
-  AdminProductFormModal,
-  AdminProductsList,
-  AdminProductsSearch,
-  type AdminProductFormMode,
-} from '../../components/admin/products'
+import { AdminProductsList, AdminProductsSearch } from '../../components/admin/products'
 import { ProductDetailEditor } from '../../components/admin/products/detail'
 import {
   AdminProductRepositoryError,
-  createAdminProduct,
   deleteAdminProduct,
   fetchAdminProducts,
-  setAdminProductSoldOut,
-  setAdminProductVisibility,
-  updateAdminProduct,
 } from '../../services/adminProductRepository'
-import { saveAdminRelatedProducts } from '../../services/adminProductRelatedRepository'
+import {
+  AdminProductDetailRepositoryError,
+  copyAdminProduct,
+  createBlankAdminProduct,
+} from '../../services/adminProductDetailRepository'
 import type {
-  AdminProductFormInput,
   AdminProductRow,
   AdminProductSearchFilters,
   AdminProductStatusFilter,
@@ -45,10 +40,15 @@ function getErrorMessage(error: unknown): string {
     return error.message
   }
 
+  if (error instanceof AdminProductDetailRepositoryError) {
+    return error.message
+  }
+
   return '상품 목록을 불러오는 중 오류가 발생했습니다.'
 }
 
 export function AdminProductsPage() {
+  const { showToast } = useAdminToast()
   const [searchParams] = useSearchParams()
   const [products, setProducts] = useState<AdminProductRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -59,10 +59,6 @@ export function AdminProductsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null)
   const [actionProductId, setActionProductId] = useState<string | null>(null)
-  const [formMode, setFormMode] = useState<AdminProductFormMode | null>(null)
-  const [editingProduct, setEditingProduct] = useState<AdminProductRow | null>(null)
-  const [isFormSubmitting, setIsFormSubmitting] = useState(false)
-  const [formErrorMessage, setFormErrorMessage] = useState<string | null>(null)
   const [detailProductId, setDetailProductId] = useState<string | null>(null)
 
   const loadProducts = useCallback(async () => {
@@ -132,84 +128,19 @@ export function AdminProductsPage() {
     setPage(1)
   }
 
-  function openCreateForm() {
-    setFormErrorMessage(null)
-    setEditingProduct(null)
-    setFormMode('create')
-  }
-
-  function openEditForm(product: AdminProductRow) {
-    setFormErrorMessage(null)
-    setEditingProduct(product)
-    setFormMode('edit')
-  }
-
-  function closeForm() {
-    if (isFormSubmitting) {
-      return
-    }
-
-    setFormMode(null)
-    setEditingProduct(null)
-    setFormErrorMessage(null)
-  }
-
-  async function runProductAction(
-    productId: string,
-    action: () => Promise<void>,
-    fallbackMessage: string,
-  ) {
+  async function handleCreate() {
     setActionErrorMessage(null)
-    setActionProductId(productId)
+    setActionProductId('create')
 
     try {
-      await action()
-      await loadProducts()
+      const productId = await createBlankAdminProduct()
+      setDetailProductId(productId)
     } catch (error) {
-      setActionErrorMessage(
-        error instanceof AdminProductRepositoryError ? error.message : fallbackMessage,
-      )
+      const message = getErrorMessage(error)
+      setActionErrorMessage(message)
+      showToast(message, { durationMs: 4000 })
     } finally {
       setActionProductId(null)
-    }
-  }
-
-  async function handleFormSubmit(input: AdminProductFormInput) {
-    setFormErrorMessage(null)
-    setIsFormSubmitting(true)
-
-    try {
-      let productId: string
-
-      if (formMode === 'create') {
-        productId = await createAdminProduct(input)
-      } else if (formMode === 'edit' && editingProduct) {
-        productId = editingProduct.id
-        await updateAdminProduct(editingProduct.id, {
-          price: input.price,
-          stock: input.stock,
-          status: input.status,
-          product_category: input.product_category,
-          isNew: input.isNew,
-          isBest: input.isBest,
-          isSale: input.isSale,
-        })
-      } else {
-        return
-      }
-
-      await saveAdminRelatedProducts(productId, input.relatedProductIds)
-
-      closeForm()
-      await loadProducts()
-    } catch (error) {
-      setFormErrorMessage(
-        error instanceof AdminProductRepositoryError
-          ? error.message
-          : '상품 저장 중 오류가 발생했습니다.',
-      )
-    } finally {
-      setIsFormSubmitting(false)
     }
   }
 
@@ -219,10 +150,29 @@ export function AdminProductsPage() {
 
   function closeDetailEditor() {
     setDetailProductId(null)
+    void loadProducts()
   }
 
   function handleDetailSaved(_message: string) {
     void loadProducts()
+  }
+
+  async function handleCopy(product: AdminProductRow) {
+    setActionErrorMessage(null)
+    setActionProductId(product.id)
+
+    try {
+      const copiedId = await copyAdminProduct(product.id)
+      await loadProducts()
+      showToast('상품이 복사되었습니다. 사진과 상품명을 수정한 뒤 저장하세요.')
+      setDetailProductId(copiedId)
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setActionErrorMessage(message)
+      showToast(message, { durationMs: 4000 })
+    } finally {
+      setActionProductId(null)
+    }
   }
 
   async function handleDelete(product: AdminProductRow) {
@@ -232,11 +182,20 @@ export function AdminProductsPage() {
       return
     }
 
-    await runProductAction(
-      product.id,
-      () => deleteAdminProduct(product.id),
-      '상품 삭제 중 오류가 발생했습니다.',
-    )
+    setActionErrorMessage(null)
+    setActionProductId(product.id)
+
+    try {
+      await deleteAdminProduct(product.id)
+      await loadProducts()
+      showToast('상품이 삭제되었습니다.')
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setActionErrorMessage(message)
+      showToast(message, { durationMs: 4000 })
+    } finally {
+      setActionProductId(null)
+    }
   }
 
   return (
@@ -244,15 +203,16 @@ export function AdminProductsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl">상품 관리</h1>
-          <p className="mt-2 text-base text-neutral-600 sm:text-lg">
-            상품 등록, 재고, 노출 상태를 관리합니다.
+          <p className="mt-2 text-base text-neutral-600">
+            사진부터 순서대로 입력해 빠르게 상품을 등록하세요.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={openCreateForm}
-          className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 sm:text-base"
+          onClick={() => void handleCreate()}
+          disabled={actionProductId === 'create'}
+          className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 disabled:opacity-50 sm:text-base"
         >
           상품 추가
         </button>
@@ -279,7 +239,7 @@ export function AdminProductsPage() {
       <div className="mt-6">
         {isLoading && (
           <div className="rounded-xl border border-neutral-200 bg-white px-6 py-12 text-center">
-            <p className="text-base text-neutral-600 sm:text-lg">상품 목록을 불러오는 중입니다...</p>
+            <p className="text-base text-neutral-600">상품 목록을 불러오는 중입니다...</p>
           </div>
         )}
 
@@ -288,11 +248,11 @@ export function AdminProductsPage() {
             role="alert"
             className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center"
           >
-            <p className="text-base font-medium text-red-700 sm:text-lg">{errorMessage}</p>
+            <p className="text-base font-medium text-red-700">{errorMessage}</p>
             <button
               type="button"
               onClick={() => void loadProducts()}
-              className="mt-4 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 sm:text-base"
+              className="mt-4 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800"
             >
               다시 시도
             </button>
@@ -301,7 +261,7 @@ export function AdminProductsPage() {
 
         {!isLoading && !errorMessage && products.length === 0 && (
           <div className="rounded-xl border border-neutral-200 bg-white px-6 py-12 text-center">
-            <p className="text-base text-neutral-600 sm:text-lg">등록된 상품이 없습니다.</p>
+            <p className="text-base text-neutral-600">등록된 상품이 없습니다.</p>
           </div>
         )}
 
@@ -310,23 +270,9 @@ export function AdminProductsPage() {
             <AdminProductsList
               products={products}
               actionProductId={actionProductId}
-              onEdit={openEditForm}
               onDetailEdit={openDetailEditor}
+              onCopy={(product) => void handleCopy(product)}
               onDelete={(product) => void handleDelete(product)}
-              onSoldOut={(productId) =>
-                void runProductAction(
-                  productId,
-                  () => setAdminProductSoldOut(productId),
-                  '품절 처리 중 오류가 발생했습니다.',
-                )
-              }
-              onToggleVisibility={(productId, visible) =>
-                void runProductAction(
-                  productId,
-                  () => setAdminProductVisibility(productId, visible),
-                  '노출 상태 변경 중 오류가 발생했습니다.',
-                )
-              }
             />
             <AdminOrdersPagination
               page={page}
@@ -337,18 +283,6 @@ export function AdminProductsPage() {
           </div>
         )}
       </div>
-
-      {formMode && (
-        <AdminProductFormModal
-          mode={formMode}
-          product={editingProduct}
-          isOpen={formMode !== null}
-          isSubmitting={isFormSubmitting}
-          errorMessage={formErrorMessage}
-          onClose={closeForm}
-          onSubmit={(input) => void handleFormSubmit(input)}
-        />
-      )}
 
       {detailProductId && (
         <ProductDetailEditor

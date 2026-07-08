@@ -11,6 +11,7 @@ import {
   getDetailImagesFromForm,
   syncProductImagesToForm,
 } from './detailContent/detailContent'
+import { adminSectionClassName } from './adminFormStyles'
 import { ProductImageGalleryItem } from './images/ProductImageGalleryItem'
 import { ProductImageUploadZone } from './images/ProductImageUploadZone'
 import { UploadProgressBar } from './images/UploadProgressBar'
@@ -162,7 +163,9 @@ export function ImagesTab({ form, onChange }: ImagesTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`${adminSectionClassName} space-y-6`}>
+      <p className="text-sm text-neutral-600">대표 이미지와 추가 이미지를 등록하세요.</p>
+
       {uploadSuccessMessage && (
         <p
           role="status"

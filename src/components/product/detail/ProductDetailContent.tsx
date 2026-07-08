@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { loadStorePolicy } from '../../../lib/storePolicy'
+import { useRef, useState } from 'react'
 import type { Product } from '../../../types/product'
-import { ProductDetailInfoPanel } from './ProductDetailInfoPanel'
+import { ProductDetailInfoTab } from './ProductDetailInfoTab'
 import { ProductDetailReturnSection } from './ProductDetailReturnSection'
 import { ProductDetailShippingSection } from './ProductDetailShippingSection'
 import { ProductDetailTabNav } from './ProductDetailTabNav'
@@ -13,25 +12,35 @@ interface ProductDetailContentProps {
 
 export function ProductDetailContent({ product }: ProductDetailContentProps) {
   const [activeTab, setActiveTab] = useState<ProductDetailTab>('info')
-  const policy = loadStorePolicy()
+  const sectionRef = useRef<HTMLElement>(null)
+
+  function handleTabChange(tab: ProductDetailTab) {
+    setActiveTab(tab)
+
+    requestAnimationFrame(() => {
+      const section = sectionRef.current
+      if (!section) {
+        return
+      }
+
+      const top = section.getBoundingClientRect().top + window.scrollY - 72
+      window.scrollTo({ top, behavior: 'smooth' })
+    })
+  }
 
   return (
-    <section className="border-t border-neutral-200 pt-6">
-      <ProductDetailTabNav activeTab={activeTab} onTabChange={setActiveTab} inline />
+    <section ref={sectionRef} className="border-t border-neutral-200 pt-8 sm:pt-10">
+      <ProductDetailTabNav activeTab={activeTab} onTabChange={handleTabChange} inline />
 
       <div
         id="product-detail-tabpanel"
         role="tabpanel"
         aria-labelledby={`product-detail-tab-${activeTab}`}
-        className="mx-auto max-w-3xl pt-5"
+        className="mx-auto max-w-3xl pt-6 sm:pt-8"
       >
-        {activeTab === 'info' && <ProductDetailInfoPanel product={product} />}
-        {activeTab === 'shipping' && (
-          <ProductDetailShippingSection shippingInfo={policy.shipping} />
-        )}
-        {activeTab === 'return' && (
-          <ProductDetailReturnSection returnInfo={policy.returns} />
-        )}
+        {activeTab === 'info' && <ProductDetailInfoTab product={product} />}
+        {activeTab === 'shipping' && <ProductDetailShippingSection product={product} />}
+        {activeTab === 'return' && <ProductDetailReturnSection product={product} />}
       </div>
     </section>
   )

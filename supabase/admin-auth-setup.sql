@@ -4,13 +4,16 @@
 -- 이 파일은 SQL이 아닙니다. Supabase Dashboard에서 관리자 계정을 만드는 방법입니다.
 --
 -- 계정 삭제 후 복구: supabase/admin-account-recovery.sql 참고
+-- 기존 admin@twotwoshop.com → admintwotwo 마이그레이션: supabase/admin-login-id-migration.sql
 -- RLS 정책: supabase/production-security-rls.sql 실행 필수
 --
 -- 1. Supabase Dashboard → Authentication → Users → Add user
--- 2. Email: admin@twotwoshop.com / Password 입력 / "Auto Confirm User" 체크
+-- 2. Email: admintwotwo@twotwoshop.com / Password 입력 / "Auto Confirm User" 체크
 -- 3. 해당 사용자 → App Metadata (raw_app_meta_data) 에 아래 JSON 설정:
 --      { "role": "admin" }
--- 4. /admin/login 에서 로그인 (아이디: admin 또는 admin@twotwoshop.com)
+-- 4. /admin/login 에서 로그인
+--      - 관리자 아이디: admintwotwo
+--      - 또는 이메일: admintwotwo@twotwoshop.com
 --
 -- 권한 구조 (코드 + RLS 기준):
 -- - JWT app_metadata.role = 'admin' 일 때만 관리자 접근

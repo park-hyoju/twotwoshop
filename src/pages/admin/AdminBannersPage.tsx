@@ -67,14 +67,18 @@ export function AdminBannersPage() {
     setIsFormOpen(true)
   }
 
+  function resetFormState() {
+    setIsFormOpen(false)
+    setEditingBanner(null)
+    setFormError(null)
+  }
+
   function closeForm() {
     if (isSaving) {
       return
     }
 
-    setIsFormOpen(false)
-    setEditingBanner(null)
-    setFormError(null)
+    resetFormState()
   }
 
   async function uploadPendingImages(
@@ -130,7 +134,7 @@ export function AdminBannersPage() {
         showToast('배너가 등록되었습니다.')
       }
 
-      closeForm()
+      resetFormState()
       await loadBanners()
     } catch (error) {
       setFormError(getErrorMessage(error))

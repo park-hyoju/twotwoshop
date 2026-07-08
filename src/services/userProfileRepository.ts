@@ -1,4 +1,4 @@
-import { isAdminUser } from '../lib/adminAuthConfig'
+import { isAdminUser, isAdminAuthEmail } from '../lib/adminAuthConfig'
 import {
   createAuthEmail,
   extractUsernameFromAuthEmail,
@@ -29,7 +29,7 @@ export function isStorefrontMember(
   }
 
   if (typeof user === 'string') {
-    return isCustomerAuthEmail(user)
+    return isCustomerAuthEmail(user) && !isAdminAuthEmail(user)
   }
 
   if (!user.email || isAdminUser(user)) {

@@ -5,6 +5,9 @@ export interface OrderItem {
   price: number
   quantity: number
   thumbnail: string
+  selectedColor?: string
+  selectedSize?: string
+  optionId?: string
 }
 
 export interface ShippingInfo {

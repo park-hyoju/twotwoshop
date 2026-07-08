@@ -1,4 +1,5 @@
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import {
   aggregateCustomersFromOrders,
   filterAndSortCustomers,
@@ -59,12 +60,8 @@ export class AdminCustomerRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminCustomerRepositoryError(
-      '고객 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminCustomerRepositoryError)
 }
 
 async function fetchAllOrders(): Promise<OrderForCustomerAggregation[]> {
@@ -134,7 +131,7 @@ async function loadAggregatedCustomers(): Promise<AdminCustomerDetail[]> {
 export async function fetchAdminCustomers(
   params: AdminCustomersQueryParams,
 ): Promise<AdminCustomersQueryResult> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const allCustomers = await loadAggregatedCustomers()
   const filtered = filterAndSortCustomers(allCustomers, params.filters)
@@ -146,14 +143,14 @@ export async function fetchAdminCustomers(
 }
 
 export async function fetchAdminCustomerDetail(groupKey: string): Promise<AdminCustomerDetail | null> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const allCustomers = await loadAggregatedCustomers()
   return allCustomers.find((row) => row.groupKey === groupKey) ?? null
 }
 
 export async function updateAdminCustomer(input: AdminCustomerUpdateInput): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const ids = new Set(input.linkedCustomerIds)
   const normalizedPhone = normalizePhone(input.phone)

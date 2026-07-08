@@ -46,7 +46,8 @@ describe('customerAuthConfig', () => {
   })
 
   it('identifies customer auth emails including real domains', () => {
-    expect(isCustomerAuthEmail('admin@twotwoshop.com')).toBe(true)
+    expect(isCustomerAuthEmail('admin@twotwoshop.com')).toBe(false)
+    expect(isCustomerAuthEmail('admintwotwo@twotwoshop.com')).toBe(false)
     expect(isCustomerAuthEmail(`member01@${LEGACY_CUSTOMER_AUTH_EMAIL_DOMAIN}`)).toBe(true)
     expect(isCustomerAuthEmail('testuser02@test.com')).toBe(true)
     expect(isVirtualCustomerAuthEmail('testuser02@test.com')).toBe(false)

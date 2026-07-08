@@ -1,8 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { formatPrice } from '../../../lib/formatPrice'
-import {
-  searchAdminProductsForRelated,
-} from '../../../services/adminProductRelatedRepository'
+import { searchAdminProductsForRelated } from '../../../services/adminProductRelatedRepository'
 import {
   MAX_RELATED_PRODUCTS,
   type RelatedProductPick,
@@ -30,6 +28,8 @@ export function RelatedProductsSection({
   const [searchResults, setSearchResults] = useState<RelatedProductPick[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
 
   const selectedIds = new Set(selectedProducts.map((item) => item.id))
   const isMaxReached = selectedProducts.length >= MAX_RELATED_PRODUCTS
@@ -85,6 +85,17 @@ export function RelatedProductsSection({
     onChange([])
   }
 
+  function reorderProducts(from: number, to: number) {
+    if (from === to) {
+      return
+    }
+
+    const next = [...selectedProducts]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    onChange(next)
+  }
+
   function openSearch() {
     if (disabled || isMaxReached) {
       return
@@ -100,12 +111,12 @@ export function RelatedProductsSection({
     <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-neutral-900">추천 연관상품</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">연관 추천상품</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            고객에게 함께 보여줄 상품을 선택해주세요.
+            고객 상세페이지 구매 영역 아래에 보여줄 상품을 선택하세요.
           </p>
           <p className="mt-1 text-xs text-neutral-400">
-            최대 {MAX_RELATED_PRODUCTS}개까지 선택할 수 있습니다. ({selectedProducts.length}/
+            최대 {MAX_RELATED_PRODUCTS}개 · 드래그로 순서 변경 ({selectedProducts.length}/
             {MAX_RELATED_PRODUCTS})
           </p>
         </div>
@@ -135,8 +146,37 @@ export function RelatedProductsSection({
           {selectedProducts.map((product, index) => (
             <li
               key={product.id}
-              className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-3"
+              draggable={!disabled}
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDropIndex(index)
+              }}
+              onDrop={() => {
+                if (dragIndex !== null) {
+                  reorderProducts(dragIndex, index)
+                }
+                setDragIndex(null)
+                setDropIndex(null)
+              }}
+              onDragEnd={() => {
+                setDragIndex(null)
+                setDropIndex(null)
+              }}
+              className={`flex items-center gap-3 rounded-lg border bg-white p-3 transition-colors ${
+                dragIndex === index
+                  ? 'border-neutral-400 opacity-60'
+                  : dropIndex === index && dragIndex !== index
+                    ? 'border-neutral-900'
+                    : 'border-neutral-200'
+              }`}
             >
+              <span
+                className="cursor-grab select-none text-lg text-neutral-400 active:cursor-grabbing"
+                aria-hidden
+              >
+                ≡
+              </span>
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-500">
                 {index + 1}
               </span>
@@ -165,7 +205,7 @@ export function RelatedProductsSection({
 
       {selectedProducts.length === 0 && (
         <p className="mt-4 rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-6 text-center text-sm text-neutral-500">
-          선택된 연관상품이 없습니다.
+          선택된 연관 추천상품이 없습니다. 비워두면 같은 카테고리 상품이 자동으로 보여집니다.
         </p>
       )}
 
@@ -186,9 +226,7 @@ export function RelatedProductsSection({
           />
 
           <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-neutral-200">
-            {isSearching && (
-              <p className="px-4 py-3 text-sm text-neutral-500">검색 중...</p>
-            )}
+            {isSearching && <p className="px-4 py-3 text-sm text-neutral-500">검색 중...</p>}
 
             {!isSearching && searchError && (
               <p role="alert" className="px-4 py-3 text-sm text-red-600">

@@ -41,6 +41,9 @@ export interface OrderItemInsert {
   quantity: number
   unit_price: number
   total_price: number
+  selected_color?: string | null
+  selected_size?: string | null
+  option_id?: string | null
 }
 
 function emptyToNull(value: string): string | null {
@@ -100,6 +103,9 @@ export function mapOrderItemToInsert(
     quantity: item.quantity,
     unit_price: item.price,
     total_price: item.price * item.quantity,
+    selected_color: item.selectedColor ?? null,
+    selected_size: item.selectedSize ?? null,
+    option_id: item.optionId ?? null,
   }
 }
 

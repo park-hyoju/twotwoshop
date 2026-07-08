@@ -38,10 +38,43 @@ export function ShippingTab({ form, onChange, minimal = false }: ShippingTabProp
     onChange('return_info', { ...form.return_info, [key]: value })
   }
 
+  const isFreeShipping =
+    form.shipping_info.shipping_fee.trim() === '0' ||
+    form.shipping_info.shipping_fee.includes('무료') ||
+    form.shipping_info.free_shipping_threshold.includes('무료')
+
+  function handleFreeShippingToggle(checked: boolean) {
+    if (checked) {
+      onChange('shipping_info', {
+        ...form.shipping_info,
+        shipping_fee: '0',
+        free_shipping_threshold: '무료배송',
+      })
+      return
+    }
+
+    onChange('shipping_info', {
+      ...form.shipping_info,
+      shipping_fee: '',
+      free_shipping_threshold: '',
+    })
+  }
+
   const wrapperClassName = minimal ? 'grid gap-8 sm:grid-cols-2' : 'grid gap-6 md:grid-cols-2'
 
   return (
-    <div className={wrapperClassName}>
+    <div className="space-y-8">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-800">
+        <input
+          type="checkbox"
+          checked={isFreeShipping}
+          onChange={(event) => handleFreeShippingToggle(event.target.checked)}
+          className="h-4 w-4 rounded border-neutral-300"
+        />
+        무료배송
+      </label>
+
+      <div className={wrapperClassName}>
       {SHIPPING_FIELDS.map((field) => (
         <div key={field.key}>
           <label htmlFor={`shipping-${field.key}`} className={adminLabelClassName}>
@@ -79,6 +112,7 @@ export function ShippingTab({ form, onChange, minimal = false }: ShippingTabProp
           )}
         </div>
       ))}
+      </div>
     </div>
   )
 }

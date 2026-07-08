@@ -1,18 +1,14 @@
-import { formatDateTime } from '../../../lib/formatDateTime'
+import { calculateDiscountRate } from '../../../lib/calculateDiscountRate'
 import { formatPrice } from '../../../lib/formatPrice'
-import { getProductCategoryDisplayLabel, resolveProductCategory } from '../../../constants/productCategories'
 import type { AdminProductRow } from '../../../types/adminProduct'
-import { ProductExposureBadges } from './ProductExposureBadges'
 import { ProductStatusBadge } from './ProductStatusBadge'
 
 interface AdminProductsListProps {
   products: AdminProductRow[]
   actionProductId: string | null
-  onEdit: (product: AdminProductRow) => void
   onDetailEdit: (product: AdminProductRow) => void
+  onCopy: (product: AdminProductRow) => void
   onDelete: (product: AdminProductRow) => void
-  onSoldOut: (productId: string) => void
-  onToggleVisibility: (productId: string, visible: boolean) => void
 }
 
 function ActionButton({
@@ -45,74 +41,54 @@ function ActionButton({
   )
 }
 
-function StockCell({ stock }: { stock: number }) {
+function ProductThumbnail({ url, name }: { url: string | null; name: string }) {
+  if (!url) {
+    return (
+      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-neutral-100 text-[10px] text-neutral-400">
+        없음
+      </div>
+    )
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <span>{stock.toLocaleString('ko-KR')}</span>
-      {stock <= 0 && (
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-          품절
-        </span>
-      )}
-    </div>
+    <img
+      src={url}
+      alt={name}
+      className="h-14 w-14 rounded-lg border border-neutral-200 object-cover"
+    />
   )
 }
 
-function getAdminCategoryLabel(product: AdminProductRow): string {
-  const categoryId = resolveProductCategory({
-    product_category: product.product_category,
-    display_category: product.display_category,
-  })
+function DiscountCell({ product }: { product: AdminProductRow }) {
+  const rate =
+    product.discount_rate > 0
+      ? product.discount_rate
+      : calculateDiscountRate(product.original_price, product.price)
 
-  return getProductCategoryDisplayLabel(categoryId)
+  if (rate === null || rate <= 0) {
+    return <span className="text-neutral-400">-</span>
+  }
+
+  return <span className="font-semibold text-rose-600">{rate}%</span>
 }
 
-function ProductActions({
-  product,
-  actionProductId,
-  onEdit,
-  onDetailEdit,
-  onDelete,
-  onSoldOut,
-  onToggleVisibility,
-}: {
-  product: AdminProductRow
-  actionProductId: string | null
-  onEdit: (product: AdminProductRow) => void
-  onDetailEdit: (product: AdminProductRow) => void
-  onDelete: (product: AdminProductRow) => void
-  onSoldOut: (productId: string) => void
-  onToggleVisibility: (productId: string, visible: boolean) => void
-}) {
-  const isBusy = actionProductId === product.id
+function StockCell({ totalStock }: { totalStock: number }) {
+  const status =
+    totalStock <= 0 ? 'soldout' : totalStock <= 5 ? 'low' : 'normal'
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <ActionButton onClick={() => onDetailEdit(product)} disabled={isBusy} variant="primary">
-        상세 수정
-      </ActionButton>
-      <ActionButton onClick={() => onEdit(product)} disabled={isBusy}>
-        수정
-      </ActionButton>
-      <ActionButton onClick={() => onSoldOut(product.id)} disabled={isBusy}>
-        품절
-      </ActionButton>
-      {product.status === 'hidden' ? (
-        <ActionButton
-          onClick={() => onToggleVisibility(product.id, true)}
-          disabled={isBusy}
-          variant="primary"
-        >
-          노출 ON
-        </ActionButton>
-      ) : (
-        <ActionButton onClick={() => onToggleVisibility(product.id, false)} disabled={isBusy}>
-          노출 OFF
-        </ActionButton>
+    <div className="flex items-center gap-2">
+      <span>{totalStock.toLocaleString('ko-KR')}</span>
+      {status === 'soldout' && (
+        <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-700">
+          품절
+        </span>
       )}
-      <ActionButton onClick={() => onDelete(product)} disabled={isBusy} variant="danger">
-        삭제
-      </ActionButton>
+      {status === 'low' && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          재고 부족
+        </span>
+      )}
     </div>
   )
 }
@@ -120,81 +96,51 @@ function ProductActions({
 function MobileProductCard({
   product,
   actionProductId,
-  onEdit,
   onDetailEdit,
+  onCopy,
   onDelete,
-  onSoldOut,
-  onToggleVisibility,
 }: {
   product: AdminProductRow
   actionProductId: string | null
-  onEdit: (product: AdminProductRow) => void
   onDetailEdit: (product: AdminProductRow) => void
+  onCopy: (product: AdminProductRow) => void
   onDelete: (product: AdminProductRow) => void
-  onSoldOut: (productId: string) => void
-  onToggleVisibility: (productId: string, visible: boolean) => void
 }) {
+  const isBusy = actionProductId === product.id
+
   return (
     <article className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <button
-            type="button"
-            onClick={() => onDetailEdit(product)}
-            className="text-left text-sm font-semibold text-neutral-900 underline-offset-2 hover:underline"
-          >
-            {product.name}
-          </button>
-          <p className="mt-1 text-xs text-neutral-500">{product.slug}</p>
-          <div className="mt-2">
-            <ProductExposureBadges
-              isNew={product.is_new}
-              isBest={product.is_best}
-              isSale={product.is_sale}
-            />
+      <div className="flex gap-3">
+        <ProductThumbnail url={product.thumbnail} name={product.name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-neutral-900">{product.name}</p>
+          <p className="mt-1 text-sm font-semibold text-neutral-900">{formatPrice(product.price)}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <DiscountCell product={product} />
+            <ProductStatusBadge status={product.status} />
           </div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <ProductStatusBadge status={product.status} />
-          {product.stock <= 0 && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-              품절
-            </span>
-          )}
         </div>
       </div>
 
       <dl className="mt-4 space-y-2 text-sm text-neutral-700">
         <div className="flex justify-between gap-3">
-          <dt className="text-neutral-500">가격</dt>
-          <dd className="font-semibold text-neutral-900">{formatPrice(product.price)}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-neutral-500">재고</dt>
+          <dt className="text-neutral-500">총 재고</dt>
           <dd>
-            <StockCell stock={product.stock} />
+            <StockCell totalStock={product.total_stock} />
           </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-neutral-500">카테고리</dt>
-          <dd>{getAdminCategoryLabel(product)}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-neutral-500">생성일</dt>
-          <dd>{formatDateTime(product.created_at)}</dd>
         </div>
       </dl>
 
-      <div className="mt-4">
-        <ProductActions
-          product={product}
-          actionProductId={actionProductId}
-          onEdit={onEdit}
-          onDetailEdit={onDetailEdit}
-          onDelete={onDelete}
-          onSoldOut={onSoldOut}
-          onToggleVisibility={onToggleVisibility}
-        />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <ActionButton onClick={() => onDetailEdit(product)} disabled={isBusy} variant="primary">
+          상세 수정
+        </ActionButton>
+        <ActionButton onClick={() => onCopy(product)} disabled={isBusy}>
+          복사
+        </ActionButton>
+        <ActionButton onClick={() => onDelete(product)} disabled={isBusy} variant="danger">
+          삭제
+        </ActionButton>
       </div>
     </article>
   )
@@ -203,11 +149,9 @@ function MobileProductCard({
 export function AdminProductsList({
   products,
   actionProductId,
-  onEdit,
   onDetailEdit,
+  onCopy,
   onDelete,
-  onSoldOut,
-  onToggleVisibility,
 }: AdminProductsListProps) {
   return (
     <>
@@ -217,11 +161,9 @@ export function AdminProductsList({
             key={product.id}
             product={product}
             actionProductId={actionProductId}
-            onEdit={onEdit}
             onDetailEdit={onDetailEdit}
+            onCopy={onCopy}
             onDelete={onDelete}
-            onSoldOut={onSoldOut}
-            onToggleVisibility={onToggleVisibility}
           />
         ))}
       </div>
@@ -230,66 +172,57 @@ export function AdminProductsList({
         <table className="min-w-full divide-y divide-neutral-200">
           <thead className="bg-neutral-50">
             <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">대표 이미지</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">상품명</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">가격</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">재고</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">판매가</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">할인율</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">총 재고</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">상태</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">카테고리</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">생성일</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-200">
-            {products.map((product) => (
-              <tr key={product.id} className="text-sm text-neutral-800">
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onDetailEdit(product)}
-                    className="text-left font-medium text-neutral-900 underline-offset-2 hover:underline"
-                  >
-                    {product.name}
-                  </button>
-                  <p className="mt-1 text-xs text-neutral-500">{product.slug}</p>
-                  <div className="mt-2">
-                    <ProductExposureBadges
-                      isNew={product.is_new}
-                      isBest={product.is_best}
-                      isSale={product.is_sale}
-                    />
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-semibold text-neutral-900">
-                  {formatPrice(product.price)}
-                </td>
-                <td className="px-4 py-3">
-                  <StockCell stock={product.stock} />
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-1">
+            {products.map((product) => {
+              const isBusy = actionProductId === product.id
+
+              return (
+                <tr key={product.id} className="text-sm text-neutral-800">
+                  <td className="px-4 py-3">
+                    <ProductThumbnail url={product.thumbnail} name={product.name} />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-neutral-900">{product.name}</td>
+                  <td className="px-4 py-3 font-semibold text-neutral-900">
+                    {formatPrice(product.price)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <DiscountCell product={product} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <StockCell totalStock={product.total_stock} />
+                  </td>
+                  <td className="px-4 py-3">
                     <ProductStatusBadge status={product.status} />
-                    {product.stock <= 0 && (
-                      <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                        품절
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">{getAdminCategoryLabel(product)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(product.created_at)}</td>
-                <td className="px-4 py-3">
-                  <ProductActions
-                    product={product}
-                    actionProductId={actionProductId}
-                    onEdit={onEdit}
-                    onDetailEdit={onDetailEdit}
-                    onDelete={onDelete}
-                    onSoldOut={onSoldOut}
-                    onToggleVisibility={onToggleVisibility}
-                  />
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton
+                        onClick={() => onDetailEdit(product)}
+                        disabled={isBusy}
+                        variant="primary"
+                      >
+                        상세 수정
+                      </ActionButton>
+                      <ActionButton onClick={() => onCopy(product)} disabled={isBusy}>
+                        복사
+                      </ActionButton>
+                      <ActionButton onClick={() => onDelete(product)} disabled={isBusy} variant="danger">
+                        삭제
+                      </ActionButton>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

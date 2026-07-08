@@ -3,16 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { ADD_TO_CART_MESSAGES } from '../../lib/cartMessages'
 import { useCart } from '../../hooks/useCart'
 import { ROUTES } from '../../lib/routes'
-import {
-  getCustomerStockBadgeClassName,
-  getCustomerStockLabel,
-  isProductSoldOut,
-} from '../../lib/productStock'
+import { isProductSoldOut } from '../../lib/productStock'
+import { hasProductOptions, isProductOptionSelectionComplete } from '../../lib/productVariants'
 import type { Product } from '../../types/product'
 import { ProductDetailContent } from './detail/ProductDetailContent'
 import { ProductRecommendedSection } from './detail/ProductRecommendedSection'
 import { ProductSoldOutNotice } from './detail/ProductSoldOutNotice'
 import { ProductImageCarousel } from './ProductImageCarousel'
+import { ProductOptionSelector } from './ProductOptionSelector'
 import { ProductPriceDisplay } from './ProductPriceDisplay'
 
 interface ProductDetailViewProps {
@@ -23,11 +21,24 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
   const navigate = useNavigate()
   const { addToCart } = useCart()
   const [cartMessage, setCartMessage] = useState('')
-  const isSoldOut = isProductSoldOut(product)
-  const stockLabel = getCustomerStockLabel(product.stock)
+  const [selectedColor, setSelectedColor] = useState('')
+  const [selectedSize, setSelectedSize] = useState('')
+  const [quantity, setQuantity] = useState(1)
 
-  const handleAddToCart = () => {
-    const result = addToCart(product)
+  const hasOptions = hasProductOptions(product)
+  const isSoldOut = isProductSoldOut(product)
+
+  function addProductToCart() {
+    if (hasOptions && !isProductOptionSelectionComplete(product, selectedColor, selectedSize)) {
+      setCartMessage(ADD_TO_CART_MESSAGES.optionRequired)
+      return
+    }
+
+    const result = addToCart(product, {
+      color: selectedColor,
+      size: selectedSize,
+      quantity,
+    })
     setCartMessage(ADD_TO_CART_MESSAGES[result])
 
     if (result === 'success') {
@@ -35,8 +46,21 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
     }
   }
 
+  const handleAddToCart = () => {
+    addProductToCart()
+  }
+
   const handleBuyNow = () => {
-    const result = addToCart(product)
+    if (hasOptions && !isProductOptionSelectionComplete(product, selectedColor, selectedSize)) {
+      setCartMessage(ADD_TO_CART_MESSAGES.optionRequired)
+      return
+    }
+
+    const result = addToCart(product, {
+      color: selectedColor,
+      size: selectedSize,
+      quantity,
+    })
 
     if (result === 'success') {
       navigate(ROUTES.cart)
@@ -53,17 +77,6 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap gap-2">
-            {stockLabel && (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide sm:text-sm ${
-                  isSoldOut
-                    ? 'bg-neutral-900 text-white'
-                    : getCustomerStockBadgeClassName(product.stock)
-                }`}
-              >
-                {stockLabel}
-              </span>
-            )}
             {product.isNew && (
               <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white sm:text-sm">
                 신상품
@@ -92,6 +105,26 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
             salePrice={product.price}
             size="detail"
           />
+
+          {!isSoldOut && (
+            <div className="lg:max-w-md">
+              <ProductOptionSelector
+                product={product}
+                selectedColor={selectedColor}
+                selectedSize={selectedSize}
+                quantity={quantity}
+                onColorChange={(color) => {
+                  setSelectedColor(color)
+                  setQuantity(1)
+                }}
+                onSizeChange={(size) => {
+                  setSelectedSize(size)
+                  setQuantity(1)
+                }}
+                onQuantityChange={setQuantity}
+              />
+            </div>
+          )}
 
           {isSoldOut ? (
             <div className="lg:max-w-md">
@@ -127,17 +160,11 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
             </div>
           )}
         </div>
-
-        <div className="lg:col-span-2">
-          <ProductDetailContent product={product} />
-        </div>
       </div>
 
-      {isSoldOut && (
-        <div className="mt-12 sm:mt-16">
-          <ProductRecommendedSection product={product} />
-        </div>
-      )}
+      <ProductRecommendedSection product={product} />
+
+      <ProductDetailContent product={product} />
     </div>
   )
 }

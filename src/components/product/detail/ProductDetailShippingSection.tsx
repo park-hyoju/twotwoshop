@@ -1,55 +1,28 @@
-import type { ReactNode } from 'react'
-import {
-  DEFAULT_PRODUCT_SHIPPING_INFO,
-  type ProductShippingInfo,
-} from '../../../types/productDetail'
+import type { Product } from '../../../types/product'
+import { getProductDetailShippingDisplay } from '../../../lib/productDetailPolicyDisplay'
 
 interface ProductDetailShippingSectionProps {
-  shippingInfo: ProductShippingInfo
+  product: Product
 }
 
-function resolveShippingInfo(shippingInfo: ProductShippingInfo): ProductShippingInfo {
-  return {
-    shipping_fee: shippingInfo.shipping_fee.trim() || DEFAULT_PRODUCT_SHIPPING_INFO.shipping_fee,
-    delivery_period:
-      shippingInfo.delivery_period.trim() || DEFAULT_PRODUCT_SHIPPING_INFO.delivery_period,
-    free_shipping_threshold:
-      shippingInfo.free_shipping_threshold.trim() ||
-      DEFAULT_PRODUCT_SHIPPING_INFO.free_shipping_threshold,
-    additional_notes:
-      shippingInfo.additional_notes.trim() || DEFAULT_PRODUCT_SHIPPING_INFO.additional_notes,
-  }
-}
-
-function PolicyBlock({ title, children }: { title: string; children: ReactNode }) {
+function PolicyRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3.5">
-      <h3 className="text-sm font-semibold text-neutral-500">{title}</h3>
-      <div className="mt-2 text-sm leading-6 text-neutral-800">{children}</div>
+    <div className="flex flex-col gap-1 border-b border-neutral-100 py-4 last:border-b-0 sm:flex-row sm:gap-6">
+      <dt className="w-28 shrink-0 text-sm font-semibold text-neutral-500">{label}</dt>
+      <dd className="whitespace-pre-wrap text-sm leading-6 text-neutral-800">{value}</dd>
     </div>
   )
 }
 
-export function ProductDetailShippingSection({ shippingInfo }: ProductDetailShippingSectionProps) {
-  const resolved = resolveShippingInfo(shippingInfo)
+export function ProductDetailShippingSection({ product }: ProductDetailShippingSectionProps) {
+  const shipping = getProductDetailShippingDisplay(product)
 
   return (
-    <div className="space-y-4">
-      <PolicyBlock title="배송비">
-        <p>{resolved.shipping_fee}</p>
-      </PolicyBlock>
-
-      <PolicyBlock title="무료배송 안내">
-        <p>{resolved.free_shipping_threshold}</p>
-      </PolicyBlock>
-
-      <PolicyBlock title="배송기간">
-        <p className="whitespace-pre-wrap">{resolved.delivery_period}</p>
-      </PolicyBlock>
-
-      <PolicyBlock title="추가 안내">
-        <p className="whitespace-pre-wrap">{resolved.additional_notes}</p>
-      </PolicyBlock>
-    </div>
+    <dl className="rounded-2xl border border-neutral-200 bg-white px-4 sm:px-5">
+      <PolicyRow label="배송비" value={shipping.shippingFee} />
+      <PolicyRow label="무료배송 조건" value={shipping.freeShippingCondition} />
+      <PolicyRow label="출고 기간" value={shipping.dispatchPeriod} />
+      <PolicyRow label="배송 기간" value={shipping.deliveryDuration} />
+    </dl>
   )
 }

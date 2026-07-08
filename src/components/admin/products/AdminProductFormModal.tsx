@@ -1,25 +1,34 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { resolveProductCategory } from '../../../constants/productCategories'
+import { formatKoreanWonDisplay, parseKoreanWonInput } from '../../../lib/adminMoneyInput'
 import { PRODUCT_STATUS_OPTIONS } from '../../../lib/adminProductStatus'
-import { fetchAdminRelatedProducts } from '../../../services/adminProductRelatedRepository'
-import type { AdminProductFormInput, AdminProductRow } from '../../../types/adminProduct'
-import type { RelatedProductPick } from '../../../types/adminProductRelated'
+import { generateProductSlugFromName } from '../../../lib/productSlug'
+import type {
+  AdminProductFormFiles,
+  AdminProductFormInput,
+} from '../../../types/adminProduct'
 import type { ProductCategoryId } from '../../../constants/productCategories'
 import type { ProductStatus } from '../../../types/status'
 import { ProductCategorySelect } from './ProductCategorySelect'
 import { ProductExposureSettings } from './ProductExposureSettings'
-import { RelatedProductsSection } from './RelatedProductsSection'
+import {
+  buildAdminProductFormFiles,
+  hasDoneGalleryImage,
+  isGalleryImageBusy,
+  ProductImageGalleryManager,
+  type ProductGalleryImage,
+} from './ProductImageGalleryManager'
 
-export type AdminProductFormMode = 'create' | 'edit'
+export interface AdminProductFormSubmitPayload {
+  input: AdminProductFormInput
+  files: AdminProductFormFiles
+}
 
 interface AdminProductFormModalProps {
-  mode: AdminProductFormMode
-  product: AdminProductRow | null
   isOpen: boolean
   isSubmitting: boolean
   errorMessage: string | null
   onClose: () => void
-  onSubmit: (input: AdminProductFormInput) => void
+  onSubmit: (payload: AdminProductFormSubmitPayload) => void
 }
 
 const EMPTY_FORM: AdminProductFormInput = {
@@ -32,33 +41,13 @@ const EMPTY_FORM: AdminProductFormInput = {
   isNew: false,
   isBest: false,
   isSale: false,
-  relatedProductIds: [],
+  description: '',
 }
 
 const inputClassName =
   'w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 sm:text-base'
 
-function toFormInput(product: AdminProductRow): AdminProductFormInput {
-  return {
-    slug: product.slug,
-    name: product.name,
-    price: product.price,
-    stock: product.stock,
-    status: product.status,
-    product_category: resolveProductCategory({
-      product_category: product.product_category,
-      display_category: product.display_category,
-    }),
-    isNew: product.is_new === true,
-    isBest: product.is_best === true,
-    isSale: product.is_sale === true,
-    relatedProductIds: [],
-  }
-}
-
 export function AdminProductFormModal({
-  mode,
-  product,
   isOpen,
   isSubmitting,
   errorMessage,
@@ -66,39 +55,16 @@ export function AdminProductFormModal({
   onSubmit,
 }: AdminProductFormModalProps) {
   const [form, setForm] = useState<AdminProductFormInput>(EMPTY_FORM)
-  const [relatedProducts, setRelatedProducts] = useState<RelatedProductPick[]>([])
-  const [isLoadingRelated, setIsLoadingRelated] = useState(false)
-  const [relatedLoadError, setRelatedLoadError] = useState<string | null>(null)
+  const [galleryImages, setGalleryImages] = useState<ProductGalleryImage[]>([])
 
   useEffect(() => {
     if (!isOpen) {
       return
     }
 
-    if (mode === 'edit' && product) {
-      setForm(toFormInput(product))
-      setRelatedProducts([])
-      setRelatedLoadError(null)
-      setIsLoadingRelated(true)
-
-      void fetchAdminRelatedProducts(product.id)
-        .then((items) => {
-          setRelatedProducts(items)
-          setIsLoadingRelated(false)
-        })
-        .catch(() => {
-          setRelatedLoadError('연관상품을 불러오지 못했습니다.')
-          setIsLoadingRelated(false)
-        })
-
-      return
-    }
-
     setForm(EMPTY_FORM)
-    setRelatedProducts([])
-    setRelatedLoadError(null)
-    setIsLoadingRelated(false)
-  }, [isOpen, mode, product])
+    setGalleryImages([])
+  }, [isOpen])
 
   if (!isOpen) {
     return null
@@ -106,14 +72,11 @@ export function AdminProductFormModal({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    onSubmit({
-      ...form,
-      relatedProductIds: relatedProducts.map((item) => item.id),
-    })
-  }
 
-  function handleRelatedProductsChange(products: RelatedProductPick[]) {
-    setRelatedProducts(products)
+    onSubmit({
+      input: { ...form, slug: generateProductSlugFromName(form.name) },
+      files: buildAdminProductFormFiles(galleryImages),
+    })
   }
 
   function updateField<K extends keyof AdminProductFormInput>(
@@ -127,6 +90,19 @@ export function AdminProductFormModal({
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  function handlePriceChange(raw: string) {
+    const parsed = parseKoreanWonInput(raw)
+    updateField('price', parsed ?? 0)
+  }
+
+  function handleStockChange(raw: string) {
+    const digits = raw.replace(/[^\d]/g, '')
+    updateField('stock', digits === '' ? 0 : Number.parseInt(digits, 10))
+  }
+
+  const priceDisplay = formatKoreanWonDisplay(form.price > 0 ? form.price : null)
+  const isGalleryBusy = galleryImages.some(isGalleryImageBusy)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
@@ -136,76 +112,61 @@ export function AdminProductFormModal({
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
       >
         <h2 id="admin-product-form-title" className="text-xl font-bold text-neutral-900">
-          {mode === 'create' ? '상품 추가' : '상품 수정'}
+          상품 추가
         </h2>
+        <p className="mt-2 text-sm text-neutral-500">
+          빠르게 등록한 뒤 상세 수정에서 정가·상세 설명·옵션·배송 정보를 입력하세요.
+        </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {mode === 'create' && (
-            <>
-              <div>
-                <label htmlFor="product-slug" className="mb-2 block text-sm font-medium text-neutral-700">
-                  slug
-                </label>
-                <input
-                  id="product-slug"
-                  required
-                  value={form.slug}
-                  onChange={(event) => updateField('slug', event.target.value)}
-                  placeholder="new-product-slug"
-                  className={inputClassName}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="product-name" className="mb-2 block text-sm font-medium text-neutral-700">
-                  상품명
-                </label>
-                <input
-                  id="product-name"
-                  required
-                  value={form.name}
-                  onChange={(event) => updateField('name', event.target.value)}
-                  className={inputClassName}
-                />
-              </div>
-            </>
-          )}
-
-          {mode === 'edit' && product && (
-            <div className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-              <p className="font-semibold text-neutral-900">{product.name}</p>
-              <p className="mt-1 text-neutral-500">{product.slug}</p>
-            </div>
-          )}
+        <form
+          onSubmit={handleSubmit}
+          onDragOver={(event) => event.preventDefault()}
+          className="mt-6 space-y-5"
+        >
+          <div>
+            <label htmlFor="product-name" className="mb-2 block text-sm font-medium text-neutral-700">
+              상품명
+            </label>
+            <input
+              id="product-name"
+              required
+              value={form.name}
+              onChange={(event) => updateField('name', event.target.value)}
+              className={inputClassName}
+              disabled={isSubmitting}
+            />
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="product-price" className="mb-2 block text-sm font-medium text-neutral-700">
-                가격
+                판매가
               </label>
               <input
                 id="product-price"
-                type="number"
-                min={0}
+                inputMode="numeric"
                 required
-                value={form.price}
-                onChange={(event) => updateField('price', Number(event.target.value))}
+                value={priceDisplay}
+                onChange={(event) => handlePriceChange(event.target.value)}
+                placeholder="0원"
                 className={inputClassName}
+                disabled={isSubmitting}
               />
             </div>
 
             <div>
               <label htmlFor="product-stock" className="mb-2 block text-sm font-medium text-neutral-700">
-                재고
+                재고 수량
               </label>
               <input
                 id="product-stock"
-                type="number"
-                min={0}
+                inputMode="numeric"
                 required
-                value={form.stock}
-                onChange={(event) => updateField('stock', Number(event.target.value))}
+                value={form.stock === 0 ? '' : String(form.stock)}
+                onChange={(event) => handleStockChange(event.target.value)}
+                placeholder="0"
                 className={inputClassName}
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -226,13 +187,14 @@ export function AdminProductFormModal({
 
             <div>
               <label htmlFor="product-status" className="mb-2 block text-sm font-medium text-neutral-700">
-                상태
+                판매 상태
               </label>
               <select
                 id="product-status"
                 value={form.status}
                 onChange={(event) => updateField('status', event.target.value as ProductStatus)}
                 className={inputClassName}
+                disabled={isSubmitting}
               >
                 {PRODUCT_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -251,26 +213,32 @@ export function AdminProductFormModal({
             disabled={isSubmitting}
           />
 
-          <div className="border-t border-neutral-200 pt-4">
-            {isLoadingRelated && (
-              <p className="text-sm text-neutral-500">연관상품을 불러오는 중...</p>
-            )}
-
-            {relatedLoadError && (
-              <p role="alert" className="mb-3 text-sm text-red-600">
-                {relatedLoadError}
-              </p>
-            )}
-
-            {!isLoadingRelated && (
-              <RelatedProductsSection
-                productId={mode === 'edit' ? product?.id ?? null : null}
-                selectedProducts={relatedProducts}
-                onChange={handleRelatedProductsChange}
-                disabled={isSubmitting}
-              />
-            )}
+          <div>
+            <label htmlFor="product-description" className="mb-2 block text-sm font-medium text-neutral-700">
+              상품 설명
+            </label>
+            <textarea
+              id="product-description"
+              rows={4}
+              value={form.description}
+              onChange={(event) => updateField('description', event.target.value)}
+              className={`${inputClassName} resize-y`}
+              disabled={isSubmitting}
+              placeholder="간단한 소개 (상세 설명은 상세 수정에서 입력)"
+            />
           </div>
+
+          <ProductImageGalleryManager
+            images={galleryImages}
+            onChange={setGalleryImages}
+            productId={null}
+            required
+            disabled={isSubmitting}
+          />
+
+          {!hasDoneGalleryImage(galleryImages) && (
+            <p className="text-xs text-neutral-500">대표 이미지 1장 이상 등록해 주세요.</p>
+          )}
 
           {errorMessage && (
             <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -289,10 +257,10 @@ export function AdminProductFormModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGalleryBusy || !hasDoneGalleryImage(galleryImages)}
               className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-700 disabled:opacity-50 sm:text-base"
             >
-              {isSubmitting ? '저장 중...' : mode === 'create' ? '등록' : '저장'}
+              {isSubmitting ? '등록 중...' : '등록'}
             </button>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import type { ProductCategoryId } from '../constants/productCategories'
+import type { DetailMediaItem } from './detailMedia'
 import type { ProductStatus } from './status'
 
 export interface AdminSizeGuideRow {
@@ -17,6 +18,13 @@ export interface AdminSizeGuideRow {
 export interface AdminSizeGuide {
   rows: AdminSizeGuideRow[]
   model_info: string
+}
+
+export interface AdminProductVariant {
+  id: string
+  color: string
+  size: string
+  stock: number
 }
 
 export interface AdminProductInfoFields {
@@ -59,20 +67,20 @@ export interface AdminProductDetailForm {
   images: string[]
   short_description: string
   description: string
+  detail_media: DetailMediaItem[]
   size_guide: AdminSizeGuide
   product_info: AdminProductInfoFields
   shipping_info: AdminShippingInfoFields
   return_info: AdminReturnInfoFields
   meta_title: string
   meta_description: string
+  isNew: boolean
+  isBest: boolean
+  isSale: boolean
+  variants: AdminProductVariant[]
 }
 
-export type ProductDetailEditorTab =
-  | 'basic'
-  | 'images'
-  | 'description'
-  | 'size'
-  | 'info'
-  | 'shipping'
-  | 'seo'
-  | 'preview'
+export type ProductSellerStep = 'photos' | 'info' | 'options' | 'description' | 'shipping'
+
+/** @deprecated Use ProductSellerStep */
+export type ProductDetailEditorTab = ProductSellerStep

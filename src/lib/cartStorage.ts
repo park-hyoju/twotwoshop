@@ -1,4 +1,5 @@
 import type { CartItem } from '../types/cart'
+import { getCartLineId } from './cartLine'
 
 const CART_STORAGE_KEY = 'twotwoshop-cart'
 
@@ -32,7 +33,12 @@ export function loadCartFromStorage(): CartItem[] {
       return []
     }
 
-    return parsed.filter(isCartItem)
+    return parsed
+      .filter(isCartItem)
+      .map((item) => ({
+        ...item,
+        cartLineId: item.cartLineId ?? getCartLineId(item),
+      }))
   } catch {
     return []
   }

@@ -20,3 +20,15 @@ export function calculateDiscountRateForStorage(
 ): number {
   return calculateDiscountRate(originalPrice, salePrice) ?? 0
 }
+
+/** Derives sale price from original price and discount percent. */
+export function calculateSalePriceFromDiscount(
+  originalPrice: number,
+  discountRate: number,
+): number {
+  if (originalPrice <= 0 || discountRate <= 0 || discountRate >= 100) {
+    return originalPrice > 0 ? originalPrice : 0
+  }
+
+  return Math.round(originalPrice * (1 - discountRate / 100))
+}

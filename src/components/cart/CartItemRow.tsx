@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { getCartOptionLabel } from '../../lib/cartLine'
 import { isCartItemAvailable } from '../../lib/cartItem'
 import { formatPrice } from '../../lib/formatPrice'
 import { getProductDetailPath } from '../../lib/productPaths'
@@ -14,6 +15,7 @@ interface CartItemRowProps {
 export function CartItemRow({ item, onDecrease, onIncrease, onRemove }: CartItemRowProps) {
   const isSoldOut = !isCartItemAvailable(item)
   const isMaxQuantity = !isSoldOut && item.quantity >= item.stock
+  const optionLabel = getCartOptionLabel(item)
 
   return (
     <article
@@ -58,6 +60,9 @@ export function CartItemRow({ item, onDecrease, onIncrease, onRemove }: CartItem
                 </span>
               )}
             </div>
+            {optionLabel && (
+              <p className="mt-1 text-sm text-neutral-600">옵션: {optionLabel}</p>
+            )}
             <p className="mt-2 text-xl font-bold text-neutral-900 sm:text-2xl">
               {formatPrice(item.price)}
             </p>

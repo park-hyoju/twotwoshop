@@ -10,7 +10,8 @@ import {
   type ProductSizeGuide,
   type ProductSizeGuideRow,
 } from '../types/productDetail'
-import { getLegacyDescriptionText } from './productIntroContent'
+import { getProductDescriptionPlainText, isFormattedProductDescription } from './productDescriptionFormat'
+import { isProductIntroPayload, isRawJsonDescription } from './productIntroContent'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -127,7 +128,21 @@ export function getProductDescriptionText(
   shortDescription: string,
   description: string,
 ): string {
-  return getLegacyDescriptionText(shortDescription, description)
+  if (isFormattedProductDescription(description)) {
+    return getProductDescriptionPlainText(description)
+  }
+
+  const text = description.trim()
+  if (text && text !== ' ' && !isRawJsonDescription(text)) {
+    return text
+  }
+
+  const shortText = shortDescription.trim()
+  if (!shortText || isProductIntroPayload(shortText) || isRawJsonDescription(shortText)) {
+    return ''
+  }
+
+  return shortText
 }
 
 export const PRODUCT_INFO_LABELS: Array<{ key: keyof ProductInfoFields; label: string }> = [

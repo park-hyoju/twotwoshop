@@ -23,7 +23,7 @@ function mapRow(row: NoticeRow): StorefrontNotice {
 }
 
 const NOTICE_SELECT =
-  'id, title, content, is_pinned, is_active, created_at, updated_at'
+  'id, title, content, is_pinned, is_active, sort_order, created_at, updated_at'
 
 export const noticeRepository = {
   async findActiveNotices(): Promise<StorefrontNotice[]> {
@@ -36,6 +36,7 @@ export const noticeRepository = {
       .select(NOTICE_SELECT)
       .eq('is_active', true)
       .order('is_pinned', { ascending: false })
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
 
     if (error) {

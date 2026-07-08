@@ -1,6 +1,7 @@
 import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
 import { formatDateTime } from '../lib/formatDateTime'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import type { AdminRestockNotificationRow } from '../types/restockNotification'
 
 export class AdminRestockNotificationRepositoryError extends Error {
@@ -13,12 +14,8 @@ export class AdminRestockNotificationRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminRestockNotificationRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminRestockNotificationRepositoryError)
 }
 
 interface RestockNotificationQueryRow {
@@ -53,7 +50,7 @@ function mapRow(row: RestockNotificationQueryRow): AdminRestockNotificationRow {
 }
 
 export async function fetchAdminRestockNotifications(): Promise<AdminRestockNotificationRow[]> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('restock_notifications')
@@ -84,7 +81,7 @@ export async function fetchAdminRestockNotifications(): Promise<AdminRestockNoti
 }
 
 export async function markRestockNotificationSent(notificationId: string): Promise<void> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('restock_notifications')

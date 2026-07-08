@@ -15,7 +15,7 @@ vi.mock('../lib/supabase', () => ({
 
 vi.mock('./productRepository', () => ({
   productRepository: {
-    findProductBySlug: vi.fn().mockResolvedValue({ stock: 99 }),
+    findProductBySlug: vi.fn().mockResolvedValue({ stock: 99, variants: [] }),
   },
 }))
 

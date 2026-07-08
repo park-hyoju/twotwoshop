@@ -1,6 +1,7 @@
 import {
   calculateDiscountRate,
   calculateDiscountRateForStorage,
+  calculateSalePriceFromDiscount,
 } from '../../../../../lib/calculateDiscountRate'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
 import type { ProductStatus } from '../../../../../types/status'
@@ -13,15 +14,17 @@ interface AdminPricingFieldsProps {
     value: AdminProductDetailForm[K],
   ) => void
   showSoldOutToggle?: boolean
+  operator?: boolean
 }
 
 export function AdminPricingFields({
   form,
   onChange,
   showSoldOutToggle = false,
+  operator = false,
 }: AdminPricingFieldsProps) {
   const isSoldOut = form.status === 'soldout'
-  const discountRate = calculateDiscountRate(form.original_price, form.price)
+  const autoDiscountRate = calculateDiscountRate(form.original_price, form.price)
 
   function handlePriceChange(value: number) {
     onChange('price', value)
@@ -33,13 +36,99 @@ export function AdminPricingFields({
     onChange('discount_rate', calculateDiscountRateForStorage(value, form.price))
   }
 
+  function handleDiscountRateChange(value: number) {
+    const nextDiscountRate = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
+    onChange('discount_rate', nextDiscountRate)
+
+    if (form.original_price > 0 && nextDiscountRate > 0 && nextDiscountRate < 100) {
+      onChange('price', calculateSalePriceFromDiscount(form.original_price, nextDiscountRate))
+    }
+  }
+
   function handleSoldOutToggle(checked: boolean) {
     const nextStatus: ProductStatus = checked ? 'soldout' : 'active'
     onChange('status', nextStatus)
   }
 
+  if (operator) {
+    return (
+      <div className="space-y-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label htmlFor="detail-original-price" className={adminLabelClassName}>
+              정가
+            </label>
+            <input
+              id="detail-original-price"
+              type="number"
+              min={0}
+              value={form.original_price || ''}
+              onChange={(event) => handleOriginalPriceChange(Number(event.target.value))}
+              className={adminInputClassName}
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label htmlFor="detail-price" className={adminLabelClassName}>
+              판매가
+            </label>
+            <input
+              id="detail-price"
+              type="number"
+              min={0}
+              value={form.price || ''}
+              onChange={(event) => handlePriceChange(Number(event.target.value))}
+              className={adminInputClassName}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        {autoDiscountRate !== null ? (
+          <div
+            className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600"
+            aria-live="polite"
+          >
+            ↓ {autoDiscountRate}% 할인
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-500" aria-live="polite">
+            할인 없음
+          </p>
+        )}
+
+        <div>
+          <label htmlFor="detail-stock" className={adminLabelClassName}>
+            재고
+          </label>
+          <input
+            id="detail-stock"
+            type="number"
+            min={0}
+            value={form.stock}
+            onChange={(event) => onChange('stock', Number(event.target.value))}
+            className={adminInputClassName}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
+      <div>
+        <label htmlFor="detail-original-price" className={adminLabelClassName}>
+          정가
+        </label>
+        <input
+          id="detail-original-price"
+          type="number"
+          min={0}
+          value={form.original_price}
+          onChange={(event) => handleOriginalPriceChange(Number(event.target.value))}
+          className={adminInputClassName}
+        />
+      </div>
       <div>
         <label htmlFor="detail-price" className={adminLabelClassName}>
           판매가
@@ -54,28 +143,23 @@ export function AdminPricingFields({
         />
       </div>
       <div>
-        <label htmlFor="detail-original-price" className={adminLabelClassName}>
-          소비자가
+        <label htmlFor="detail-discount-rate" className={adminLabelClassName}>
+          할인율 (%)
         </label>
         <input
-          id="detail-original-price"
+          id="detail-discount-rate"
           type="number"
           min={0}
-          value={form.original_price}
-          onChange={(event) => handleOriginalPriceChange(Number(event.target.value))}
+          max={100}
+          value={form.discount_rate}
+          onChange={(event) => handleDiscountRateChange(Number(event.target.value))}
           className={adminInputClassName}
         />
-      </div>
-      <div>
-        <label htmlFor="detail-discount-rate" className={adminLabelClassName}>
-          할인율
-        </label>
-        <div
-          id="detail-discount-rate"
-          className={`${adminInputClassName} flex items-center bg-neutral-50 text-neutral-700`}
-        >
-          {discountRate !== null ? `${discountRate}%` : '할인 없음'}
-        </div>
+        <p className="mt-1 text-xs text-neutral-500" aria-live="polite">
+          {autoDiscountRate !== null
+            ? `자동 계산: ${autoDiscountRate}%`
+            : '정가가 없거나 정가 이하 판매가면 할인 없음'}
+        </p>
       </div>
       <div>
         <label htmlFor="detail-stock" className={adminLabelClassName}>

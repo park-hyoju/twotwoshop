@@ -58,7 +58,7 @@ export function ProductDetailTabNav({
       aria-label="상품 상세 탭"
       className={
         inline
-          ? 'border-b border-neutral-200 bg-white'
+          ? 'sticky top-16 z-30 border-b border-neutral-200 bg-white'
           : 'sticky top-16 z-30 -mx-4 border-b border-neutral-200 bg-white sm:-mx-6 lg:-mx-8'
       }
     >

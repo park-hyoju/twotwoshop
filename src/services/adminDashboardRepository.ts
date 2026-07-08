@@ -1,4 +1,5 @@
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import { supabase } from '../lib/supabase'
 import { buildDailyActivityList } from '../lib/adminDashboardCalendar'
 import type { DbOrderStatus } from '../types/adminOrder'
 import type {
@@ -38,12 +39,8 @@ export class AdminDashboardRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminDashboardRepositoryError(
-      '데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminDashboardRepositoryError)
 }
 
 function getDateBoundaries() {
@@ -126,7 +123,7 @@ async function fetchOrderCount(options?: {
 }
 
 export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { todayStart, tomorrowStart } = getDateBoundaries()
 

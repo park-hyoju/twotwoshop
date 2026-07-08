@@ -1,10 +1,8 @@
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
-import type { ProductCategoryId } from '../../../../../constants/productCategories'
 import {
   calculateDiscountRate,
   calculateDiscountRateForStorage,
 } from '../../../../../lib/calculateDiscountRate'
-import { ProductCategorySelect } from '../../ProductCategorySelect'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
 
 interface ProductPricingSectionProps {
@@ -30,19 +28,6 @@ export function ProductPricingSection({ form, onChange }: ProductPricingSectionP
 
   return (
     <div className="space-y-8">
-      <div>
-        <label htmlFor="pricing-product-category" className={adminLabelClassName}>
-          카테고리
-        </label>
-        <ProductCategorySelect
-          id="pricing-product-category"
-          value={form.product_category}
-          onChange={(value: ProductCategoryId) => onChange('product_category', value)}
-          className={adminInputClassName}
-          required
-        />
-      </div>
-
       <div className="grid gap-8 sm:grid-cols-2">
         <div>
           <label htmlFor="pricing-sale-price" className={adminLabelClassName}>
@@ -60,7 +45,7 @@ export function ProductPricingSection({ form, onChange }: ProductPricingSectionP
 
         <div>
           <label htmlFor="pricing-original-price" className={adminLabelClassName}>
-            소비자가
+            정가
           </label>
           <input
             id="pricing-original-price"
@@ -86,7 +71,7 @@ export function ProductPricingSection({ form, onChange }: ProductPricingSectionP
 
         <div>
           <label htmlFor="pricing-stock" className={adminLabelClassName}>
-            재고
+            재고 수량
           </label>
           <input
             id="pricing-stock"

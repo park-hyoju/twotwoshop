@@ -6,4 +6,4 @@ export interface RelatedProductPick {
   thumbnail: string
 }
 
-export const MAX_RELATED_PRODUCTS = 8
+export const MAX_RELATED_PRODUCTS = 4

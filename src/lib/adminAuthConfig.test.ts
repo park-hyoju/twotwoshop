@@ -1,27 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADMIN_DEFAULT_EMAIL,
+  ADMIN_LEGACY_EMAIL,
   ADMIN_ROLE,
   ADMIN_UNAUTHORIZED_MESSAGE,
   ADMIN_INVALID_CREDENTIALS_MESSAGE,
+  isAdminAuthEmail,
   isAdminUser,
   resolveAdminLoginId,
 } from './adminAuthConfig'
 
+describe('isAdminAuthEmail', () => {
+  it('identifies admin domain emails', () => {
+    expect(isAdminAuthEmail('admintwotwo@twotwoshop.com')).toBe(true)
+    expect(isAdminAuthEmail('admin@twotwoshop.com')).toBe(true)
+    expect(isAdminAuthEmail('user01@twotwoshop.app')).toBe(false)
+  })
+})
+
 describe('resolveAdminLoginId', () => {
-  it('maps admin alias to allowed email', () => {
-    expect(resolveAdminLoginId('admin')).toBe('admin@twotwoshop.com')
-    expect(resolveAdminLoginId(' Admin ')).toBe('admin@twotwoshop.com')
-    expect(resolveAdminLoginId('ADMIN')).toBe('admin@twotwoshop.com')
+  it('appends @twotwoshop.com when login id has no @', () => {
+    expect(resolveAdminLoginId('admintwotwo')).toBe(ADMIN_DEFAULT_EMAIL)
+    expect(resolveAdminLoginId(' admintwotwo ')).toBe(ADMIN_DEFAULT_EMAIL)
+    expect(resolveAdminLoginId('AdminTwoTwo')).toBe(ADMIN_DEFAULT_EMAIL)
   })
 
-  it('passes through full admin email', () => {
-    expect(resolveAdminLoginId('admin@twotwoshop.com')).toBe('admin@twotwoshop.com')
-    expect(resolveAdminLoginId(' admin@twotwoshop.com ')).toBe('admin@twotwoshop.com')
+  it('passes through full email when @ is included', () => {
+    expect(resolveAdminLoginId('admin@twotwoshop.com')).toBe(ADMIN_LEGACY_EMAIL)
+    expect(resolveAdminLoginId(' admintwotwo@twotwoshop.com ')).toBe(ADMIN_DEFAULT_EMAIL)
   })
 
-  it('passes through other login ids unchanged', () => {
-    expect(resolveAdminLoginId('wrong-user')).toBe('wrong-user')
-    expect(resolveAdminLoginId('other@example.com')).toBe('other@example.com')
+  it('maps legacy admin alias to old email for migration', () => {
+    expect(resolveAdminLoginId('admin')).toBe(ADMIN_LEGACY_EMAIL)
+    expect(resolveAdminLoginId(' Admin ')).toBe(ADMIN_LEGACY_EMAIL)
+    expect(resolveAdminLoginId('ADMIN')).toBe(ADMIN_LEGACY_EMAIL)
+  })
+
+  it('appends domain for other bare login ids', () => {
+    expect(resolveAdminLoginId('other-admin')).toBe('other-admin@twotwoshop.com')
   })
 })
 
@@ -37,7 +53,7 @@ describe('isAdminUser', () => {
   it('does not grant admin by email alone', () => {
     expect(
       isAdminUser({
-        email: 'admin@twotwoshop.com',
+        email: ADMIN_DEFAULT_EMAIL,
         app_metadata: {},
       } as never),
     ).toBe(false)

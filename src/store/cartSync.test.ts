@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { PRODUCTS } from '../data/products'
+import {
+  EMPTY_PRODUCT_INFO,
+  EMPTY_PRODUCT_RETURN_INFO,
+  EMPTY_PRODUCT_SHIPPING_INFO,
+  EMPTY_PRODUCT_SIZE_GUIDE,
+} from '../types/productDetail'
 import type { Product } from '../types/product'
 import type { CartItem } from '../types/cart'
 import { syncCartItemsWithResolver } from './cartSync'
@@ -9,14 +14,42 @@ const LEGACY_ID = 'p-w-001'
 
 function createProduct(overrides: Partial<Product> = {}): Product {
   return {
-    ...PRODUCTS[0],
     id: SUPABASE_UUID,
+    slug: 'classic-linen-shirt',
+    name: '클래식 린넨 셔츠',
+    shortDescription: '시원한 린넨 데일리 셔츠',
+    description: '시원한 린넨 소재의 데일리 셔츠입니다.',
+    detailMedia: [],
+    price: 69000,
+    originalPrice: 89000,
+    discountRate: 22,
+    thumbnail: '/images/placeholder/classic-linen-shirt.jpg',
+    images: ['/images/placeholder/classic-linen-shirt.jpg'],
+    productCategory: 'women_top',
+    gender: 'women',
+    displayCategory: 'top',
+    detailCategory: 'shirt',
+    tags: ['linen', 'summer', 'shirt'],
+    isNew: false,
+    isBest: false,
+    isSale: false,
+    stock: 10,
+    soldOut: false,
+    status: 'active',
+    createdAt: '2026-05-10T09:00:00.000Z',
+    updatedAt: '2026-05-10T09:00:00.000Z',
+    sizeGuide: { ...EMPTY_PRODUCT_SIZE_GUIDE, rows: [] },
+    productInfo: { ...EMPTY_PRODUCT_INFO },
+    shippingInfo: { ...EMPTY_PRODUCT_SHIPPING_INFO },
+    returnInfo: { ...EMPTY_PRODUCT_RETURN_INFO },
+    variants: [],
     ...overrides,
   }
 }
 
 function createCartItem(overrides: Partial<CartItem> = {}): CartItem {
   return {
+    cartLineId: LEGACY_ID,
     productId: LEGACY_ID,
     slug: 'classic-linen-shirt',
     name: '클래식 린넨 셔츠',

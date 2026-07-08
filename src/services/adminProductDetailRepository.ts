@@ -1,11 +1,20 @@
 import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
+import {
+  EMPTY_RETURN_INFO,
+  EMPTY_SHIPPING_INFO,
+  EMPTY_SIZE_GUIDE,
+} from '../lib/adminProductDetailDefaults'
+import { generateProductSlugFromName, resolveUniqueProductSlug } from '../lib/productSlug'
+import { supabase } from '../lib/supabase'
 import type { AdminProductDetailForm } from '../types/adminProductDetail'
+import { buildProductCategoryPayload } from './productMapper'
 import {
   mapAdminProductDetailFormToUpdatePayload,
   mapRowToAdminProductDetailForm,
   type AdminProductDetailRow,
 } from './adminProductDetailMapper'
+import { fetchAdminRelatedProducts, saveAdminRelatedProducts } from './adminProductRelatedRepository'
 
 const PRODUCT_DETAIL_SELECT = `
   id,
@@ -31,7 +40,11 @@ const PRODUCT_DETAIL_SELECT = `
   size_guide,
   product_info,
   shipping_info,
-  return_info
+  return_info,
+  detail_media,
+  is_new,
+  is_best,
+  is_sale
 `
 
 export class AdminProductDetailRepositoryError extends Error {
@@ -44,18 +57,14 @@ export class AdminProductDetailRepositoryError extends Error {
   }
 }
 
-function assertSupabaseReady(): void {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new AdminProductDetailRepositoryError(
-      'Supabase 환경변수가 설정되지 않았습니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.',
-    )
-  }
+async function ensureAdminAccess(): Promise<void> {
+  await assertAdminRepositoryAccess(AdminProductDetailRepositoryError)
 }
 
 export async function fetchAdminProductDetail(
   productId: string,
 ): Promise<AdminProductDetailForm> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const { data, error } = await supabase!
     .from('products')
@@ -80,7 +89,7 @@ export async function fetchAdminProductDetail(
 export async function saveAdminProductDetail(
   form: AdminProductDetailForm,
 ): Promise<AdminProductDetailForm> {
-  assertSupabaseReady()
+  await ensureAdminAccess()
 
   const payload = mapAdminProductDetailFormToUpdatePayload(form)
 
@@ -99,4 +108,79 @@ export async function saveAdminProductDetail(
   )
 
   return mapRowToAdminProductDetailForm(row as AdminProductDetailRow)
+}
+
+export async function createBlankAdminProduct(): Promise<string> {
+  await ensureAdminAccess()
+
+  const slug = await resolveUniqueProductSlug(`product-${Date.now().toString(36)}`)
+  const categoryFields = buildProductCategoryPayload('etc')
+
+  const { data, error } = await supabase!
+    .from('products')
+    .insert({
+      slug,
+      name: '',
+      status: 'hidden',
+      price: 0,
+      original_price: 0,
+      discount_rate: 0,
+      stock: 0,
+      thumbnail: '',
+      images: [],
+      short_description: '',
+      description: '',
+      detail_media: [],
+      size_guide: { ...EMPTY_SIZE_GUIDE, rows: [] },
+      product_info: {},
+      shipping_info: { ...EMPTY_SHIPPING_INFO },
+      return_info: { ...EMPTY_RETURN_INFO },
+    is_new: false,
+    is_best: false,
+    is_sale: false,
+    is_admin_registered: true,
+    ...categoryFields,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    throw new AdminProductDetailRepositoryError('새 상품을 만들지 못했습니다.', error)
+  }
+
+  return data.id
+}
+
+export async function copyAdminProduct(sourceProductId: string): Promise<string> {
+  await ensureAdminAccess()
+
+  const source = await fetchAdminProductDetail(sourceProductId)
+  const copyName = source.name.trim() ? `${source.name.trim()} (복사)` : '새 상품 (복사)'
+  const slug = await resolveUniqueProductSlug(generateProductSlugFromName(copyName))
+  const payload = mapAdminProductDetailFormToUpdatePayload({
+    ...source,
+    name: copyName,
+    slug,
+    status: 'hidden',
+  })
+
+  const { data, error } = await supabase!
+    .from('products')
+    .insert(payload)
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    throw new AdminProductDetailRepositoryError('상품을 복사하지 못했습니다.', error)
+  }
+
+  const relatedProducts = await fetchAdminRelatedProducts(sourceProductId)
+  if (relatedProducts.length > 0) {
+    await saveAdminRelatedProducts(
+      data.id,
+      relatedProducts.map((item) => item.id),
+    )
+  }
+
+  return data.id
 }
