@@ -4,6 +4,7 @@ import { buildCartLineId, getCartLineId } from '../lib/cartLine'
 import { isCartItemAvailable } from '../lib/cartItem'
 import {
   findProductVariant,
+  findProductVariantByOptions,
   getProductOptionStock,
   hasProductOptions,
   isProductOptionSelectionComplete,
@@ -17,9 +18,14 @@ function clampQuantity(quantity: number, stock: number): number {
   return clampCartQuantity(quantity, stock)
 }
 
-function resolveOptionStock(product: Product, color: string, size: string): number {
+function resolveOptionStock(
+  product: Product,
+  color: string,
+  size: string,
+  selectedOptions?: Record<string, string>,
+): number {
   if (hasProductOptions(product)) {
-    return getProductOptionStock(product, color, size)
+    return getProductOptionStock(product, color, size, selectedOptions)
   }
 
   return product.stock
@@ -32,20 +38,26 @@ export function createCartItemFromProduct(
 ): CartItem {
   const color = options?.color?.trim() ?? ''
   const size = options?.size?.trim() ?? ''
-  const variant = hasProductOptions(product) ? findProductVariant(product.variants, color, size) : undefined
-  const stock = resolveOptionStock(product, color, size)
+  const selectedOptions = options?.selectedOptions
+  const variant = hasProductOptions(product)
+    ? selectedOptions
+      ? findProductVariantByOptions(product.variants, selectedOptions)
+      : findProductVariant(product.variants, color, size)
+    : undefined
+  const stock = resolveOptionStock(product, color, size, selectedOptions)
 
   return {
-    cartLineId: buildCartLineId(product.id, color, size),
+    cartLineId: buildCartLineId(product.id, color, size, selectedOptions),
     productId: product.id,
     slug: product.slug,
     name: product.name,
-    price: product.price,
+    price: product.price + (variant?.extraPrice ?? 0),
     thumbnail: product.thumbnail,
     quantity: clampQuantity(quantity, stock),
     stock,
     selectedColor: color || undefined,
     selectedSize: size || undefined,
+    selectedOptions,
     optionId: variant?.id,
   }
 }
@@ -83,6 +95,7 @@ export function normalizeCartItems(items: CartItem[]): CartItem[] {
         quantity: existing.quantity + normalizedItem.quantity,
         selectedColor: normalizedItem.selectedColor ?? existing.selectedColor,
         selectedSize: normalizedItem.selectedSize ?? existing.selectedSize,
+        selectedOptions: normalizedItem.selectedOptions ?? existing.selectedOptions,
         optionId: normalizedItem.optionId ?? existing.optionId,
       })
       continue
@@ -101,6 +114,7 @@ export function normalizeCartItems(items: CartItem[]): CartItem[] {
         quantity,
         selectedColor: normalizedItem.selectedColor ?? existing.selectedColor,
         selectedSize: normalizedItem.selectedSize ?? existing.selectedSize,
+        selectedOptions: normalizedItem.selectedOptions ?? existing.selectedOptions,
         optionId: normalizedItem.optionId ?? existing.optionId,
       })
     }
@@ -120,19 +134,23 @@ export function addToCart(
 
   const color = options?.color?.trim() ?? ''
   const size = options?.size?.trim() ?? ''
+  const selectedOptions = options?.selectedOptions
   const quantity = options?.quantity ?? 1
 
-  if (hasProductOptions(product) && !isProductOptionSelectionComplete(product, color, size)) {
+  if (
+    hasProductOptions(product) &&
+    !isProductOptionSelectionComplete(product, color, size, selectedOptions)
+  ) {
     return { items, result: 'optionRequired' }
   }
 
-  const stock = resolveOptionStock(product, color, size)
+  const stock = resolveOptionStock(product, color, size, selectedOptions)
 
   if (stock <= 0) {
     return { items, result: 'soldOut' }
   }
 
-  const lineId = buildCartLineId(product.id, color, size)
+  const lineId = buildCartLineId(product.id, color, size, selectedOptions)
   const existing = items.find((item) => getCartLineId(item) === lineId)
 
   if (existing && existing.quantity + quantity > stock) {
@@ -147,7 +165,11 @@ export function addToCart(
             return item
           }
 
-          return createCartItemFromProduct(product, item.quantity + quantity, { color, size })
+          return createCartItemFromProduct(product, item.quantity + quantity, {
+            color,
+            size,
+            selectedOptions,
+          })
         }),
       ),
       result: 'success',
@@ -157,7 +179,7 @@ export function addToCart(
   return {
     items: normalizeCartItems([
       ...items,
-      createCartItemFromProduct(product, quantity, { color, size }),
+      createCartItemFromProduct(product, quantity, { color, size, selectedOptions }),
     ]),
     result: 'success',
   }

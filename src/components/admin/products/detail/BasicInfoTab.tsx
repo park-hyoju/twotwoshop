@@ -1,6 +1,7 @@
 import { PRODUCT_STATUS_OPTIONS } from '../../../../lib/adminProductStatus'
-import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
 import type { ProductCategoryId } from '../../../../constants/productCategories'
+import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
+import type { AdminPricingNumericDraft } from '../../../../lib/adminNumericInput'
 import type { ProductStatus } from '../../../../types/status'
 import { ProductCategorySelect } from '../ProductCategorySelect'
 import { ProductExposureSettings } from '../ProductExposureSettings'
@@ -13,9 +14,16 @@ interface BasicInfoTabProps {
     field: K,
     value: AdminProductDetailForm[K],
   ) => void
+  onPricingDraftChange?: (draft: AdminPricingNumericDraft) => void
+  variantStockDraft?: Record<string, string>
 }
 
-export function BasicInfoTab({ form, onChange }: BasicInfoTabProps) {
+export function BasicInfoTab({
+  form,
+  onChange,
+  onPricingDraftChange,
+  variantStockDraft,
+}: BasicInfoTabProps) {
   return (
     <div className={`${adminSectionClassName} space-y-6`}>
       <div>
@@ -44,7 +52,13 @@ export function BasicInfoTab({ form, onChange }: BasicInfoTabProps) {
         />
       </div>
 
-      <AdminPricingFields form={form} onChange={onChange} operator />
+      <AdminPricingFields
+        form={form}
+        onChange={onChange}
+        operator
+        onPricingDraftChange={onPricingDraftChange}
+        variantStockDraft={variantStockDraft}
+      />
 
       <div>
         <label htmlFor="detail-status" className={adminLabelClassName}>

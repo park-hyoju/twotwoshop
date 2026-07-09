@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { migrateDetailMedia, normalizeDetailMediaOrder } from './detailMedia'
+import { migrateDetailMedia, normalizeDetailMediaOrder, reindexDetailMediaByArrayOrder } from './detailMedia'
 import { serializeProductIntroPayload } from './productIntroContent'
 
 describe('detailMedia', () => {
@@ -34,5 +34,47 @@ describe('detailMedia', () => {
 
     expect(items.map((item) => item.order)).toEqual([0, 1])
     expect(items[0]?.url).toContain('1.mp4')
+  })
+
+  it('preserves drag-reordered array positions', () => {
+    const dragged = reindexDetailMediaByArrayOrder([
+      {
+        type: 'image',
+        url: 'https://example.com/3.jpg',
+        order: 2,
+        filename: '3.jpg',
+        thumbnail: null,
+        duration: null,
+        width: null,
+        height: null,
+      },
+      {
+        type: 'image',
+        url: 'https://example.com/1.jpg',
+        order: 0,
+        filename: '1.jpg',
+        thumbnail: null,
+        duration: null,
+        width: null,
+        height: null,
+      },
+      {
+        type: 'image',
+        url: 'https://example.com/2.jpg',
+        order: 1,
+        filename: '2.jpg',
+        thumbnail: null,
+        duration: null,
+        width: null,
+        height: null,
+      },
+    ])
+
+    expect(dragged.map((item) => item.url)).toEqual([
+      'https://example.com/3.jpg',
+      'https://example.com/1.jpg',
+      'https://example.com/2.jpg',
+    ])
+    expect(dragged.map((item) => item.order)).toEqual([0, 1, 2])
   })
 })

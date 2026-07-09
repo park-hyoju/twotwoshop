@@ -4,7 +4,12 @@ import { ADD_TO_CART_MESSAGES } from '../../lib/cartMessages'
 import { useCart } from '../../hooks/useCart'
 import { ROUTES } from '../../lib/routes'
 import { isProductSoldOut } from '../../lib/productStock'
-import { hasProductOptions, isProductOptionSelectionComplete } from '../../lib/productVariants'
+import {
+  getLegacyColorSizeFromOptions,
+  getProductOptionGroups,
+  hasProductOptions,
+  isProductOptionSelectionComplete,
+} from '../../lib/productVariants'
 import type { Product } from '../../types/product'
 import { ProductDetailContent } from './detail/ProductDetailContent'
 import { ProductRecommendedSection } from './detail/ProductRecommendedSection'
@@ -21,24 +26,45 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
   const navigate = useNavigate()
   const { addToCart } = useCart()
   const [cartMessage, setCartMessage] = useState('')
-  const [selectedColor, setSelectedColor] = useState('')
-  const [selectedSize, setSelectedSize] = useState('')
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
   const hasOptions = hasProductOptions(product)
   const isSoldOut = isProductSoldOut(product)
+  const optionGroups = getProductOptionGroups(product)
+
+  function handleOptionChange(optionName: string, value: string) {
+    setSelectedOptions((current) => {
+      const groupIndex = optionGroups.findIndex((group) => group.name === optionName)
+      const next = { ...current, [optionName]: value }
+
+      for (const laterGroup of optionGroups.slice(groupIndex + 1)) {
+        delete next[laterGroup.name]
+      }
+
+      return next
+    })
+    setQuantity(1)
+  }
+
+  function buildCartOptions() {
+    const { color, size } = getLegacyColorSizeFromOptions(selectedOptions, optionGroups)
+
+    return {
+      color,
+      size,
+      selectedOptions,
+      quantity,
+    }
+  }
 
   function addProductToCart() {
-    if (hasOptions && !isProductOptionSelectionComplete(product, selectedColor, selectedSize)) {
+    if (hasOptions && !isProductOptionSelectionComplete(product, '', '', selectedOptions)) {
       setCartMessage(ADD_TO_CART_MESSAGES.optionRequired)
       return
     }
 
-    const result = addToCart(product, {
-      color: selectedColor,
-      size: selectedSize,
-      quantity,
-    })
+    const result = addToCart(product, buildCartOptions())
     setCartMessage(ADD_TO_CART_MESSAGES[result])
 
     if (result === 'success') {
@@ -51,16 +77,12 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
   }
 
   const handleBuyNow = () => {
-    if (hasOptions && !isProductOptionSelectionComplete(product, selectedColor, selectedSize)) {
+    if (hasOptions && !isProductOptionSelectionComplete(product, '', '', selectedOptions)) {
       setCartMessage(ADD_TO_CART_MESSAGES.optionRequired)
       return
     }
 
-    const result = addToCart(product, {
-      color: selectedColor,
-      size: selectedSize,
-      quantity,
-    })
+    const result = addToCart(product, buildCartOptions())
 
     if (result === 'success') {
       navigate(ROUTES.cart)
@@ -110,17 +132,9 @@ export function ProductDetailView({ product }: ProductDetailViewProps) {
             <div className="lg:max-w-md">
               <ProductOptionSelector
                 product={product}
-                selectedColor={selectedColor}
-                selectedSize={selectedSize}
+                selectedOptions={selectedOptions}
                 quantity={quantity}
-                onColorChange={(color) => {
-                  setSelectedColor(color)
-                  setQuantity(1)
-                }}
-                onSizeChange={(size) => {
-                  setSelectedSize(size)
-                  setQuantity(1)
-                }}
+                onOptionChange={handleOptionChange}
                 onQuantityChange={setQuantity}
               />
             </div>

@@ -43,10 +43,35 @@ const productWithOptions: Product = {
   productInfo: { ...EMPTY_PRODUCT_INFO },
   shippingInfo: { ...EMPTY_PRODUCT_SHIPPING_INFO },
   returnInfo: { ...EMPTY_PRODUCT_RETURN_INFO },
+  optionGroups: [],
   variants: [
-    { id: 'v1', color: '진청', size: '55', stock: 3 },
-    { id: 'v2', color: '진청', size: '66', stock: 0 },
-    { id: 'v3', color: '흑청', size: '55', stock: 5 },
+    {
+      id: 'v1',
+      options: { 색상: '진청', 사이즈: '55' },
+      color: '진청',
+      size: '55',
+      stock: 3,
+      extraPrice: 0,
+      sku: '',
+    },
+    {
+      id: 'v2',
+      options: { 색상: '진청', 사이즈: '66' },
+      color: '진청',
+      size: '66',
+      stock: 0,
+      extraPrice: 0,
+      sku: '',
+    },
+    {
+      id: 'v3',
+      options: { 색상: '흑청', 사이즈: '55' },
+      color: '흑청',
+      size: '55',
+      stock: 5,
+      extraPrice: 0,
+      sku: '',
+    },
   ],
 }
 
@@ -56,7 +81,17 @@ describe('productVariants', () => {
       parseProductVariants({
         variants: [{ id: 'v1', color: '진청', size: '55', stock: 2 }],
       }),
-    ).toEqual([{ id: 'v1', color: '진청', size: '55', stock: 2 }])
+    ).toEqual([
+      {
+        id: 'v1',
+        options: { 색상: '진청', 사이즈: '55' },
+        color: '진청',
+        size: '55',
+        stock: 2,
+        extraPrice: 0,
+        sku: '',
+      },
+    ])
   })
 
   it('detects option products and resolves variant stock', () => {

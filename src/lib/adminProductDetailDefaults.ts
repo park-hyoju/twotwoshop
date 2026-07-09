@@ -77,6 +77,7 @@ export function createEmptyProductDetailForm(id: string): AdminProductDetailForm
     isNew: false,
     isBest: false,
     isSale: false,
+    optionGroups: [],
     variants: [],
   }
 }

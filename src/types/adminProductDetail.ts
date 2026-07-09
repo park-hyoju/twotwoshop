@@ -2,6 +2,24 @@ import type { ProductCategoryId } from '../constants/productCategories'
 import type { DetailMediaItem } from './detailMedia'
 import type { ProductStatus } from './status'
 
+export interface AdminProductOptionGroup {
+  id: string
+  name: string
+  valuesInput: string
+}
+
+export interface AdminProductVariant {
+  id: string
+  options: Record<string, string>
+  stock: number
+  extraPrice: number
+  sku: string
+  /** @deprecated cart/order legacy — synced from options on save */
+  color: string
+  /** @deprecated cart/order legacy — synced from options on save */
+  size: string
+}
+
 export interface AdminSizeGuideRow {
   size: string
   total_length: string
@@ -18,13 +36,6 @@ export interface AdminSizeGuideRow {
 export interface AdminSizeGuide {
   rows: AdminSizeGuideRow[]
   model_info: string
-}
-
-export interface AdminProductVariant {
-  id: string
-  color: string
-  size: string
-  stock: number
 }
 
 export interface AdminProductInfoFields {
@@ -77,6 +88,7 @@ export interface AdminProductDetailForm {
   isNew: boolean
   isBest: boolean
   isSale: boolean
+  optionGroups: AdminProductOptionGroup[]
   variants: AdminProductVariant[]
 }
 

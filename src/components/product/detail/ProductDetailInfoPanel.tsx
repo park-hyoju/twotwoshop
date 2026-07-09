@@ -7,7 +7,7 @@ interface ProductDetailInfoPanelProps {
 }
 
 export function ProductDetailInfoPanel({ product }: ProductDetailInfoPanelProps) {
-  const detailMedia = product.detailMedia
+  const detailMedia = [...product.detailMedia].sort((left, right) => left.order - right.order)
 
   if (detailMedia.length === 0) {
     return (

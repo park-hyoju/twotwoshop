@@ -63,10 +63,15 @@ export function parseDetailMediaArray(value: unknown): DetailMediaItem[] {
     .filter((item): item is DetailMediaItem => item !== null)
 }
 
+export function reindexDetailMediaByArrayOrder(items: DetailMediaItem[]): DetailMediaItem[] {
+  return items.map((item, index) => ({ ...item, order: index }))
+}
+
+/** Sorts by stored `order` field, then reindexes 0..n-1 (DB read / legacy). */
 export function normalizeDetailMediaOrder(items: DetailMediaItem[]): DetailMediaItem[] {
-  return [...items]
-    .sort((a, b) => a.order - b.order)
-    .map((item, index) => ({ ...item, order: index }))
+  return reindexDetailMediaByArrayOrder(
+    [...items].sort((left, right) => left.order - right.order),
+  )
 }
 
 export function migrateDetailMedia(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   galleryImagesFromUrls,
   hasDoneGalleryImage,
@@ -7,7 +7,8 @@ import {
 import {
   AdminProductDetailRepositoryError,
   fetchAdminProductDetail,
-  saveAdminProductDetail,
+  saveAdminProductDetailDescription,
+  saveAdminProductDetailPartial,
 } from '../../../../services/adminProductDetailRepository'
 import {
   fetchAdminRelatedProducts,
@@ -19,10 +20,17 @@ import type {
 } from '../../../../types/adminProductDetail'
 import type { RelatedProductPick } from '../../../../types/adminProductRelated'
 import { createEmptyProductDetailForm } from '../../../../lib/adminProductDetailDefaults'
-import { clearProductDraft, loadProductDraft } from '../../../../lib/adminProductDraftStorage'
+import {
+  createEmptyPricingDraft,
+  formatAdminNumericInput,
+  pricingDraftFromForm,
+  type AdminPricingNumericDraft,
+} from '../../../../lib/adminNumericInput'
+import { clearProductDraft } from '../../../../lib/adminProductDraftStorage'
 import { generateProductSlugFromName, resolveUniqueProductSlug } from '../../../../lib/productSlug'
 import { getProductStorefrontPath } from '../../../../lib/productStorefront'
 import {
+  galleryImagesDifferFromForm,
   hasBusyGalleryImage,
   syncGalleryImagesToForm,
 } from '../../../../lib/syncProductGalleryToForm'
@@ -36,8 +44,23 @@ import { SellerShippingStep } from './steps/SellerShippingStep'
 import { collectGalleryPhotos } from './detailContent/detailContent'
 import { adminSectionClassName } from './adminFormStyles'
 import { serializeEditorState } from './editor/editorState'
+import {
+  detectAdminProductDetailChanges,
+  hasPersistableChanges,
+  isDescriptionOnlyChanges,
+  summarizeVariantStock,
+} from './editor/productSaveChanges'
 import { getSellerStepIndex, PRODUCT_SELLER_STEPS } from './productSellerSteps'
-import { ProductOptionsSection } from './sections/ProductOptionsSection'
+import { applyPricingDraftToForm } from './sections/AdminPricingFields'
+import { ProductOptionsSection, applyVariantStockDraftToForm } from './sections/ProductOptionsSection'
+
+function buildVariantStockDraft(
+  variants: AdminProductDetailForm['variants'],
+): Record<string, string> {
+  return Object.fromEntries(
+    variants.map((row) => [row.id, formatAdminNumericInput(row.stock)]),
+  )
+}
 
 interface ProductDetailEditorProps {
   productId: string
@@ -83,6 +106,18 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const { showToast } = useAdminToast()
+  const pricingDraftRef = useRef(createEmptyPricingDraft())
+  const variantStockDraftRef = useRef<Record<string, string>>({})
+  const [variantStockDraft, setVariantStockDraft] = useState<Record<string, string>>({})
+
+  const handlePricingDraftChange = useCallback((draft: AdminPricingNumericDraft) => {
+    pricingDraftRef.current = draft
+  }, [])
+
+  const handleVariantStockDraftChange = useCallback((draft: Record<string, string>) => {
+    variantStockDraftRef.current = draft
+    setVariantStockDraft(draft)
+  }, [])
 
   const isDirty = useMemo(
     () =>
@@ -103,18 +138,23 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     async function loadDetail() {
       setIsLoading(true)
       setLoadError(null)
+      setSaveError(null)
+      setActiveStep('photos')
+      pricingDraftRef.current = createEmptyPricingDraft()
+      variantStockDraftRef.current = {}
+      setVariantStockDraft({})
 
       try {
         const detail = await fetchAdminProductDetail(productId)
         const related = await fetchAdminRelatedProducts(productId)
-        const draft = loadProductDraft(productId)
-        const nextForm = draft ?? detail
         if (!cancelled) {
-          setForm(nextForm)
+          pricingDraftRef.current = pricingDraftFromForm(detail)
+          variantStockDraftRef.current = buildVariantStockDraft(detail.variants)
+          setVariantStockDraft(variantStockDraftRef.current)
+          setForm(detail)
           setRelatedProducts(related)
-          setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(nextForm)))
+          setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(detail)))
           setSavedSnapshot(serializeEditorState(detail, related))
-          setActiveStep('photos')
         }
       } catch (error) {
         if (!cancelled) {
@@ -134,6 +174,25 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     }
   }, [productId])
 
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (isDirty) {
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
+  function handleClose() {
+    if (isDirty && !window.confirm('저장하지 않은 변경 내용이 있습니다. 닫으시겠습니까?')) {
+      return
+    }
+
+    onClose()
+  }
+
   function updateForm<K extends keyof AdminProductDetailForm>(
     field: K,
     value: AdminProductDetailForm[K],
@@ -141,22 +200,34 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  function prepareFormWithGallery(currentForm: AdminProductDetailForm): AdminProductDetailForm | null {
-    if (hasBusyGalleryImage(galleryImages)) {
-      setSaveError('이미지 업로드가 끝난 뒤 저장해 주세요.')
-      return null
+  function prepareFormForSave(currentForm: AdminProductDetailForm): AdminProductDetailForm | null {
+    const galleryChanged =
+      galleryImages.length > 0 && galleryImagesDifferFromForm(galleryImages, currentForm)
+
+    if (galleryChanged) {
+      if (hasBusyGalleryImage(galleryImages)) {
+        setSaveError('이미지 업로드가 끝난 뒤 저장해 주세요.')
+        return null
+      }
+
+      if (!hasDoneGalleryImage(galleryImages)) {
+        setSaveError('대표 이미지를 1장 이상 등록해 주세요.')
+        return null
+      }
+
+      const draft = { ...currentForm }
+      syncGalleryImagesToForm(galleryImages, draft, (field, value) => {
+        ;(draft as AdminProductDetailForm)[field] = value
+      })
+      return draft
     }
 
-    if (!hasDoneGalleryImage(galleryImages)) {
+    if (collectGalleryPhotos(currentForm).length === 0) {
       setSaveError('대표 이미지를 1장 이상 등록해 주세요.')
       return null
     }
 
-    const draft = { ...currentForm }
-    syncGalleryImagesToForm(galleryImages, draft, (field, value) => {
-      ;(draft as AdminProductDetailForm)[field] = value
-    })
-    return draft
+    return currentForm
   }
 
   async function handleSave(closeAfter = false): Promise<AdminProductDetailForm | null> {
@@ -164,17 +235,64 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     setIsSaving(true)
 
     try {
-      const withGallery = prepareFormWithGallery(form)
+      const withGallery = prepareFormForSave(form)
       if (!withGallery) {
         return null
       }
 
-      const withSlug = await ensureProductSlug(withGallery)
-      const savedForm = await saveAdminProductDetail(withSlug)
-      await saveAdminRelatedProducts(
-        savedForm.id,
-        relatedProducts.map((item) => item.id),
+      if (!withGallery.name.trim()) {
+        setSaveError('상품명을 입력해 주세요.')
+        setActiveStep('info')
+        return null
+      }
+
+      const dbBaseline = await fetchAdminProductDetail(productId)
+      const dbRelated = await fetchAdminRelatedProducts(productId)
+      const dbRelatedIds = dbRelated.map((item) => item.id)
+      const nextRelatedIds = relatedProducts.map((item) => item.id)
+      const changes = detectAdminProductDetailChanges(
+        dbBaseline,
+        withGallery,
+        dbRelatedIds,
+        nextRelatedIds,
       )
+
+      if (!hasPersistableChanges(changes)) {
+        showToast('변경된 내용이 없습니다.')
+        return withGallery
+      }
+
+      let workingForm = withGallery
+
+      if (changes.pricing || changes.simpleStock) {
+        workingForm = applyPricingDraftToForm(workingForm, pricingDraftRef.current)
+      }
+
+      if (changes.options) {
+        workingForm = applyVariantStockDraftToForm(
+          workingForm,
+          variantStockDraftRef.current,
+        )
+        workingForm = summarizeVariantStock(workingForm)
+      }
+
+      let savedForm: AdminProductDetailForm
+
+      if (isDescriptionOnlyChanges(changes)) {
+        const withSlug = await ensureProductSlug(workingForm)
+        savedForm = await saveAdminProductDetailDescription(withSlug)
+      } else {
+        const withSlug = await ensureProductSlug(workingForm)
+        savedForm = await saveAdminProductDetailPartial(withSlug, dbBaseline, changes)
+
+        if (changes.related) {
+          await saveAdminRelatedProducts(withSlug.id, nextRelatedIds)
+        }
+      }
+
+      pricingDraftRef.current = pricingDraftFromForm(savedForm)
+      variantStockDraftRef.current = buildVariantStockDraft(savedForm.variants)
+      setVariantStockDraft(variantStockDraftRef.current)
       setForm(savedForm)
       setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(savedForm)))
       setSavedSnapshot(serializeEditorState(savedForm, relatedProducts))
@@ -233,13 +351,16 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
             productId={productId}
             galleryImages={galleryImages}
             onGalleryChange={setGalleryImages}
-            initialPhotoUrls={collectGalleryPhotos(form)}
           />
         )
       case 'info':
         return (
           <div className="space-y-6">
-            <BasicInfoTab {...tabProps} />
+            <BasicInfoTab
+              {...tabProps}
+              onPricingDraftChange={handlePricingDraftChange}
+              variantStockDraft={variantStockDraft}
+            />
             <div className={adminSectionClassName}>
               <RelatedProductsSection
                 productId={productId}
@@ -252,9 +373,10 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         )
       case 'options':
         return (
-          <div className={adminSectionClassName}>
-            <ProductOptionsSection {...tabProps} />
-          </div>
+          <ProductOptionsSection
+            {...tabProps}
+            onVariantStockDraftChange={handleVariantStockDraftChange}
+          />
         )
       case 'description':
         return <DescriptionTab {...tabProps} />
@@ -286,7 +408,7 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isSaving}
             className="h-10 shrink-0 rounded-xl px-3 text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
           >

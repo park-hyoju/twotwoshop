@@ -105,7 +105,6 @@ function buildBasePayload(input: AdminProductFormInput, slug: string) {
     stock: input.stock,
     display_order: 0,
     status: input.stock <= 0 && input.status === 'active' ? 'soldout' : input.status,
-    is_admin_registered: true,
   }
 }
 
@@ -281,7 +280,6 @@ export async function saveAdminProductForm(
       .from('products')
       .update({
         ...basePayload,
-        is_admin_registered: true,
       })
       .eq('id', targetId)
 

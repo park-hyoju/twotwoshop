@@ -10,6 +10,7 @@
     "test:auth": "node scripts/test-auth-signup-login.mjs",
     "test:auth:login": "node scripts/test-auth-signup-login.mjs --login-only",
     "test:security:live": "node scripts/live-security-verification.mjs",
+    "test:p0-save-browser": "node scripts/p0-save-browser-test.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -17,6 +17,7 @@ export function DescriptionTab({ form, onChange }: DescriptionTabProps) {
       <div className={`${adminSectionClassName} space-y-4`}>
         <ProductDescriptionEditor
           value={form.description}
+          shortDescription={form.short_description}
           onChange={(value) => onChange('description', value)}
         />
       </div>

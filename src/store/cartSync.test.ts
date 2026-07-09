@@ -42,6 +42,7 @@ function createProduct(overrides: Partial<Product> = {}): Product {
     productInfo: { ...EMPTY_PRODUCT_INFO },
     shippingInfo: { ...EMPTY_PRODUCT_SHIPPING_INFO },
     returnInfo: { ...EMPTY_PRODUCT_RETURN_INFO },
+    optionGroups: [],
     variants: [],
     ...overrides,
   }

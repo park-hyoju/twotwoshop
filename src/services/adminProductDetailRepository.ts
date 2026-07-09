@@ -1,4 +1,4 @@
-import { assertSupabaseMutationRow } from '../lib/adminSupabaseMutation'
+import { assertSupabaseMutationRow, formatPostgrestErrorMessage } from '../lib/adminSupabaseMutation'
 import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
 import {
   EMPTY_RETURN_INFO,
@@ -7,14 +7,21 @@ import {
 } from '../lib/adminProductDetailDefaults'
 import { generateProductSlugFromName, resolveUniqueProductSlug } from '../lib/productSlug'
 import { supabase } from '../lib/supabase'
+import type { AdminProductDetailChangeSet } from '../components/admin/products/detail/editor/productSaveChanges'
 import type { AdminProductDetailForm } from '../types/adminProductDetail'
 import { buildProductCategoryPayload } from './productMapper'
 import {
-  mapAdminProductDetailFormToUpdatePayload,
+  buildAdminProductDetailPartialUpdatePayload,
+  mapAdminProductDetailFormToDescriptionUpdatePayload,
+  mapAdminProductDetailFormToFullUpdatePayload,
   mapRowToAdminProductDetailForm,
   type AdminProductDetailRow,
 } from './adminProductDetailMapper'
 import { fetchAdminRelatedProducts, saveAdminRelatedProducts } from './adminProductRelatedRepository'
+import {
+  cloneOptionGroupsForNewProduct,
+  cloneVariantsForNewProduct,
+} from '../lib/adminProductOptions'
 
 const PRODUCT_DETAIL_SELECT = `
   id,
@@ -74,7 +81,10 @@ export async function fetchAdminProductDetail(
 
   if (error) {
     throw new AdminProductDetailRepositoryError(
-      '상품 상세를 불러오지 못했습니다. product-detail-v093.sql migration 적용 여부를 확인해주세요.',
+      formatPostgrestErrorMessage(
+        '상품 상세를 불러오지 못했습니다. product-detail-v093.sql migration 적용 여부를 확인해주세요.',
+        error,
+      ),
       error,
     )
   }
@@ -91,7 +101,7 @@ export async function saveAdminProductDetail(
 ): Promise<AdminProductDetailForm> {
   await ensureAdminAccess()
 
-  const payload = mapAdminProductDetailFormToUpdatePayload(form)
+  const payload = mapAdminProductDetailFormToFullUpdatePayload(form)
 
   const { data, error } = await supabase!
     .from('products')
@@ -104,6 +114,60 @@ export async function saveAdminProductDetail(
     data,
     error,
     '상품 상세를 저장하지 못했습니다.',
+    AdminProductDetailRepositoryError,
+  )
+
+  return mapRowToAdminProductDetailForm(row as AdminProductDetailRow)
+}
+
+export async function saveAdminProductDetailPartial(
+  form: AdminProductDetailForm,
+  baseline: AdminProductDetailForm,
+  changes: AdminProductDetailChangeSet,
+): Promise<AdminProductDetailForm> {
+  await ensureAdminAccess()
+
+  const payload = buildAdminProductDetailPartialUpdatePayload(baseline, form, changes)
+
+  if (Object.keys(payload).length === 0) {
+    return fetchAdminProductDetail(form.id)
+  }
+
+  const { data, error } = await supabase!
+    .from('products')
+    .update(payload)
+    .eq('id', form.id)
+    .select(PRODUCT_DETAIL_SELECT)
+    .maybeSingle()
+
+  const row = assertSupabaseMutationRow(
+    data,
+    error,
+    '상품 상세를 저장하지 못했습니다.',
+    AdminProductDetailRepositoryError,
+  )
+
+  return mapRowToAdminProductDetailForm(row as AdminProductDetailRow)
+}
+
+export async function saveAdminProductDetailDescription(
+  form: AdminProductDetailForm,
+): Promise<AdminProductDetailForm> {
+  await ensureAdminAccess()
+
+  const payload = mapAdminProductDetailFormToDescriptionUpdatePayload(form)
+
+  const { data, error } = await supabase!
+    .from('products')
+    .update(payload)
+    .eq('id', form.id)
+    .select(PRODUCT_DETAIL_SELECT)
+    .maybeSingle()
+
+  const row = assertSupabaseMutationRow(
+    data,
+    error,
+    '상품 상세설명을 저장하지 못했습니다.',
     AdminProductDetailRepositoryError,
   )
 
@@ -130,7 +194,6 @@ export async function createBlankAdminProduct(): Promise<string> {
       images: [],
       short_description: '',
       description: '',
-      detail_media: [],
       size_guide: { ...EMPTY_SIZE_GUIDE, rows: [] },
       product_info: {},
       shipping_info: { ...EMPTY_SHIPPING_INFO },
@@ -138,14 +201,23 @@ export async function createBlankAdminProduct(): Promise<string> {
     is_new: false,
     is_best: false,
     is_sale: false,
-    is_admin_registered: true,
     ...categoryFields,
     })
     .select('id')
     .single()
 
-  if (error || !data) {
-    throw new AdminProductDetailRepositoryError('새 상품을 만들지 못했습니다.', error)
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.error('[createBlankAdminProduct] insert failed', error)
+    }
+    throw new AdminProductDetailRepositoryError(
+      formatPostgrestErrorMessage('새 상품을 만들지 못했습니다.', error),
+      error,
+    )
+  }
+
+  if (!data) {
+    throw new AdminProductDetailRepositoryError('새 상품을 만들지 못했습니다.')
   }
 
   return data.id
@@ -157,11 +229,13 @@ export async function copyAdminProduct(sourceProductId: string): Promise<string>
   const source = await fetchAdminProductDetail(sourceProductId)
   const copyName = source.name.trim() ? `${source.name.trim()} (복사)` : '새 상품 (복사)'
   const slug = await resolveUniqueProductSlug(generateProductSlugFromName(copyName))
-  const payload = mapAdminProductDetailFormToUpdatePayload({
+  const payload = mapAdminProductDetailFormToFullUpdatePayload({
     ...source,
     name: copyName,
     slug,
     status: 'hidden',
+    optionGroups: cloneOptionGroupsForNewProduct(source.optionGroups),
+    variants: cloneVariantsForNewProduct(source.variants),
   })
 
   const { data, error } = await supabase!
@@ -170,8 +244,18 @@ export async function copyAdminProduct(sourceProductId: string): Promise<string>
     .select('id')
     .single()
 
-  if (error || !data) {
-    throw new AdminProductDetailRepositoryError('상품을 복사하지 못했습니다.', error)
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.error('[copyAdminProduct] insert failed', error)
+    }
+    throw new AdminProductDetailRepositoryError(
+      formatPostgrestErrorMessage('상품을 복사하지 못했습니다.', error),
+      error,
+    )
+  }
+
+  if (!data) {
+    throw new AdminProductDetailRepositoryError('상품을 복사하지 못했습니다.')
   }
 
   const relatedProducts = await fetchAdminRelatedProducts(sourceProductId)

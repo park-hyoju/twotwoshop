@@ -9,6 +9,7 @@ export interface CartItem {
   stock: number
   selectedColor?: string
   selectedSize?: string
+  selectedOptions?: Record<string, string>
   optionId?: string
 }
 
@@ -28,6 +29,7 @@ export type CartSyncNoticeType =
 export interface AddToCartInput {
   color?: string
   size?: string
+  selectedOptions?: Record<string, string>
   quantity?: number
 }
 

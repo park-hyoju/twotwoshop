@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
 import type { DetailMediaItem } from '../../../../../types/detailMedia'
+import { reindexDetailMediaByArrayOrder } from '../../../../../lib/detailMedia'
 import { isPlaceholderProductImage } from '../../../../../lib/productImageStorage'
 import { isAcceptedVideoFile } from '../../../../../lib/productVideoStorage'
 import { extractVideoMetadata } from '../../../../../lib/videoMetadata'
@@ -178,7 +179,7 @@ export function ProductDetailMediaSection({ form, onChange }: ProductDetailMedia
     const next = [...detailMedia]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    applyDetailMedia(next)
+    applyDetailMedia(reindexDetailMediaByArrayOrder(next))
   }
 
   const previewItem = previewIndex !== null ? detailMedia[previewIndex] : null
@@ -224,7 +225,7 @@ export function ProductDetailMediaSection({ form, onChange }: ProductDetailMedia
         <div className="space-y-2">
           {detailMedia.map((item, index) => (
             <DetailMediaListItem
-              key={`${item.url}-${index}`}
+              key={item.url}
               item={item}
               index={index}
               isDragging={dragIndex === index}

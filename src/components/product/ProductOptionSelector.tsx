@@ -1,23 +1,20 @@
 import { useMemo } from 'react'
 import type { Product } from '../../types/product'
 import {
-  findProductVariant,
-  formatProductOptionLabel,
-  getProductColors,
+  findProductVariantByOptions,
+  formatSelectedOptionsLabel,
+  getOptionValuesForGroup,
+  getProductOptionGroups,
   getProductOptionStock,
-  getProductSizes,
   hasProductOptions,
-  requiresColorSelection,
-  requiresSizeSelection,
+  isProductOptionSelectionComplete,
 } from '../../lib/productVariants'
 
 interface ProductOptionSelectorProps {
   product: Product
-  selectedColor: string
-  selectedSize: string
+  selectedOptions: Record<string, string>
   quantity: number
-  onColorChange: (color: string) => void
-  onSizeChange: (size: string) => void
+  onOptionChange: (optionName: string, value: string) => void
   onQuantityChange: (quantity: number) => void
 }
 
@@ -54,31 +51,25 @@ function OptionButton({
 
 export function ProductOptionSelector({
   product,
-  selectedColor,
-  selectedSize,
+  selectedOptions,
   quantity,
-  onColorChange,
-  onSizeChange,
+  onOptionChange,
   onQuantityChange,
 }: ProductOptionSelectorProps) {
   const hasOptions = hasProductOptions(product)
-  const colors = useMemo(() => getProductColors(product.variants), [product.variants])
-  const sizes = useMemo(
-    () => getProductSizes(product.variants, selectedColor || undefined),
-    [product.variants, selectedColor],
-  )
+  const optionGroups = useMemo(() => getProductOptionGroups(product), [product])
 
   const selectedStock = hasOptions
-    ? getProductOptionStock(product, selectedColor, selectedSize)
+    ? getProductOptionStock(product, '', '', selectedOptions)
     : product.stock
 
-  const selectedVariant =
-    hasOptions && selectedColor && selectedSize
-      ? findProductVariant(product.variants, selectedColor, selectedSize)
-      : undefined
+  const selectedVariant = hasOptions
+    ? findProductVariantByOptions(product.variants, selectedOptions)
+    : undefined
 
   const maxQuantity = Math.max(selectedStock, 0)
-  const selectionLabel = formatProductOptionLabel(selectedColor, selectedSize)
+  const selectionLabel = formatSelectedOptionsLabel(selectedOptions)
+  const selectionComplete = isProductOptionSelectionComplete(product, '', '', selectedOptions)
 
   if (!hasOptions) {
     return (
@@ -109,58 +100,48 @@ export function ProductOptionSelector({
 
   return (
     <div className="space-y-6">
-      {requiresColorSelection(product.variants) && (
-        <div>
-          <p className="mb-3 text-sm font-semibold text-neutral-700">색상</p>
-          <div className="flex flex-wrap gap-2">
-            {colors.map((color) => {
-              const colorStock = getProductSizes(product.variants, color).some((size) => {
-                const variant = findProductVariant(product.variants, color, size)
-                return (variant?.stock ?? 0) > 0
-              })
+      {optionGroups.map((group, groupIndex) => {
+        const values = getOptionValuesForGroup(
+          product.variants,
+          group.name,
+          selectedOptions,
+          optionGroups,
+        )
+        const priorGroups = optionGroups.slice(0, groupIndex)
+        const priorSelected = priorGroups.every((prior) => selectedOptions[prior.name])
 
-              return (
-                <OptionButton
-                  key={color}
-                  label={color}
-                  selected={selectedColor === color}
-                  soldOut={!colorStock}
-                  onClick={() => {
-                    onColorChange(color)
-                    onSizeChange('')
-                  }}
-                />
-              )
-            })}
+        return (
+          <div key={group.name}>
+            <p className="mb-3 text-sm font-semibold text-neutral-700">{group.name}</p>
+            <div className="flex flex-wrap gap-2">
+              {values.map((value) => {
+                const nextOptions = { ...selectedOptions, [group.name]: value }
+                const stock = getProductOptionStock(product, '', '', nextOptions)
+                const laterGroups = optionGroups.slice(groupIndex + 1)
+                const hasLaterStock = laterGroups.length
+                  ? product.variants.some(
+                      (variant) =>
+                        Object.entries(nextOptions).every(
+                          ([name, optionValue]) => variant.options[name] === optionValue,
+                        ) && variant.stock > 0,
+                    )
+                  : stock > 0
+
+                return (
+                  <OptionButton
+                    key={`${group.name}-${value}`}
+                    label={value}
+                    selected={selectedOptions[group.name] === value}
+                    soldOut={!hasLaterStock}
+                    disabled={!priorSelected}
+                    onClick={() => onOptionChange(group.name, value)}
+                  />
+                )
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
-      {requiresSizeSelection(product.variants) && (
-        <div>
-          <p className="mb-3 text-sm font-semibold text-neutral-700">사이즈</p>
-          <div className="flex flex-wrap gap-2">
-            {sizes.map((size) => {
-              const stock = getProductOptionStock(
-                product,
-                selectedColor || colors[0] || '',
-                size,
-              )
-
-              return (
-                <OptionButton
-                  key={size}
-                  label={size}
-                  selected={selectedSize === size}
-                  soldOut={stock <= 0}
-                  disabled={requiresColorSelection(product.variants) && !selectedColor}
-                  onClick={() => onSizeChange(size)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
+        )
+      })}
 
       <div>
         <p className="mb-3 text-sm font-semibold text-neutral-700">수량</p>
@@ -168,7 +149,7 @@ export function ProductOptionSelector({
           <button
             type="button"
             onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-            disabled={quantity <= 1 || maxQuantity <= 0}
+            disabled={quantity <= 1 || maxQuantity <= 0 || !selectionComplete}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-300 text-lg font-semibold disabled:opacity-40"
           >
             −
@@ -177,7 +158,7 @@ export function ProductOptionSelector({
           <button
             type="button"
             onClick={() => onQuantityChange(Math.min(maxQuantity, quantity + 1))}
-            disabled={maxQuantity <= 0 || quantity >= maxQuantity}
+            disabled={maxQuantity <= 0 || quantity >= maxQuantity || !selectionComplete}
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-300 text-lg font-semibold disabled:opacity-40"
           >
             +
@@ -185,7 +166,7 @@ export function ProductOptionSelector({
         </div>
       </div>
 
-      {selectionLabel && selectedStock > 0 && (
+      {selectionLabel && selectedStock > 0 && selectionComplete && (
         <div className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
           <p className="font-semibold text-neutral-900">선택한 옵션</p>
           <p className="mt-1">
@@ -194,7 +175,7 @@ export function ProductOptionSelector({
         </div>
       )}
 
-      {selectedVariant && selectedStock <= 0 && (
+      {selectedVariant && selectedStock <= 0 && selectionComplete && (
         <p className="text-sm font-medium text-red-600">선택한 옵션은 품절입니다.</p>
       )}
     </div>

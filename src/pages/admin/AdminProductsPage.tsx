@@ -136,9 +136,12 @@ export function AdminProductsPage() {
       const productId = await createBlankAdminProduct()
       setDetailProductId(productId)
     } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('[AdminProductsPage] create product failed', error)
+      }
       const message = getErrorMessage(error)
       setActionErrorMessage(message)
-      showToast(message, { durationMs: 4000 })
+      showToast(message, { durationMs: 6000 })
     } finally {
       setActionProductId(null)
     }
@@ -286,6 +289,7 @@ export function AdminProductsPage() {
 
       {detailProductId && (
         <ProductDetailEditor
+          key={detailProductId}
           productId={detailProductId}
           onClose={closeDetailEditor}
           onSaved={handleDetailSaved}

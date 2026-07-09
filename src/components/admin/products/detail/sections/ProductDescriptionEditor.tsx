@@ -4,6 +4,8 @@ import type {
   ProductDescriptionFontWeight,
   ProductDescriptionFormat,
 } from '../../../../../lib/productDescriptionFormat'
+import { getProductDescriptionText } from '../../../../../lib/productDetailContent'
+import { ProductDetailDescriptionSection } from '../../../../product/detail/ProductDetailDescriptionSection'
 import {
   parseProductDescription,
   serializeProductDescription,
@@ -12,6 +14,7 @@ import { adminLabelClassName, adminTextareaClassName } from '../adminFormStyles'
 
 interface ProductDescriptionEditorProps {
   value: string
+  shortDescription?: string
   onChange: (value: string) => void
 }
 
@@ -56,8 +59,13 @@ function ToolbarButton({
   )
 }
 
-export function ProductDescriptionEditor({ value, onChange }: ProductDescriptionEditorProps) {
+export function ProductDescriptionEditor({
+  value,
+  shortDescription = '',
+  onChange,
+}: ProductDescriptionEditorProps) {
   const format = parseProductDescription(value)
+  const hasDescription = Boolean(getProductDescriptionText(shortDescription, value).trim())
 
   function updateFormat(next: Partial<ProductDescriptionFormat>) {
     onChange(serializeProductDescription({ ...format, ...next }))
@@ -115,6 +123,27 @@ export function ProductDescriptionEditor({ value, onChange }: ProductDescription
         className={`${adminTextareaClassName} min-h-40 resize-y`}
         placeholder="상품 설명을 입력하세요"
       />
+
+      <div className="border-t border-neutral-200 pt-6">
+        <p className={adminLabelClassName}>고객 화면 미리보기</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          쇼핑몰 상품 상세의 상품정보 탭과 동일한 스타일로 표시됩니다.
+        </p>
+        <div className="mx-auto mt-4 max-w-3xl pt-6 sm:pt-8" aria-live="polite">
+          <div className="space-y-8">
+            {hasDescription ? (
+              <ProductDetailDescriptionSection
+                shortDescription={shortDescription}
+                description={value}
+              />
+            ) : (
+              <p className="text-sm text-neutral-400">
+                상품 설명을 입력하면 고객 화면에 이렇게 보입니다.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

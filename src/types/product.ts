@@ -9,13 +9,19 @@ import type {
   ProductSizeGuide,
 } from './productDetail'
 import type { DetailMediaItem } from './detailMedia'
+import type { ProductOptionGroup } from './productOptions'
 import type { ProductStatus } from './status'
 
 export interface ProductVariant {
   id: string
-  color: string
-  size: string
+  options: Record<string, string>
   stock: number
+  extraPrice: number
+  sku: string
+  /** @deprecated legacy cart/order slot */
+  color: string
+  /** @deprecated legacy cart/order slot */
+  size: string
 }
 
 export interface Product {
@@ -47,5 +53,6 @@ export interface Product {
   productInfo: ProductInfoFields
   shippingInfo: ProductShippingInfo
   returnInfo: ProductReturnInfo
+  optionGroups: ProductOptionGroup[]
   variants: ProductVariant[]
 }

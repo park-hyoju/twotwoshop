@@ -1,8 +1,15 @@
+import { useEffect, useState } from 'react'
 import {
   calculateDiscountRate,
   calculateDiscountRateForStorage,
   calculateSalePriceFromDiscount,
 } from '../../../../../lib/calculateDiscountRate'
+import { getDisplayedVariantTotalStock, getVariantTotalStock } from '../../../../../lib/adminProductOptions'
+import {
+  parseAdminNumericInput,
+  pricingDraftFromForm,
+  type AdminPricingNumericDraft,
+} from '../../../../../lib/adminNumericInput'
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
 import type { ProductStatus } from '../../../../../types/status'
 import { adminInputClassName, adminLabelClassName } from '../adminFormStyles'
@@ -15,6 +22,8 @@ interface AdminPricingFieldsProps {
   ) => void
   showSoldOutToggle?: boolean
   operator?: boolean
+  onPricingDraftChange?: (draft: AdminPricingNumericDraft) => void
+  variantStockDraft?: Record<string, string>
 }
 
 export function AdminPricingFields({
@@ -22,27 +31,106 @@ export function AdminPricingFields({
   onChange,
   showSoldOutToggle = false,
   operator = false,
+  onPricingDraftChange,
+  variantStockDraft,
 }: AdminPricingFieldsProps) {
-  const isSoldOut = form.status === 'soldout'
-  const autoDiscountRate = calculateDiscountRate(form.original_price, form.price)
+  const [originalPriceInput, setOriginalPriceInput] = useState('')
+  const [priceInput, setPriceInput] = useState('')
+  const [stockInput, setStockInput] = useState('')
+  const [discountRateInput, setDiscountRateInput] = useState('')
+  const hasOptionVariants = form.variants.length > 0
+  const variantTotalStock = hasOptionVariants
+    ? getDisplayedVariantTotalStock(form.variants, variantStockDraft ?? {})
+    : getVariantTotalStock(form.variants)
 
-  function handlePriceChange(value: number) {
-    onChange('price', value)
-    onChange('discount_rate', calculateDiscountRateForStorage(form.original_price, value))
-  }
+  useEffect(() => {
+    const draft = pricingDraftFromForm(form)
+    setOriginalPriceInput(draft.originalPrice)
+    setPriceInput(draft.price)
+    setStockInput(draft.stock)
+    setDiscountRateInput(draft.discountRate)
+    onPricingDraftChange?.(draft)
+  }, [form.id, onPricingDraftChange])
 
-  function handleOriginalPriceChange(value: number) {
-    onChange('original_price', value)
-    onChange('discount_rate', calculateDiscountRateForStorage(value, form.price))
-  }
+  function publishDraft(next: AdminPricingNumericDraft) {
+    onPricingDraftChange?.(next)
 
-  function handleDiscountRateChange(value: number) {
-    const nextDiscountRate = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
-    onChange('discount_rate', nextDiscountRate)
+    // Keep form state in sync so remount / dirty checks / save payload use latest prices.
+    const original_price = parseAdminNumericInput(next.originalPrice)
+    const price = parseAdminNumericInput(next.price)
+    const stock =
+      form.variants.length > 0
+        ? form.stock
+        : parseAdminNumericInput(next.stock)
+    const discount_rate = next.discountRate.trim()
+      ? parseAdminNumericInput(next.discountRate)
+      : calculateDiscountRateForStorage(original_price, price)
 
-    if (form.original_price > 0 && nextDiscountRate > 0 && nextDiscountRate < 100) {
-      onChange('price', calculateSalePriceFromDiscount(form.original_price, nextDiscountRate))
+    if (form.original_price !== original_price) {
+      onChange('original_price', original_price)
     }
+    if (form.price !== price) {
+      onChange('price', price)
+    }
+    if (form.variants.length === 0 && form.stock !== stock) {
+      onChange('stock', stock)
+    }
+    if (form.discount_rate !== discount_rate) {
+      onChange('discount_rate', discount_rate)
+    }
+  }
+
+  const parsedOriginalPrice = parseAdminNumericInput(originalPriceInput)
+  const parsedPrice = parseAdminNumericInput(priceInput)
+  const isSoldOut = form.status === 'soldout'
+  const autoDiscountRate = calculateDiscountRate(parsedOriginalPrice, parsedPrice)
+
+  function handleOriginalPriceInputChange(value: string) {
+    setOriginalPriceInput(value)
+    publishDraft({
+      originalPrice: value,
+      price: priceInput,
+      stock: stockInput,
+      discountRate: discountRateInput,
+    })
+  }
+
+  function handlePriceInputChange(value: string) {
+    setPriceInput(value)
+    publishDraft({
+      originalPrice: originalPriceInput,
+      price: value,
+      stock: stockInput,
+      discountRate: discountRateInput,
+    })
+  }
+
+  function handleStockInputChange(value: string) {
+    setStockInput(value)
+    publishDraft({
+      originalPrice: originalPriceInput,
+      price: priceInput,
+      stock: value,
+      discountRate: discountRateInput,
+    })
+  }
+
+  function handleDiscountRateInputChange(value: string) {
+    setDiscountRateInput(value)
+    const nextDiscountRate = parseAdminNumericInput(value)
+    const nextPrice =
+      parsedOriginalPrice > 0 && nextDiscountRate > 0 && nextDiscountRate < 100
+        ? String(calculateSalePriceFromDiscount(parsedOriginalPrice, nextDiscountRate))
+        : priceInput
+    if (nextPrice !== priceInput) {
+      setPriceInput(nextPrice)
+    }
+    publishDraft({
+      originalPrice: originalPriceInput,
+      price: nextPrice,
+      stock: stockInput,
+      discountRate: value,
+    })
   }
 
   function handleSoldOutToggle(checked: boolean) {
@@ -62,10 +150,10 @@ export function AdminPricingFields({
               id="detail-original-price"
               type="number"
               min={0}
-              value={form.original_price || ''}
-              onChange={(event) => handleOriginalPriceChange(Number(event.target.value))}
+              value={originalPriceInput}
+              onChange={(event) => handleOriginalPriceInputChange(event.target.value)}
               className={adminInputClassName}
-              placeholder="0"
+              placeholder="정가 입력"
             />
           </div>
           <div>
@@ -76,10 +164,10 @@ export function AdminPricingFields({
               id="detail-price"
               type="number"
               min={0}
-              value={form.price || ''}
-              onChange={(event) => handlePriceChange(Number(event.target.value))}
+              value={priceInput}
+              onChange={(event) => handlePriceInputChange(event.target.value)}
               className={adminInputClassName}
-              placeholder="0"
+              placeholder="판매가 입력"
             />
           </div>
         </div>
@@ -101,14 +189,21 @@ export function AdminPricingFields({
           <label htmlFor="detail-stock" className={adminLabelClassName}>
             재고
           </label>
-          <input
-            id="detail-stock"
-            type="number"
-            min={0}
-            value={form.stock}
-            onChange={(event) => onChange('stock', Number(event.target.value))}
-            className={adminInputClassName}
-          />
+          {hasOptionVariants ? (
+            <p className="text-sm font-semibold text-neutral-800" aria-live="polite">
+              총 재고 : {variantTotalStock}개 (자동)
+            </p>
+          ) : (
+            <input
+              id="detail-stock"
+              type="number"
+              min={0}
+              value={stockInput}
+              onChange={(event) => handleStockInputChange(event.target.value)}
+              className={adminInputClassName}
+              placeholder="재고 입력"
+            />
+          )}
         </div>
       </div>
     )
@@ -124,9 +219,10 @@ export function AdminPricingFields({
           id="detail-original-price"
           type="number"
           min={0}
-          value={form.original_price}
-          onChange={(event) => handleOriginalPriceChange(Number(event.target.value))}
+          value={originalPriceInput}
+          onChange={(event) => handleOriginalPriceInputChange(event.target.value)}
           className={adminInputClassName}
+          placeholder="정가 입력"
         />
       </div>
       <div>
@@ -137,9 +233,10 @@ export function AdminPricingFields({
           id="detail-price"
           type="number"
           min={0}
-          value={form.price}
-          onChange={(event) => handlePriceChange(Number(event.target.value))}
+          value={priceInput}
+          onChange={(event) => handlePriceInputChange(event.target.value)}
           className={adminInputClassName}
+          placeholder="판매가 입력"
         />
       </div>
       <div>
@@ -151,9 +248,10 @@ export function AdminPricingFields({
           type="number"
           min={0}
           max={100}
-          value={form.discount_rate}
-          onChange={(event) => handleDiscountRateChange(Number(event.target.value))}
+          value={discountRateInput}
+          onChange={(event) => handleDiscountRateInputChange(event.target.value)}
           className={adminInputClassName}
+          placeholder="할인율 입력"
         />
         <p className="mt-1 text-xs text-neutral-500" aria-live="polite">
           {autoDiscountRate !== null
@@ -165,14 +263,21 @@ export function AdminPricingFields({
         <label htmlFor="detail-stock" className={adminLabelClassName}>
           재고
         </label>
-        <input
-          id="detail-stock"
-          type="number"
-          min={0}
-          value={form.stock}
-          onChange={(event) => onChange('stock', Number(event.target.value))}
-          className={adminInputClassName}
-        />
+        {hasOptionVariants ? (
+          <p className="text-sm font-semibold text-neutral-800" aria-live="polite">
+            총 재고 : {variantTotalStock}개 (자동)
+          </p>
+        ) : (
+          <input
+            id="detail-stock"
+            type="number"
+            min={0}
+            value={stockInput}
+            onChange={(event) => handleStockInputChange(event.target.value)}
+            className={adminInputClassName}
+            placeholder="재고 입력"
+          />
+        )}
       </div>
 
       {showSoldOutToggle && (
@@ -191,4 +296,27 @@ export function AdminPricingFields({
       )}
     </div>
   )
+}
+
+export function applyPricingDraftToForm(
+  form: AdminProductDetailForm,
+  draft: AdminPricingNumericDraft,
+): AdminProductDetailForm {
+  const original_price = parseAdminNumericInput(draft.originalPrice)
+  const price = parseAdminNumericInput(draft.price)
+  const stock =
+    form.variants.length > 0
+      ? getVariantTotalStock(form.variants)
+      : parseAdminNumericInput(draft.stock)
+  const discount_rate = draft.discountRate.trim()
+    ? parseAdminNumericInput(draft.discountRate)
+    : calculateDiscountRateForStorage(original_price, price)
+
+  return {
+    ...form,
+    original_price,
+    price,
+    stock,
+    discount_rate,
+  }
 }

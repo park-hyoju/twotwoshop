@@ -53,6 +53,7 @@ function createProduct(overrides: Partial<Product> = {}): Product {
       ineligible_cases: '',
       shipping_fee_notes: '',
     },
+    optionGroups: [],
     variants: [],
     ...overrides,
   }

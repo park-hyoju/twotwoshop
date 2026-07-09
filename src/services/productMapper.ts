@@ -17,7 +17,11 @@ import {
   parseProductShippingInfo,
   parseProductSizeGuide,
 } from '../lib/productDetailContent'
-import { parseProductVariants } from '../lib/productVariants'
+import {
+  inferOptionGroupsFromVariants,
+  parseOptionGroupsFromProductInfo,
+  parseProductVariants,
+} from '../lib/productVariants'
 
 /** Supabase `public.products` row shape (snake_case). */
 export interface ProductRow {
@@ -101,6 +105,9 @@ export function mapProductRowToProduct(row: ProductRow): Product {
   const images = resolveProductImages(row.images, row.thumbnail, row.slug)
   const status = asProductStatus(row.status)
   const stock = row.stock ?? 0
+  const variants = parseProductVariants(row.product_info)
+  const parsedGroups = parseOptionGroupsFromProductInfo(row.product_info)
+  const optionGroups = parsedGroups.length > 0 ? parsedGroups : inferOptionGroupsFromVariants(variants)
   const productCategory = normalizeProductCategoryId(row.product_category, row)
   const legacy = syncLegacyCategoryFields(productCategory)
 
@@ -125,7 +132,7 @@ export function mapProductRowToProduct(row: ProductRow): Product {
     isBest: row.is_best ?? false,
     isSale: row.is_sale ?? false,
     stock,
-    soldOut: status === 'soldout' || isProductSoldOut({ stock }),
+    soldOut: isProductSoldOut({ stock, status, variants }),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     status,
@@ -133,7 +140,8 @@ export function mapProductRowToProduct(row: ProductRow): Product {
     productInfo: parseProductInfoFields(row.product_info),
     shippingInfo: parseProductShippingInfo(row.shipping_info),
     returnInfo: parseProductReturnInfo(row.return_info),
-    variants: parseProductVariants(row.product_info),
+    optionGroups,
+    variants,
   }
 }
 
@@ -180,9 +188,14 @@ export function enrichProduct(product: Product): Product {
   return {
     ...product,
     productCategory,
+    optionGroups: product.optionGroups ?? inferOptionGroupsFromVariants(product.variants ?? []),
     variants: product.variants ?? [],
     detailMedia: product.detailMedia ?? [],
-    soldOut: product.status === 'soldout' || isProductSoldOut({ stock }),
+    soldOut: isProductSoldOut({
+      stock,
+      status: product.status,
+      variants: product.variants,
+    }),
   }
 }
 

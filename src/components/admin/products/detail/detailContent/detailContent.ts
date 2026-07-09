@@ -1,6 +1,6 @@
 import type { AdminProductDetailForm } from '../../../../../types/adminProductDetail'
 import type { DetailMediaItem } from '../../../../../types/detailMedia'
-import { normalizeDetailMediaOrder } from '../../../../../lib/detailMedia'
+import { normalizeDetailMediaOrder, reindexDetailMediaByArrayOrder } from '../../../../../lib/detailMedia'
 import {
   isValidIntroImageUrl,
   parseProductIntroPayload,
@@ -60,23 +60,25 @@ export function hasDetailImages(form: AdminProductDetailForm): boolean {
 
 export function syncGalleryToForm(
   galleryPhotos: string[],
+  form: AdminProductDetailForm,
   onChange: <K extends keyof AdminProductDetailForm>(
     field: K,
     value: AdminProductDetailForm[K],
   ) => void,
 ) {
   const galleryUrls = galleryPhotos.filter(isValidImageUrl)
-  const galleryCount = Math.max(0, galleryUrls.length - 1)
   const mergedImages = galleryUrls.slice(1)
-
-  const payload: ProductIntroPayloadV2 = {
-    galleryCount,
-    detailImages: [],
-  }
 
   onChange('thumbnail', galleryUrls[0] ?? '')
   onChange('images', mergedImages)
-  onChange('short_description', serializeProductIntroPayload(payload))
+  onChange(
+    'short_description',
+    buildIntroShortDescriptionFromForm({
+      ...form,
+      thumbnail: galleryUrls[0] ?? '',
+      images: mergedImages,
+    }),
+  )
 }
 
 export function syncDetailMediaToForm(
@@ -87,8 +89,29 @@ export function syncDetailMediaToForm(
     value: AdminProductDetailForm[K],
   ) => void,
 ) {
-  onChange('detail_media', normalizeDetailMediaOrder(detailMedia))
-  syncGalleryToForm(collectGalleryPhotos(form), onChange)
+  const normalized = reindexDetailMediaByArrayOrder(detailMedia)
+  onChange('detail_media', normalized)
+  onChange(
+    'short_description',
+    buildIntroShortDescriptionFromForm({
+      ...form,
+      detail_media: normalized,
+    }),
+  )
+}
+
+export function buildIntroShortDescriptionFromForm(form: AdminProductDetailForm): string {
+  const existing = parseProductIntroPayload(form.short_description)
+  const galleryCount =
+    existing?.galleryCount ?? Math.max(0, collectGalleryPhotos(form).length - 1)
+  const detailImages = normalizeDetailMediaOrder(form.detail_media)
+    .map((item) => item.url.trim())
+    .filter(Boolean)
+
+  return serializeProductIntroPayload({
+    galleryCount,
+    detailImages,
+  })
 }
 
 /** @deprecated use syncGalleryToForm + syncDetailMediaToForm */

@@ -1,4 +1,6 @@
 import { formatPrice } from '../../../../lib/formatPrice'
+import { getProductDescriptionText } from '../../../../lib/productDetailContent'
+import { ProductDetailDescriptionSection } from '../../../product/detail/ProductDetailDescriptionSection'
 import type { AdminProductDetailForm } from '../../../../types/adminProductDetail'
 import { adminCardClassName, adminPageStackClassName, adminSectionTitleClassName } from './adminFormStyles'
 
@@ -25,6 +27,9 @@ function PreviewImage({ src, alt, className = '' }: { src: string; alt: string; 
 export function AdminProductPreview({ form }: AdminProductPreviewProps) {
   const isSoldOut = form.status === 'soldout' || form.stock <= 0
   const hasDiscount = form.discount_rate > 0
+  const hasDescription = Boolean(
+    getProductDescriptionText(form.short_description, form.description).trim(),
+  )
 
   return (
     <div className={adminPageStackClassName}>
@@ -106,12 +111,13 @@ export function AdminProductPreview({ form }: AdminProductPreviewProps) {
                 </div>
               </div>
 
-              {form.description && (
+              {hasDescription && (
                 <div className="border-t border-neutral-100 pt-4">
                   <p className="mb-2 text-sm font-bold text-neutral-900">상세정보</p>
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-600">
-                    {form.description}
-                  </p>
+                  <ProductDetailDescriptionSection
+                    shortDescription={form.short_description}
+                    description={form.description}
+                  />
                 </div>
               )}
             </div>

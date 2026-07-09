@@ -6,6 +6,7 @@ import {
 } from '../components/admin/products/ProductImageGalleryManager'
 import type { AdminProductDetailForm } from '../types/adminProductDetail'
 import {
+  collectGalleryPhotos,
   syncGalleryToForm,
 } from '../components/admin/products/detail/detailContent/detailContent'
 
@@ -18,6 +19,15 @@ export function getGalleryImageUrls(images: ProductGalleryImage[]): string[] {
 
 export function hasBusyGalleryImage(images: ProductGalleryImage[]): boolean {
   return images.some(isGalleryImageBusy)
+}
+
+export function galleryImagesDifferFromForm(
+  galleryImages: ProductGalleryImage[],
+  form: AdminProductDetailForm,
+): boolean {
+  const nextUrls = getGalleryImageUrls(galleryImages)
+  const currentUrls = collectGalleryPhotos(form)
+  return JSON.stringify(nextUrls) !== JSON.stringify(currentUrls)
 }
 
 export function syncGalleryImagesToForm(
@@ -33,6 +43,6 @@ export function syncGalleryImagesToForm(
   }
 
   const galleryUrls = getGalleryImageUrls(galleryImages)
-  syncGalleryToForm(galleryUrls, onChange)
+  syncGalleryToForm(galleryUrls, _form, onChange)
   return true
 }

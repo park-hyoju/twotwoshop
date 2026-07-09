@@ -1,4 +1,22 @@
+import type { ProductVariant } from '../types/product'
+import { hasProductOptions } from './productVariants'
+
 export type CustomerStockStatus = 'available' | 'low' | 'soldout'
+
+export function getProductTotalStock(product: {
+  stock: number
+  variants?: ProductVariant[]
+}): number {
+  if (hasProductOptions({ variants: product.variants ?? [] })) {
+    return (product.variants ?? []).reduce(
+      (sum, variant) => sum + Math.max(0, variant.stock ?? 0),
+      0,
+    )
+  }
+
+  const stock = product.stock ?? 0
+  return Number.isFinite(stock) ? Math.max(0, stock) : 0
+}
 
 export function getCustomerStockStatus(stock: number): CustomerStockStatus {
   if (stock <= 0) {
@@ -15,16 +33,25 @@ export function getCustomerStockStatus(stock: number): CustomerStockStatus {
 export function isProductPurchasable(product: {
   stock: number
   status?: string
+  variants?: ProductVariant[]
 }): boolean {
-  if (product.status === 'hidden') {
+  if (product.status === 'hidden' || product.status === 'soldout') {
     return false
   }
 
-  return product.stock > 0
+  return getProductTotalStock(product) > 0
 }
 
-export function isProductSoldOut(product: { stock: number }): boolean {
-  return product.stock <= 0
+export function isProductSoldOut(product: {
+  stock: number
+  status?: string
+  variants?: ProductVariant[]
+}): boolean {
+  if (product.status === 'soldout') {
+    return true
+  }
+
+  return getProductTotalStock(product) === 0
 }
 
 /** 고객 화면용 재고 상태 라벨. 수량은 노출하지 않고 품절만 표시합니다. */

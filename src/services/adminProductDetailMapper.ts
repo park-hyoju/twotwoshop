@@ -1,4 +1,13 @@
 import {
+  buildOptionGroupsPayload,
+  formatOptionValuesInput,
+  getVariantTotalStock,
+  inferOptionGroupsFromVariants,
+  normalizeAdminVariants,
+  variantsFromLegacyRows,
+} from '../lib/adminProductOptions'
+import { createOptionGroupId } from '../types/productOptions'
+import {
   EMPTY_PRODUCT_INFO,
   EMPTY_RETURN_INFO,
   EMPTY_SHIPPING_INFO,
@@ -6,11 +15,14 @@ import {
   EMPTY_SIZE_GUIDE_ROW,
 } from '../lib/adminProductDetailDefaults'
 import { migrateDetailMedia, serializeDetailMediaForDb } from '../lib/detailMedia'
+import { buildIntroShortDescriptionFromForm } from '../components/admin/products/detail/detailContent/detailContent'
 import { resolveProductCategory } from '../constants/productCategories'
 import { buildProductCategoryPayload } from './productMapper'
+import type { AdminProductDetailChangeSet } from '../components/admin/products/detail/editor/productSaveChanges'
 import type {
   AdminProductDetailForm,
   AdminProductInfoFields,
+  AdminProductOptionGroup,
   AdminProductVariant,
   AdminReturnInfoFields,
   AdminShippingInfoFields,
@@ -99,25 +111,95 @@ function parseSizeGuide(value: unknown): AdminSizeGuide {
   }
 }
 
+function parseOptionGroups(value: unknown): AdminProductOptionGroup[] {
+  if (!isRecord(value) || !Array.isArray(value.optionGroups)) {
+    return []
+  }
+
+  return value.optionGroups
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null
+      }
+
+      const name = asString(item.name).trim()
+      const values = Array.isArray(item.values)
+        ? [...new Set(item.values.map((entry) => asString(entry).trim()).filter(Boolean))]
+        : []
+
+      if (!name) {
+        return null
+      }
+
+      const storedId = asString(item.id).trim()
+
+      return {
+        id: storedId || createOptionGroupId(),
+        name,
+        valuesInput: formatOptionValuesInput(values),
+      }
+    })
+    .filter((item): item is AdminProductOptionGroup => item !== null)
+}
+
 function parseVariants(value: unknown): AdminProductVariant[] {
   if (!Array.isArray(value)) {
     return []
   }
 
-  return value
-    .map((item, index) => {
+  const rows = value
+    .map((item) => {
       if (!isRecord(item)) {
         return null
       }
 
+      const options =
+        isRecord(item.options)
+          ? Object.fromEntries(
+              Object.entries(item.options)
+                .map(([key, optionValue]) => [key.trim(), asString(optionValue).trim()])
+                .filter(([key, optionValue]) => key && optionValue),
+            )
+          : undefined
+
       return {
-        id: asString(item.id, `variant-${index}`),
+        id: asString(item.id),
         color: asString(item.color),
         size: asString(item.size),
         stock: typeof item.stock === 'number' && Number.isFinite(item.stock) ? item.stock : 0,
+        extraPrice:
+          typeof item.extraPrice === 'number' && Number.isFinite(item.extraPrice)
+            ? item.extraPrice
+            : 0,
+        sku: asString(item.sku),
+        options,
       }
     })
-    .filter((item): item is AdminProductVariant => item !== null)
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  return rows
+}
+
+function extractProductInfoFields(value: unknown): {
+  optionGroups: AdminProductOptionGroup[]
+  variants: AdminProductVariant[]
+} {
+  if (!isRecord(value)) {
+    return { optionGroups: [], variants: [] }
+  }
+
+  const rawVariants = parseVariants(value.variants)
+  let optionGroups = parseOptionGroups(value)
+
+  if (optionGroups.length === 0 && rawVariants.length > 0) {
+    const provisional = variantsFromLegacyRows(rawVariants, ['색상', '사이즈'])
+    optionGroups = inferOptionGroupsFromVariants(provisional)
+  }
+
+  const groupNames = optionGroups.map((group) => group.name.trim()).filter(Boolean)
+  const variants = normalizeAdminVariants(variantsFromLegacyRows(rawVariants, groupNames), groupNames)
+
+  return { optionGroups, variants }
 }
 
 function parseProductInfo(value: unknown): AdminProductInfoFields {
@@ -136,14 +218,6 @@ function parseProductInfo(value: unknown): AdminProductInfoFields {
     lining: asString(value.lining),
     fit: asString(value.fit),
   }
-}
-
-function extractVariantsFromProductInfo(value: unknown): AdminProductVariant[] {
-  if (!isRecord(value)) {
-    return []
-  }
-
-  return parseVariants(value.variants)
 }
 
 function parseShippingInfo(value: unknown): AdminShippingInfoFields {
@@ -178,6 +252,7 @@ export function mapRowToAdminProductDetailForm(row: AdminProductDetailRow): Admi
   const slug = row.slug
   const thumbnail = row.thumbnail ?? placeholderImage(slug)
   const images = row.images && row.images.length > 0 ? row.images : [thumbnail]
+  const { optionGroups, variants } = extractProductInfoFields(row.product_info)
 
   return {
     id: row.id,
@@ -205,12 +280,116 @@ export function mapRowToAdminProductDetailForm(row: AdminProductDetailRow): Admi
     isNew: row.is_new === true,
     isBest: row.is_best === true,
     isSale: row.is_sale === true,
-    variants: extractVariantsFromProductInfo(row.product_info),
+    optionGroups,
+    variants,
+  }
+}
+
+/** Updates only description tab fields — never touches options, stock, status, or pricing. */
+export function mapAdminProductDetailFormToDescriptionUpdatePayload(
+  form: AdminProductDetailForm,
+) {
+  return {
+    description: form.description,
+    short_description: buildIntroShortDescriptionFromForm(form),
+    detail_media: serializeDetailMediaForDb(form.detail_media),
   }
 }
 
 export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetailForm) {
+  return mapAdminProductDetailFormToFullUpdatePayload(form)
+}
+
+function buildVariantsPayload(form: AdminProductDetailForm) {
+  const optionGroups = buildOptionGroupsPayload(form.optionGroups)
+  const groupNames = optionGroups.map((group) => group.name)
+
+  return {
+    optionGroups,
+    variants: normalizeAdminVariants(form.variants, groupNames).map((variant) => ({
+      id: variant.id,
+      options: variant.options,
+      stock: variant.stock,
+      extraPrice: variant.extraPrice,
+      sku: variant.sku,
+      color: variant.color,
+      size: variant.size,
+    })),
+  }
+}
+
+/** Builds a partial Supabase update — only fields flagged in `changes` are included. */
+export function buildAdminProductDetailPartialUpdatePayload(
+  baseline: AdminProductDetailForm,
+  next: AdminProductDetailForm,
+  changes: AdminProductDetailChangeSet,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+
+  if (changes.description) {
+    Object.assign(payload, mapAdminProductDetailFormToDescriptionUpdatePayload(next))
+  } else if (changes.detailMedia) {
+    payload.detail_media = serializeDetailMediaForDb(next.detail_media)
+    payload.short_description = buildIntroShortDescriptionFromForm(next)
+  }
+
+  if (changes.pricing) {
+    payload.price = next.price
+    payload.original_price = next.original_price
+    payload.discount_rate = next.discount_rate
+  }
+
+  if (changes.simpleStock) {
+    payload.stock = next.stock
+  }
+
+  if (changes.options) {
+    const { optionGroups, variants } = buildVariantsPayload(next)
+    payload.product_info = {
+      ...baseline.product_info,
+      optionGroups,
+      variants,
+    }
+    payload.stock = getVariantTotalStock(next.variants)
+  }
+
+  if (changes.basicInfo) {
+    const categoryFields = buildProductCategoryPayload(next.product_category)
+    payload.name = next.name.trim()
+    payload.slug = next.slug.trim()
+    payload.brand = next.brand.trim() || null
+    payload.sku = next.sku.trim() || null
+    Object.assign(payload, categoryFields)
+  }
+
+  if (changes.status) {
+    payload.status = next.status
+  }
+
+  if (changes.media) {
+    payload.thumbnail = next.thumbnail.trim() || null
+    payload.images = next.images
+  }
+
+  if (changes.shipping) {
+    payload.shipping_info = next.shipping_info
+    payload.return_info = next.return_info
+    payload.size_guide = next.size_guide
+  }
+
+  if (changes.exposure) {
+    payload.is_new = next.isNew === true
+    payload.is_best = next.isBest === true
+    payload.is_sale = next.isSale === true
+  }
+
+  return payload
+}
+
+// Legacy full payload helper (used by copy product)
+export function mapAdminProductDetailFormToFullUpdatePayload(form: AdminProductDetailForm) {
   const categoryFields = buildProductCategoryPayload(form.product_category)
+  const { optionGroups, variants } = buildVariantsPayload(form)
 
   return {
     name: form.name.trim(),
@@ -225,13 +404,14 @@ export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetai
     stock: form.stock,
     thumbnail: form.thumbnail.trim() || null,
     images: form.images,
-    short_description: form.short_description.trim() || null,
+    short_description: buildIntroShortDescriptionFromForm(form),
     description: form.description,
     detail_media: serializeDetailMediaForDb(form.detail_media),
     size_guide: form.size_guide,
     product_info: {
       ...form.product_info,
-      variants: form.variants,
+      optionGroups,
+      variants,
     },
     shipping_info: form.shipping_info,
     return_info: form.return_info,
@@ -240,6 +420,5 @@ export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetai
     is_new: form.isNew === true,
     is_best: form.isBest === true,
     is_sale: form.isSale === true,
-    is_admin_registered: true,
   }
 }
