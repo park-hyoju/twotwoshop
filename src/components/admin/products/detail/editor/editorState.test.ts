@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyProductDetailForm } from '../../../../../lib/adminProductDetailDefaults'
-import { isDescriptionOnlySave, serializeEditorState } from './editorState'
+import {
+  canonicalizeFormForSnapshot,
+  isDescriptionOnlySave,
+  serializeEditorState,
+} from './editorState'
 
 describe('isDescriptionOnlySave', () => {
   const baseForm = {
@@ -52,5 +56,18 @@ describe('isDescriptionOnlySave', () => {
     const nextForm = { ...baseForm, price: 10_000 }
 
     expect(isDescriptionOnlySave(nextForm, snapshot, [])).toBe(false)
+  })
+
+  it('does not mark dirty when only variant ids differ', () => {
+    const snapshot = serializeEditorState(baseForm, [])
+    const nextForm = {
+      ...baseForm,
+      variants: [{ ...baseForm.variants[0], id: 'regenerated-id' }],
+    }
+
+    expect(serializeEditorState(nextForm, [])).toBe(snapshot)
+    expect(canonicalizeFormForSnapshot(nextForm).variants[0]?.id).toBe(
+      canonicalizeFormForSnapshot(baseForm).variants[0]?.id,
+    )
   })
 })

@@ -57,6 +57,26 @@ export function validateProductVideoFile(file: File): void {
   }
 }
 
+/** Storage 업로드용 Content-Type. 빈 file.type은 확장자로 video MIME을 지정합니다. */
+export function resolveProductVideoContentType(file: File): string {
+  if (file.type && VIDEO_MIME_TYPES.has(file.type)) {
+    return file.type
+  }
+
+  const lowerName = file.name.toLowerCase()
+  if (lowerName.endsWith('.mp4')) {
+    return 'video/mp4'
+  }
+  if (lowerName.endsWith('.webm')) {
+    return 'video/webm'
+  }
+  if (lowerName.endsWith('.mov')) {
+    return 'video/quicktime'
+  }
+
+  return 'video/mp4'
+}
+
 export function buildProductVideoPath(productId: string, fileName: string): string {
   return buildProductImagePath(productId, 'detail', fileName).replace('/detail-', '/detail-video-')
 }

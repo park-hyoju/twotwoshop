@@ -9,6 +9,7 @@ import {
   getVariantTotalStock,
   mergeVariantCombinations,
   normalizeOptionGroupsInput,
+  optionGroupsNeedNormalization,
   parseOptionTokens,
   parseOptionValuesInput,
   resolveVariantStocksFromDraft,
@@ -16,6 +17,40 @@ import {
 import type { AdminProductVariant } from '../types/adminProductDetail'
 
 describe('adminProductOptions', () => {
+  it('preserves in-progress option groups with empty values', () => {
+    const normalized = normalizeOptionGroupsInput([
+      { id: 'g1', name: '색상', valuesInput: '' },
+    ])
+
+    expect(normalized).toEqual([{ id: 'g1', name: '색상', valuesInput: '' }])
+    expect(optionGroupsNeedNormalization(normalized)).toBe(false)
+  })
+
+  it('keeps color and empty size groups together while editing', () => {
+    const groups = [
+      { id: 'g1', name: '색상', valuesInput: '네이비, 화이트, 블랙' },
+      { id: 'g2', name: '사이즈', valuesInput: '' },
+    ]
+
+    expect(optionGroupsNeedNormalization(groups)).toBe(false)
+    expect(normalizeOptionGroupsInput(groups)).toEqual(groups)
+
+    const withSizes = [
+      { id: 'g1', name: '색상', valuesInput: '네이비, 화이트' },
+      { id: 'g2', name: '사이즈', valuesInput: '95, 100, 105' },
+    ]
+    const variants = buildVariantsFromOptionGroups(withSizes, [])
+    expect(variants).toHaveLength(6)
+    expect(variants.map((variant) => formatVariantOptionLabel(variant, ['색상', '사이즈']))).toEqual([
+      '네이비 / 95',
+      '네이비 / 100',
+      '네이비 / 105',
+      '화이트 / 95',
+      '화이트 / 100',
+      '화이트 / 105',
+    ])
+  })
+
   it('parses comma and newline separated option values', () => {
     expect(parseOptionValuesInput('블랙, 화이트\n베이지')).toEqual(['블랙', '화이트', '베이지'])
   })

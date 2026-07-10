@@ -6,6 +6,24 @@ import {
 } from './adminNumericInput'
 import { createOptionGroupId, createVariantId } from '../types/productOptions'
 
+export function sortOptionGroupNames(names: string[]): string[] {
+  const order = ['색상', '사이즈']
+  return [...names].sort((left, right) => {
+    const leftIndex = order.indexOf(left)
+    const rightIndex = order.indexOf(right)
+    if (leftIndex === -1 && rightIndex === -1) {
+      return left.localeCompare(right, 'ko')
+    }
+    if (leftIndex === -1) {
+      return 1
+    }
+    if (rightIndex === -1) {
+      return -1
+    }
+    return leftIndex - rightIndex
+  })
+}
+
 export function parseOptionValuesInput(input: string): string[] {
   const values = input
     .split(/[,\n]/)
@@ -97,6 +115,15 @@ export function normalizeOptionGroupsInput(
         ...group,
         name: defaultDimensionName(index),
         valuesInput: group.valuesInput,
+      })
+      continue
+    }
+
+    if (rawName && valueTokens.length === 0) {
+      expanded.push({
+        ...group,
+        name: isDimensionLabel(rawName) ? canonicalDimensionLabel(rawName) : rawName,
+        valuesInput: '',
       })
       continue
     }
@@ -317,7 +344,7 @@ export function inferOptionGroupsFromVariants(
       }
     }
 
-    return [...names].map((name) => ({
+    return sortOptionGroupNames([...names]).map((name) => ({
       id: createOptionGroupId(),
       name,
       valuesInput: formatOptionValuesInput([
@@ -405,6 +432,7 @@ export function buildOptionGroupsPayload(groups: AdminProductOptionGroup[]) {
     .filter((group) => group.name && group.values.length > 0)
 }
 
+/** 옵션값이 채워진 그룹이 2개 이상일 때만 색상×사이즈 조합을 생성합니다. */
 export function buildVariantsFromOptionGroups(
   groups: AdminProductOptionGroup[],
   existingVariants: AdminProductVariant[],
@@ -417,13 +445,23 @@ export function buildVariantsFromOptionGroups(
   }
 
   const combinations = cartesianCombinations(payload)
-  const groupNames = payload.map((group) => group.name)
+  const groupNames = sortOptionGroupNames(payload.map((group) => group.name))
+  const stockByOptionKey = new Map(
+    existingVariants.map((variant) => [
+      getVariantOptionKey(variant.options ?? {}),
+      stockByVariantId?.[variant.id] ?? variant.stock,
+    ]),
+  )
   const existingWithStock = existingVariants.map((variant) => ({
     ...variant,
     stock: stockByVariantId?.[variant.id] ?? variant.stock,
   }))
 
-  return mergeVariantCombinations(existingWithStock, combinations, groupNames)
+  const merged = mergeVariantCombinations(existingWithStock, combinations, groupNames)
+  return merged.map((variant) => ({
+    ...variant,
+    stock: stockByOptionKey.get(getVariantOptionKey(variant.options ?? {})) ?? variant.stock,
+  }))
 }
 
 export function cloneOptionGroupsForNewProduct(

@@ -1,12 +1,15 @@
 import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
 import { supabase } from '../lib/supabase'
 import {
+  PRODUCT_IMAGE_BUCKET,
   buildProductVideoPath,
   getProductVideoPublicUrl,
   getProductVideoUploadEndpoint,
   getSupabaseAnonKey,
+  resolveProductVideoContentType,
   validateProductVideoFile,
 } from '../lib/productVideoStorage'
+import { buildStorageUploadErrorMessage } from '../lib/supabaseStorageUploadError'
 import { ProductImageUploadError } from './adminProductImageUploadService'
 
 async function getAccessToken(): Promise<string> {
@@ -25,10 +28,35 @@ async function getAccessToken(): Promise<string> {
   return token
 }
 
+function logVideoUploadFailure(details: {
+  status: number
+  responseText: string
+  bucket: string
+  path: string
+  contentType: string
+  fileName: string
+  fileSize: number
+}): void {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  console.group('[video-upload] storage upload failed')
+  console.log('bucket', details.bucket)
+  console.log('path', details.path)
+  console.log('contentType', details.contentType)
+  console.log('fileName', details.fileName)
+  console.log('fileSize', details.fileSize)
+  console.log('httpStatus', details.status)
+  console.log('responseText', details.responseText)
+  console.groupEnd()
+}
+
 function uploadRawFileWithProgress(
   path: string,
   file: File,
   token: string,
+  contentType: string,
   onProgress?: (percent: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -38,7 +66,7 @@ function uploadRawFileWithProgress(
     xhr.open('POST', endpoint)
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.setRequestHeader('apikey', getSupabaseAnonKey())
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.setRequestHeader('Content-Type', contentType)
     xhr.setRequestHeader('x-upsert', 'true')
 
     xhr.upload.addEventListener('progress', (event) => {
@@ -61,21 +89,24 @@ function uploadRawFileWithProgress(
         return
       }
 
-      let message = '영상 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.'
-      if (xhr.status === 401 || xhr.status === 403) {
-        message =
-          '영상 업로드 권한이 없습니다. 관리자 로그인 상태와 Storage 정책을 확인해 주세요.'
-      } else if (xhr.status === 413) {
-        message = '영상 용량이 너무 큽니다. 500MB 이하 영상으로 다시 시도해 주세요.'
-      }
+      logVideoUploadFailure({
+        status: xhr.status,
+        responseText: xhr.responseText,
+        bucket: PRODUCT_IMAGE_BUCKET,
+        path,
+        contentType,
+        fileName: file.name,
+        fileSize: file.size,
+      })
 
+      const message = buildStorageUploadErrorMessage(xhr.status, xhr.responseText)
       reject(new ProductImageUploadError(message, xhr.responseText))
     })
 
     xhr.addEventListener('error', () => {
       reject(
         new ProductImageUploadError(
-          '네트워크 오류로 영상을 업로드하지 못했습니다. 연결 상태를 확인해 주세요.',
+          '업로드 실패\n네트워크 오류로 Storage에 연결하지 못했습니다.',
         ),
       )
     })
@@ -92,10 +123,11 @@ export async function uploadProductVideo(
   validateProductVideoFile(file)
 
   const path = buildProductVideoPath(productId, file.name)
+  const contentType = resolveProductVideoContentType(file)
   const token = await getAccessToken()
 
   onProgress?.(5)
-  await uploadRawFileWithProgress(path, file, token, (percent) => {
+  await uploadRawFileWithProgress(path, file, token, contentType, (percent) => {
     onProgress?.(5 + Math.round(percent * 0.95))
   })
 

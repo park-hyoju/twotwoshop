@@ -35,7 +35,13 @@ interface UploadTask {
 
 function getUploadErrorMessage(error: unknown): string {
   if (error instanceof ProductImageUploadError) {
-    return error.message
+    if (error.message.trim()) {
+      return error.message
+    }
+
+    if (typeof error.cause === 'string' && error.cause.trim()) {
+      return error.cause
+    }
   }
 
   if (error instanceof Error) {
@@ -201,7 +207,7 @@ export function ProductDetailMediaSection({ form, onChange }: ProductDetailMedia
       />
 
       {uploadError && (
-        <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p role="alert" className="whitespace-pre-wrap rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
           {uploadError}
         </p>
       )}

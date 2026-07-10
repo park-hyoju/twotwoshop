@@ -3,6 +3,9 @@ import { createEmptyProductDetailForm } from '../../../../../lib/adminProductDet
 import {
   detectAdminProductDetailChanges,
   isDescriptionOnlyChanges,
+  mergeVariantStockDraftIntoForm,
+  prepareOptionsFormForSave,
+  resolveSoldoutStatusWhenStockAvailable,
 } from './productSaveChanges'
 
 describe('detectAdminProductDetailChanges', () => {
@@ -57,6 +60,90 @@ describe('detectAdminProductDetailChanges', () => {
     expect(changes.pricing).toBe(false)
   })
 
+  it('detects stock-only edits after merging variant stock draft', () => {
+    const baselineForm = {
+      ...createEmptyProductDetailForm('p1'),
+      stock: 0,
+      status: 'soldout' as const,
+      optionGroups: [
+        { id: 'g1', name: '색상', valuesInput: '네이비, 화이트' },
+        { id: 'g2', name: '사이즈', valuesInput: '95, 100, 105' },
+      ],
+      variants: [
+        {
+          id: 'v-navy-95',
+          options: { 색상: '네이비', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '네이비',
+          size: '95',
+        },
+        {
+          id: 'v-navy-100',
+          options: { 색상: '네이비', 사이즈: '100' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '네이비',
+          size: '100',
+        },
+        {
+          id: 'v-white-95',
+          options: { 색상: '화이트', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '화이트',
+          size: '95',
+        },
+      ],
+    }
+    const draft = {
+      'v-navy-95': '3',
+      'v-navy-100': '4',
+      'v-white-95': '5',
+    }
+    const merged = mergeVariantStockDraftIntoForm(baselineForm, draft)
+    const changes = detectAdminProductDetailChanges(baselineForm, merged, [], [])
+
+    expect(merged.variants.map((row) => row.stock)).toEqual([3, 4, 5])
+    expect(merged.stock).toBe(12)
+    expect(changes.options).toBe(true)
+    expect(changes.description).toBe(false)
+    expect(changes.pricing).toBe(false)
+  })
+
+  it('offers active status when stock exists while soldout', () => {
+    const form = {
+      ...createEmptyProductDetailForm('p1'),
+      status: 'soldout' as const,
+      stock: 12,
+      variants: [
+        {
+          id: 'v1',
+          options: { 색상: '네이비', 사이즈: '95' },
+          stock: 12,
+          extraPrice: 0,
+          sku: '',
+          color: '네이비',
+          size: '95',
+        },
+      ],
+    }
+
+    const confirmed = resolveSoldoutStatusWhenStockAvailable(form, () => true)
+    const declined = resolveSoldoutStatusWhenStockAvailable(form, () => false)
+    const hidden = resolveSoldoutStatusWhenStockAvailable(
+      { ...form, status: 'hidden' },
+      () => true,
+    )
+
+    expect(confirmed.status).toBe('active')
+    expect(declined.status).toBe('soldout')
+    expect(hidden.status).toBe('hidden')
+  })
+
   it('does not treat regenerated variant ids as option changes', () => {
     const next = {
       ...baseline,
@@ -65,6 +152,34 @@ describe('detectAdminProductDetailChanges', () => {
     const changes = detectAdminProductDetailChanges(baseline, next, [], [])
 
     expect(changes.options).toBe(false)
+  })
+
+  it('rebuilds six variants from color and size groups', () => {
+    const form = {
+      ...createEmptyProductDetailForm('p1'),
+      optionGroups: [
+        { id: 'g1', name: '색상', valuesInput: '네이비, 화이트' },
+        { id: 'g2', name: '사이즈', valuesInput: '95, 100, 105' },
+      ],
+      variants: [],
+      stock: 0,
+    }
+    const draft = {}
+
+    const prepared = prepareOptionsFormForSave(form, draft)
+
+    expect(prepared.variants).toHaveLength(6)
+    expect(prepared.stock).toBe(0)
+    expect(
+      prepared.variants.map((variant) => `${variant.options.색상}/${variant.options.사이즈}`),
+    ).toEqual([
+      '네이비/95',
+      '네이비/100',
+      '네이비/105',
+      '화이트/95',
+      '화이트/100',
+      '화이트/105',
+    ])
   })
 
   it('detects detail media order changes without description text changes', () => {

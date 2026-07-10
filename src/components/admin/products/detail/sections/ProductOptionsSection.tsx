@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildVariantsFromOptionGroups,
   formatVariantOptionLabel,
   getDisplayedVariantTotalStock,
   getVariantOptionKey,
   getVariantTotalStock,
-  normalizeOptionGroupsInput,
-  optionGroupsNeedNormalization,
   resolveVariantStocksFromDraft,
 } from '../../../../../lib/adminProductOptions'
 import {
@@ -27,10 +25,11 @@ interface ProductOptionsSectionProps {
     field: K,
     value: AdminProductDetailForm[K],
   ) => void
+  onBatchChange?: (patch: Partial<AdminProductDetailForm>) => void
   onVariantStockDraftChange?: (draft: Record<string, string>) => void
 }
 
-const OPTION_SYNC_DEBOUNCE_MS = 350
+const OPTION_SYNC_DEBOUNCE_MS = 250
 
 function buildStockDraft(rows: AdminProductVariant[]): Record<string, string> {
   return Object.fromEntries(rows.map((row) => [row.id, formatAdminNumericInput(row.stock)]))
@@ -44,6 +43,11 @@ function createBlankOptionGroup(index: number): AdminProductOptionGroup {
   }
 }
 
+/** 첫 옵션 추가 시 색상·사이즈 두 그룹을 바로 보여줍니다. */
+function createInitialOptionGroups(): AdminProductOptionGroup[] {
+  return [createBlankOptionGroup(0), createBlankOptionGroup(1)]
+}
+
 function stockByVariantIdFromDraft(
   rows: AdminProductVariant[],
   stockInputs: Record<string, string>,
@@ -53,9 +57,20 @@ function stockByVariantIdFromDraft(
   )
 }
 
+function buildVariantsSignature(rows: AdminProductVariant[]): string {
+  return rows
+    .map((row) => `${row.id}:${getVariantOptionKey(row.options)}:${row.stock}`)
+    .join('|')
+}
+
+function buildVariantKeysSignature(rows: AdminProductVariant[]): string {
+  return rows.map((row) => getVariantOptionKey(row.options)).join(',')
+}
+
 export function ProductOptionsSection({
   form,
   onChange,
+  onBatchChange,
   onVariantStockDraftChange,
 }: ProductOptionsSectionProps) {
   const rows = form.variants
@@ -68,6 +83,7 @@ export function ProductOptionsSection({
     () => groups.map((group) => `${group.id}:${group.name}:${group.valuesInput}`).join('|'),
     [groups],
   )
+  const variantsSignature = useMemo(() => buildVariantsSignature(rows), [rows])
 
   const [stockInputs, setStockInputs] = useState<Record<string, string>>(() => buildStockDraft(rows))
   const [bulkStockInput, setBulkStockInput] = useState('')
@@ -77,27 +93,54 @@ export function ProductOptionsSection({
   rowsRef.current = rows
   stockInputsRef.current = stockInputs
 
+  /** 옵션값 입력 즉시 조합 미리보기 (form 반영 전에도 표 표시) */
+  const tableVariants = useMemo(() => {
+    if (groups.length === 0) {
+      return rows
+    }
+
+    const built = buildVariantsFromOptionGroups(
+      groups,
+      rows,
+      stockByVariantIdFromDraft(rows, stockInputs),
+    )
+
+    return built.length > 0 ? built : rows
+  }, [groups, rows, stockInputs])
+
+  const applyFormPatch = useCallback(
+    (patch: Partial<AdminProductDetailForm>) => {
+      if (onBatchChange) {
+        onBatchChange(patch)
+        return
+      }
+
+      for (const [field, value] of Object.entries(patch) as Array<
+        [keyof AdminProductDetailForm, AdminProductDetailForm[keyof AdminProductDetailForm]]
+      >) {
+        onChange(field, value)
+      }
+    },
+    [onBatchChange, onChange],
+  )
+
   useEffect(() => {
     const nextStock = buildStockDraft(form.variants)
     setStockInputs(nextStock)
     onVariantStockDraftChange?.(nextStock)
-  }, [form.id, onVariantStockDraftChange])
+  }, [form.id, variantsSignature, onVariantStockDraftChange, form.variants])
 
+  // 옵션 그룹 편집 중에는 normalize로 optionGroups를 덮어쓰지 않습니다.
+  // (빈 사이즈 그룹이 사라지는 원인). variants만 동기화합니다.
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (groups.length === 0) {
         if (rowsRef.current.length > 0) {
-          onChange('variants', [])
-          onChange('stock', 0)
+          applyFormPatch({ variants: [], stock: 0 })
           const nextDraft = {}
           setStockInputs(nextDraft)
           onVariantStockDraftChange?.(nextDraft)
         }
-        return
-      }
-
-      if (optionGroupsNeedNormalization(groups)) {
-        onChange('optionGroups', normalizeOptionGroupsInput(groups))
         return
       }
 
@@ -106,37 +149,46 @@ export function ProductOptionsSection({
         rowsRef.current,
         stockByVariantIdFromDraft(rowsRef.current, stockInputsRef.current),
       )
-      const currentKeys = rowsRef.current
-        .map((row) => getVariantOptionKey(row.options))
-        .join(',')
-      const nextKeys = nextVariants.map((row) => getVariantOptionKey(row.options)).join(',')
+      const currentKeys = buildVariantKeysSignature(rowsRef.current)
+      const nextKeys = buildVariantKeysSignature(nextVariants)
 
       if (currentKeys === nextKeys) {
         return
       }
 
-      onChange('variants', nextVariants)
-      onChange('stock', getVariantTotalStock(nextVariants))
       const nextDraft = buildStockDraft(nextVariants)
+      applyFormPatch({
+        variants: nextVariants,
+        stock: getVariantTotalStock(nextVariants),
+      })
       setStockInputs(nextDraft)
       onVariantStockDraftChange?.(nextDraft)
     }, OPTION_SYNC_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [groups, groupsSignature, form.id, onChange, onVariantStockDraftChange])
+  }, [groups, groupsSignature, form.id, applyFormPatch, onVariantStockDraftChange])
 
   const displayedTotalStock = useMemo(
-    () => getDisplayedVariantTotalStock(rows, stockInputs),
-    [rows, stockInputs],
+    () => getDisplayedVariantTotalStock(tableVariants, stockInputs),
+    [tableVariants, stockInputs],
   )
 
   function publishStockDraft(next: Record<string, string>) {
     setStockInputs(next)
     onVariantStockDraftChange?.(next)
+
+    const currentRows = tableVariants.length > 0 ? tableVariants : rowsRef.current
+    if (currentRows.length > 0) {
+      const variants = resolveVariantStocksFromDraft(currentRows, next)
+      applyFormPatch({
+        variants,
+        stock: getVariantTotalStock(variants),
+      })
+    }
   }
 
   function setOptionGroups(nextGroups: AdminProductOptionGroup[]) {
-    onChange('optionGroups', nextGroups)
+    applyFormPatch({ optionGroups: nextGroups })
   }
 
   function updateGroup(id: string, patch: Partial<AdminProductOptionGroup>) {
@@ -144,6 +196,11 @@ export function ProductOptionsSection({
   }
 
   function addGroup() {
+    if (groups.length === 0) {
+      setOptionGroups(createInitialOptionGroups())
+      return
+    }
+
     setOptionGroups([...groups, createBlankOptionGroup(groups.length)])
   }
 
@@ -158,11 +215,11 @@ export function ProductOptionsSection({
   function applyBulkStock() {
     const stock = parseAdminNumericInput(bulkStockInput)
     publishStockDraft(
-      Object.fromEntries(rows.map((row) => [row.id, formatAdminNumericInput(stock)])),
+      Object.fromEntries(tableVariants.map((row) => [row.id, formatAdminNumericInput(stock)])),
     )
   }
 
-  const hasGeneratedVariants = rows.length > 0
+  const showStockTable = tableVariants.length > 0
 
   return (
     <div className={`${adminSectionClassName} space-y-5`}>
@@ -179,11 +236,6 @@ export function ProductOptionsSection({
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-            옵션명에는 <strong className="font-semibold text-neutral-800">색상</strong>,{' '}
-            <strong className="font-semibold text-neutral-800">사이즈</strong>처럼 종류만 입력하고,
-            네이비·화이트·95·100 같은 실제 선택지는 옵션값에 입력하세요.
-          </p>
           {groups.map((group, index) => (
             <div key={group.id} className="space-y-2 rounded-xl border border-neutral-200 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -229,7 +281,7 @@ export function ProductOptionsSection({
         </div>
       )}
 
-      {hasGeneratedVariants && (
+      {showStockTable && (
         <div className="space-y-4">
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
             <p className={adminLabelClassName}>총 재고</p>
@@ -248,7 +300,7 @@ export function ProductOptionsSection({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {tableVariants.map((row) => (
                   <tr key={row.id} className="border-t border-neutral-100">
                     <td className="px-4 py-2.5 text-neutral-800">
                       {formatVariantOptionLabel(row, groupNames)}
@@ -298,15 +350,4 @@ export function ProductOptionsSection({
   )
 }
 
-export function applyVariantStockDraftToForm(
-  form: AdminProductDetailForm,
-  draft: Record<string, string>,
-): AdminProductDetailForm {
-  const variants = resolveVariantStocksFromDraft(form.variants, draft)
-
-  return {
-    ...form,
-    variants,
-    stock: form.variants.length > 0 ? getVariantTotalStock(variants) : form.stock,
-  }
-}
+export { mergeVariantStockDraftIntoForm as applyVariantStockDraftToForm } from '../editor/productSaveChanges'
