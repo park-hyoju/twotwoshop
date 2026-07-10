@@ -43,18 +43,16 @@ import { SellerPhotosStep } from './steps/SellerPhotosStep'
 import { SellerShippingStep } from './steps/SellerShippingStep'
 import { collectGalleryPhotos } from './detailContent/detailContent'
 import { adminSectionClassName } from './adminFormStyles'
-import { serializeEditorState, logProductEditorDebugState } from './editor/editorState'
-import { buildAdminProductDetailPartialUpdatePayload } from '../../../../services/adminProductDetailMapper'
+import { serializeEditorState } from './editor/editorState'
 import {
   detectAdminProductDetailChanges,
   hasPersistableChanges,
   isDescriptionOnlyChanges,
-  logAdminOptionStockSaveDebug,
-  prepareOptionsFormForSave,
+  summarizeVariantStock,
 } from './editor/productSaveChanges'
 import { getSellerStepIndex, PRODUCT_SELLER_STEPS } from './productSellerSteps'
 import { applyPricingDraftToForm } from './sections/AdminPricingFields'
-import { ProductOptionsSection } from './sections/ProductOptionsSection'
+import { ProductOptionsSection, applyVariantStockDraftToForm } from './sections/ProductOptionsSection'
 
 function buildVariantStockDraft(
   variants: AdminProductDetailForm['variants'],
@@ -202,26 +200,6 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  const updateFormBatch = useCallback((patch: Partial<AdminProductDetailForm>) => {
-    setForm((current) => ({ ...current, ...patch }))
-  }, [])
-
-  useEffect(() => {
-    if (!import.meta.env.DEV || activeStep !== 'options') {
-      return
-    }
-
-    logProductEditorDebugState({
-      isDirty,
-      isSaving,
-      savedSnapshot,
-      form,
-      variantStockDraft: variantStockDraftRef.current,
-      pricingDraft: pricingDraftRef.current,
-      disabledReason: isSaving ? 'isSaving' : loadError ? 'loadError' : null,
-    })
-  }, [activeStep, form, isDirty, isSaving, loadError, savedSnapshot, variantStockDraft])
-
   function prepareFormForSave(currentForm: AdminProductDetailForm): AdminProductDetailForm | null {
     const galleryChanged =
       galleryImages.length > 0 && galleryImagesDifferFromForm(galleryImages, currentForm)
@@ -273,9 +251,11 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       const dbRelatedIds = dbRelated.map((item) => item.id)
       const nextRelatedIds = relatedProducts.map((item) => item.id)
 
+      // Apply option stock draft before change detection so stock-only edits are persisted.
       let workingForm = withGallery
-      if (workingForm.optionGroups.length > 0 || workingForm.variants.length > 0) {
-        workingForm = prepareOptionsFormForSave(workingForm, variantStockDraftRef.current)
+      if (workingForm.variants.length > 0 || workingForm.optionGroups.length > 0) {
+        workingForm = applyVariantStockDraftToForm(workingForm, variantStockDraftRef.current)
+        workingForm = summarizeVariantStock(workingForm)
       }
 
       const changes = detectAdminProductDetailChanges(
@@ -294,62 +274,18 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         workingForm = applyPricingDraftToForm(workingForm, pricingDraftRef.current)
       }
 
-      let savedForm: AdminProductDetailForm | undefined
-      const debugEnabled = import.meta.env.DEV && workingForm.variants.length > 0
-      const debugPayload =
-        debugEnabled && !isDescriptionOnlyChanges(changes)
-          ? buildAdminProductDetailPartialUpdatePayload(dbBaseline, workingForm, changes)
-          : undefined
+      let savedForm: AdminProductDetailForm
 
-      if (debugEnabled) {
-        console.group('[admin-product-save] option stock')
-        logAdminOptionStockSaveDebug({
-          productId,
-          optionStockDraft: variantStockDraftRef.current,
-          formVariantsStock: withGallery.variants.map((row) => row.stock),
-          finalVariantsStock: workingForm.variants.map((row) => row.stock),
-          totalStock: workingForm.stock,
-          currentStatus: workingForm.status,
-          updatePayload: debugPayload,
-        })
-      }
+      if (isDescriptionOnlyChanges(changes)) {
+        const withSlug = await ensureProductSlug(workingForm)
+        savedForm = await saveAdminProductDetailDescription(withSlug)
+      } else {
+        const withSlug = await ensureProductSlug(workingForm)
+        savedForm = await saveAdminProductDetailPartial(withSlug, dbBaseline, changes)
 
-      try {
-        if (isDescriptionOnlyChanges(changes)) {
-          const withSlug = await ensureProductSlug(workingForm)
-          savedForm = await saveAdminProductDetailDescription(withSlug)
-        } else {
-          const withSlug = await ensureProductSlug(workingForm)
-          savedForm = await saveAdminProductDetailPartial(withSlug, dbBaseline, changes)
-
-          if (changes.related) {
-            await saveAdminRelatedProducts(withSlug.id, nextRelatedIds)
-          }
+        if (changes.related) {
+          await saveAdminRelatedProducts(withSlug.id, nextRelatedIds)
         }
-      } finally {
-        if (debugEnabled) {
-          if (savedForm) {
-            logAdminOptionStockSaveDebug({
-              productId,
-              optionStockDraft: variantStockDraftRef.current,
-              formVariantsStock: withGallery.variants.map((row) => row.stock),
-              finalVariantsStock: workingForm.variants.map((row) => row.stock),
-              totalStock: workingForm.stock,
-              currentStatus: workingForm.status,
-              updatePayload: debugPayload,
-              updateResult: {
-                stock: savedForm.stock,
-                status: savedForm.status,
-                variantStocks: savedForm.variants.map((row) => row.stock),
-              },
-            })
-          }
-          console.groupEnd()
-        }
-      }
-
-      if (!savedForm) {
-        return null
       }
 
       pricingDraftRef.current = pricingDraftFromForm(savedForm)
@@ -437,7 +373,6 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         return (
           <ProductOptionsSection
             {...tabProps}
-            onBatchChange={updateFormBatch}
             onVariantStockDraftChange={handleVariantStockDraftChange}
           />
         )

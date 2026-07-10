@@ -1,6 +1,5 @@
 import {
   buildOptionGroupsPayload,
-  buildVariantsFromOptionGroups,
   formatOptionValuesInput,
   getVariantTotalStock,
   inferOptionGroupsFromVariants,
@@ -304,15 +303,10 @@ export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetai
 function buildVariantsPayload(form: AdminProductDetailForm) {
   const optionGroups = buildOptionGroupsPayload(form.optionGroups)
   const groupNames = optionGroups.map((group) => group.name)
-  const stockByVariantId = Object.fromEntries(form.variants.map((variant) => [variant.id, variant.stock]))
-  const rebuiltVariants =
-    optionGroups.length > 0
-      ? buildVariantsFromOptionGroups(form.optionGroups, form.variants, stockByVariantId)
-      : form.variants
 
   return {
     optionGroups,
-    variants: normalizeAdminVariants(rebuiltVariants, groupNames).map((variant) => ({
+    variants: normalizeAdminVariants(form.variants, groupNames).map((variant) => ({
       id: variant.id,
       options: variant.options,
       stock: variant.stock,
