@@ -130,4 +130,42 @@ describe('syncCartItemsWithResolver', () => {
     expect(result.items[0]?.stock).toBe(2)
     expect(result.notices).toContain('quantityAdjusted')
   })
+
+  it('preserves selectedOptions and resolves option stock on sync', async () => {
+    const product = createProduct({
+      stock: 18,
+      optionGroups: [
+        { name: '색상', values: ['베이지', '브라운'] },
+        { name: '사이즈', values: ['95', '100'] },
+      ],
+      variants: [
+        {
+          id: 'v1',
+          options: { 색상: '베이지', 사이즈: '95' },
+          color: '베이지',
+          size: '95',
+          stock: 3,
+          extraPrice: 0,
+          sku: '',
+        },
+      ],
+    })
+
+    const result = await syncCartItemsWithResolver(
+      [
+        createCartItem({
+          quantity: 2,
+          stock: 3,
+          selectedColor: '베이지',
+          selectedSize: '95',
+          selectedOptions: { 색상: '베이지', 사이즈: '95' },
+        }),
+      ],
+      async () => product,
+    )
+
+    expect(result.items[0]?.selectedOptions).toEqual({ 색상: '베이지', 사이즈: '95' })
+    expect(result.items[0]?.stock).toBe(3)
+    expect(result.items[0]?.quantity).toBe(2)
+  })
 })

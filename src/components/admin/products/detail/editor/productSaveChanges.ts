@@ -1,4 +1,8 @@
-import { getVariantOptionKey, getVariantTotalStock, normalizeOptionGroupsInput } from '../../../../../lib/adminProductOptions'
+import { getVariantOptionKey, getVariantTotalStock, normalizeOptionGroupsInput, buildVariantsFromOptionGroups } from '../../../../../lib/adminProductOptions'
+import {
+  formatAdminNumericInput,
+  parseAdminNumericInput,
+} from '../../../../../lib/adminNumericInput'
 import type { AdminProductDetailForm, AdminProductOptionGroup, AdminProductVariant } from '../../../../../types/adminProductDetail'
 import type { DetailMediaItem } from '../../../../../types/detailMedia'
 import { reindexDetailMediaByArrayOrder } from '../../../../../lib/detailMedia'
@@ -131,5 +135,83 @@ export function summarizeVariantStock(form: AdminProductDetailForm): AdminProduc
   return {
     ...form,
     stock: getVariantTotalStock(form.variants),
+  }
+}
+
+/** Apply option stock draft into form.variants and summed products.stock. */
+export function applyVariantStockDraftToForm(
+  form: AdminProductDetailForm,
+  draft: Record<string, string>,
+): AdminProductDetailForm {
+  if (form.variants.length === 0 && form.optionGroups.length === 0) {
+    return form
+  }
+
+  // Align to current option rows (same structure as the stock table).
+  const aligned =
+    form.optionGroups.length > 0
+      ? buildVariantsFromOptionGroups(form.optionGroups, form.variants)
+      : form.variants
+
+  if (aligned.length === 0) {
+    return form
+  }
+
+  if (Object.keys(draft).length === 0) {
+    return {
+      ...form,
+      variants: aligned,
+      stock: getVariantTotalStock(aligned),
+    }
+  }
+
+  // id → stock from draft (only when the typed value differs from the row baseline display)
+  const draftStockById = new Map<string, number>()
+  for (const row of [...form.variants, ...aligned]) {
+    if (!(row.id in draft)) {
+      continue
+    }
+    const draftValue = draft[row.id]
+    const baselineDisplay = formatAdminNumericInput(row.stock)
+    if (draftValue === baselineDisplay) {
+      draftStockById.set(row.id, row.stock)
+      continue
+    }
+    const parsed = parseAdminNumericInput(draftValue)
+    if (!Number.isFinite(parsed)) {
+      continue
+    }
+    draftStockById.set(row.id, parsed)
+  }
+
+  // optionKey → stock, preferring draft values when the draft id maps to that combination
+  const stockByOptionKey = new Map<string, number>()
+  for (const row of form.variants) {
+    const key = getVariantOptionKey(row.options ?? {})
+    if (!key) {
+      continue
+    }
+    if (draftStockById.has(row.id)) {
+      stockByOptionKey.set(key, draftStockById.get(row.id)!)
+    } else if (!stockByOptionKey.has(key)) {
+      stockByOptionKey.set(key, row.stock)
+    }
+  }
+
+  const variants = aligned.map((row) => {
+    const key = getVariantOptionKey(row.options ?? {})
+    if (draftStockById.has(row.id)) {
+      return { ...row, stock: draftStockById.get(row.id)! }
+    }
+    if (key && stockByOptionKey.has(key)) {
+      return { ...row, stock: stockByOptionKey.get(key)! }
+    }
+    return row
+  })
+
+  return {
+    ...form,
+    variants,
+    stock: getVariantTotalStock(variants),
   }
 }

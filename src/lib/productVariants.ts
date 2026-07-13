@@ -17,6 +17,21 @@ function normalizeOptions(value: unknown): Record<string, string> {
   )
 }
 
+function parseVariantStock(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value))
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.trunc(parsed))
+    }
+  }
+
+  return 0
+}
+
 export function parseOptionGroupsFromProductInfo(value: unknown): ProductOptionGroup[] {
   if (!isRecord(value) || !Array.isArray(value.optionGroups)) {
     return []
@@ -56,7 +71,13 @@ export function inferOptionGroupsFromVariants(variants: ProductVariant[]): Produ
       }
     }
 
-    return [...names].map((name) => ({
+    const preferredOrder = ['색상', '사이즈']
+    const orderedNames = [
+      ...preferredOrder.filter((name) => names.has(name)),
+      ...[...names].filter((name) => !preferredOrder.includes(name)),
+    ]
+
+    return orderedNames.map((name) => ({
       name,
       values: [
         ...new Set(variants.map((variant) => variant.options?.[name] ?? '').filter(Boolean)),
@@ -79,6 +100,45 @@ export function inferOptionGroupsFromVariants(variants: ProductVariant[]): Produ
   return groups
 }
 
+/** True when every option group name exists as a key on variant.options. */
+export function optionGroupsAlignWithVariants(
+  groups: ProductOptionGroup[],
+  variants: ProductVariant[],
+): boolean {
+  if (groups.length === 0 || variants.length === 0) {
+    return false
+  }
+
+  const optionKeys = new Set<string>()
+  for (const variant of variants) {
+    for (const key of Object.keys(variant.options ?? {})) {
+      optionKeys.add(key)
+    }
+  }
+
+  if (optionKeys.size === 0) {
+    return false
+  }
+
+  return groups.every((group) => optionKeys.has(group.name))
+}
+
+/**
+ * Prefer stored optionGroups only when their names match variant.options keys.
+ * Admin row-based saves use color names as group names while variants use { 색상, 사이즈 }.
+ */
+export function resolveProductOptionGroups(
+  storedGroups: ProductOptionGroup[],
+  variants: ProductVariant[],
+): ProductOptionGroup[] {
+  if (optionGroupsAlignWithVariants(storedGroups, variants)) {
+    return storedGroups
+  }
+
+  const inferred = inferOptionGroupsFromVariants(variants)
+  return inferred.length > 0 ? inferred : storedGroups
+}
+
 export function parseProductVariants(value: unknown): ProductVariant[] {
   if (!isRecord(value) || !Array.isArray(value.variants)) {
     return []
@@ -93,8 +153,7 @@ export function parseProductVariants(value: unknown): ProductVariant[] {
       const options = normalizeOptions(item.options)
       const color = typeof item.color === 'string' ? item.color.trim() : ''
       const size = typeof item.size === 'string' ? item.size.trim() : ''
-      const stock =
-        typeof item.stock === 'number' && Number.isFinite(item.stock) ? Math.max(0, item.stock) : 0
+      const stock = parseVariantStock(item.stock)
       const extraPrice =
         typeof item.extraPrice === 'number' && Number.isFinite(item.extraPrice)
           ? Math.max(0, item.extraPrice)
@@ -137,11 +196,7 @@ export function hasProductOptions(product: Pick<Product, 'variants'>): boolean {
 }
 
 export function getProductOptionGroups(product: Pick<Product, 'optionGroups' | 'variants'>): ProductOptionGroup[] {
-  if (product.optionGroups.length > 0) {
-    return product.optionGroups
-  }
-
-  return inferOptionGroupsFromVariants(product.variants)
+  return resolveProductOptionGroups(product.optionGroups, product.variants)
 }
 
 export function getOptionValuesForGroup(
@@ -273,7 +328,12 @@ export function formatProductOptionLabel(color?: string, size?: string): string 
 }
 
 export function formatSelectedOptionsLabel(selectedOptions: Record<string, string>): string | null {
-  const parts = Object.values(selectedOptions).map((value) => value.trim()).filter(Boolean)
+  const preferredOrder = ['색상', '사이즈']
+  const keys = [
+    ...preferredOrder.filter((name) => selectedOptions[name]),
+    ...Object.keys(selectedOptions).filter((name) => !preferredOrder.includes(name)),
+  ]
+  const parts = keys.map((name) => selectedOptions[name]?.trim() ?? '').filter(Boolean)
   return parts.length > 0 ? parts.join(' / ') : null
 }
 
@@ -281,6 +341,13 @@ export function getLegacyColorSizeFromOptions(
   selectedOptions: Record<string, string>,
   groups: ProductOptionGroup[],
 ): { color: string; size: string } {
+  if (selectedOptions['색상'] || selectedOptions['사이즈']) {
+    return {
+      color: selectedOptions['색상'] ?? '',
+      size: selectedOptions['사이즈'] ?? '',
+    }
+  }
+
   const color = groups[0] ? selectedOptions[groups[0].name] ?? '' : ''
   const size = groups[1] ? selectedOptions[groups[1].name] ?? '' : ''
   return { color, size }

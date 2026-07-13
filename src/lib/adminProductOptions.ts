@@ -171,8 +171,17 @@ export function formatVariantOptionLabel(
   variant: AdminProductVariant,
   groupNames: string[],
 ): string {
+  const options = variant.options ?? {}
+  // Row-based variants always store { 색상, 사이즈 } regardless of optionGroup.name labels.
+  if (options['색상'] || options['사이즈']) {
+    return ['색상', '사이즈']
+      .map((name) => options[name] ?? '')
+      .filter(Boolean)
+      .join(' / ')
+  }
+
   return groupNames
-    .map((name) => variant.options[name] ?? '')
+    .map((name) => options[name] ?? '')
     .filter(Boolean)
     .join(' / ')
 }
@@ -404,9 +413,8 @@ export function variantsFromLegacyRows(
 }
 
 export function buildOptionGroupsPayload(groups: AdminProductOptionGroup[]) {
-  const normalized = normalizeOptionGroupsInput(groups)
-
-  return normalized
+  // Live combination generation must use each row as-is (no merge/rewrite).
+  return groups
     .map((group) => ({
       id: group.id,
       name: group.name.trim(),
@@ -415,25 +423,51 @@ export function buildOptionGroupsPayload(groups: AdminProductOptionGroup[]) {
     .filter((group) => group.name && group.values.length > 0)
 }
 
+/**
+ * Each option row is one color: name = color, valuesInput = sizes for that color.
+ * Does NOT cartesian-multiply rows against each other.
+ */
+export function buildRowBasedColorSizeCombinations(
+  groups: AdminProductOptionGroup[],
+): Array<Record<string, string>> {
+  const combinations: Array<Record<string, string>> = []
+
+  for (const group of groups) {
+    const color = group.name.trim()
+    if (!color) {
+      continue
+    }
+
+    for (const size of parseOptionValuesInput(group.valuesInput)) {
+      combinations.push({ 색상: color, 사이즈: size })
+    }
+  }
+
+  return combinations
+}
+
 export function buildVariantsFromOptionGroups(
   groups: AdminProductOptionGroup[],
   existingVariants: AdminProductVariant[],
   stockByVariantId?: Record<string, number>,
 ): AdminProductVariant[] {
-  const normalizedGroups = normalizeOptionGroupsInput(groups)
-  const payload = buildOptionGroupsPayload(normalizedGroups)
-  if (payload.length === 0) {
+  const combinations = buildRowBasedColorSizeCombinations(groups)
+  if (combinations.length === 0) {
     return []
   }
 
-  const combinations = cartesianCombinations(payload)
-  const groupNames = payload.map((group) => group.name)
+  const groupNames = ['색상', '사이즈']
   const existingWithStock = existingVariants.map((variant) => ({
     ...variant,
     stock: stockByVariantId?.[variant.id] ?? variant.stock,
   }))
 
   return mergeVariantCombinations(existingWithStock, combinations, groupNames)
+}
+
+/** Save-time payload may still recover misplaced "네이비/화이트" names. */
+export function buildOptionGroupsPayloadForSave(groups: AdminProductOptionGroup[]) {
+  return buildOptionGroupsPayload(normalizeOptionGroupsInput(groups))
 }
 
 export function cloneOptionGroupsForNewProduct(

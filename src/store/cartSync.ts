@@ -4,6 +4,7 @@ import type { CartItem, CartSyncNoticeType, CartSyncOutcome } from '../types/car
 import { getCartLineId } from '../lib/cartLine'
 import {
   findProductVariant,
+  findProductVariantByOptions,
   getProductOptionStock,
   hasProductOptions,
 } from '../lib/productVariants'
@@ -23,8 +24,14 @@ export function getSyncNoticeMessages(notices: CartSyncNoticeType[]): string[] {
 }
 
 function resolveCartItemStock(product: Product, item: CartItem): number {
-  if (hasProductOptions(product) && (item.selectedColor || item.selectedSize)) {
-    return getProductOptionStock(product, item.selectedColor ?? '', item.selectedSize ?? '')
+  if (hasProductOptions(product)) {
+    if (item.selectedOptions && Object.keys(item.selectedOptions).length > 0) {
+      return getProductOptionStock(product, '', '', item.selectedOptions)
+    }
+
+    if (item.selectedColor || item.selectedSize) {
+      return getProductOptionStock(product, item.selectedColor ?? '', item.selectedSize ?? '')
+    }
   }
 
   return product.stock
@@ -67,11 +74,13 @@ function syncSingleCartItem(
       quantity: item.quantity,
       optionId:
         item.optionId ??
-        findProductVariant(
-          product.variants,
-          item.selectedColor ?? '',
-          item.selectedSize ?? '',
-        )?.id,
+        (item.selectedOptions
+          ? findProductVariantByOptions(product.variants, item.selectedOptions)?.id
+          : findProductVariant(
+              product.variants,
+              item.selectedColor ?? '',
+              item.selectedSize ?? '',
+            )?.id),
     }
   }
 
@@ -84,6 +93,7 @@ function syncSingleCartItem(
   return createCartItemFromProduct(product, quantity, {
     color: item.selectedColor,
     size: item.selectedSize,
+    selectedOptions: item.selectedOptions,
   })
 }
 

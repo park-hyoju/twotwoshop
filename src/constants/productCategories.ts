@@ -115,7 +115,7 @@ export function getGenderNavCategories(group: 'women' | 'men'): ProductCategoryD
 export const PRODUCT_CATEGORY_GROUP_LABELS: Record<ProductCategoryGroup, string> = {
   women: '여성',
   men: '남성',
-  common: '공용',
+  common: '잡화',
 }
 
 export function getAdminCategorySelectOptions(): Array<{
@@ -437,7 +437,7 @@ export function buildStorefrontNavItems(): NavItem[] {
       children: menChildren,
     },
     {
-      label: '공용',
+      label: PRODUCT_CATEGORY_GROUP_LABELS.common,
       href: ROUTES.products,
       children: commonChildren,
     },

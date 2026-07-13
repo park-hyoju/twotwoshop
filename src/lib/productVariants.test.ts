@@ -8,10 +8,12 @@ import {
 } from '../types/productDetail'
 import {
   findProductVariant,
+  getProductOptionGroups,
   getProductOptionStock,
   hasProductOptions,
   isProductOptionSelectionComplete,
   parseProductVariants,
+  resolveProductOptionGroups,
 } from './productVariants'
 
 const productWithOptions: Product = {
@@ -105,5 +107,68 @@ describe('productVariants', () => {
     expect(isProductOptionSelectionComplete(productWithOptions, '', '')).toBe(false)
     expect(isProductOptionSelectionComplete(productWithOptions, '진청', '')).toBe(false)
     expect(isProductOptionSelectionComplete(productWithOptions, '진청', '55')).toBe(true)
+  })
+
+  it('ignores admin row-based optionGroups that do not match variant option keys', () => {
+    const product = {
+      ...productWithOptions,
+      optionGroups: [
+        { name: '베이지', values: ['95', '100'] },
+        { name: '브라운', values: ['95', '100'] },
+      ],
+      variants: [
+        {
+          id: 'v1',
+          options: { 색상: '베이지', 사이즈: '95' },
+          color: '베이지',
+          size: '95',
+          stock: 3,
+          extraPrice: 0,
+          sku: '',
+        },
+        {
+          id: 'v2',
+          options: { 색상: '베이지', 사이즈: '100' },
+          color: '베이지',
+          size: '100',
+          stock: 4,
+          extraPrice: 0,
+          sku: '',
+        },
+        {
+          id: 'v3',
+          options: { 색상: '브라운', 사이즈: '95' },
+          color: '브라운',
+          size: '95',
+          stock: 5,
+          extraPrice: 0,
+          sku: '',
+        },
+        {
+          id: 'v4',
+          options: { 색상: '브라운', 사이즈: '100' },
+          color: '브라운',
+          size: '100',
+          stock: 6,
+          extraPrice: 0,
+          sku: '',
+        },
+      ],
+    }
+
+    expect(resolveProductOptionGroups(product.optionGroups, product.variants)).toEqual([
+      { name: '색상', values: ['베이지', '브라운'] },
+      { name: '사이즈', values: ['95', '100'] },
+    ])
+    expect(getProductOptionGroups(product)).toEqual([
+      { name: '색상', values: ['베이지', '브라운'] },
+      { name: '사이즈', values: ['95', '100'] },
+    ])
+    expect(
+      getProductOptionStock(product, '', '', { 색상: '베이지', 사이즈: '95' }),
+    ).toBe(3)
+    expect(isProductOptionSelectionComplete(product, '', '', { 색상: '베이지', 사이즈: '100' })).toBe(
+      true,
+    )
   })
 })

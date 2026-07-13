@@ -155,4 +155,87 @@ describe('mapAdminProductDetailFormToDescriptionUpdatePayload', () => {
       expect.objectContaining({ url: 'https://example.com/2.jpg', order: 2 }),
     ])
   })
+
+  it('partial payload writes variant stocks and summed products.stock', () => {
+    const baseline = {
+      ...createEmptyProductDetailForm('p1'),
+      name: '상품',
+      slug: 'product',
+      stock: 0,
+      status: 'active' as const,
+      optionGroups: [
+        { id: 'g1', name: '베이지', valuesInput: '95, 100' },
+        { id: 'g2', name: '브라운', valuesInput: '95, 100' },
+      ],
+      variants: [
+        {
+          id: 'v1',
+          options: { 색상: '베이지', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '베이지',
+          size: '95',
+        },
+        {
+          id: 'v2',
+          options: { 색상: '베이지', 사이즈: '100' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '베이지',
+          size: '100',
+        },
+        {
+          id: 'v3',
+          options: { 색상: '브라운', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '브라운',
+          size: '95',
+        },
+        {
+          id: 'v4',
+          options: { 색상: '브라운', 사이즈: '100' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '브라운',
+          size: '100',
+        },
+      ],
+    }
+
+    const next = {
+      ...baseline,
+      variants: [
+        { ...baseline.variants[0], stock: 3 },
+        { ...baseline.variants[1], stock: 4 },
+        { ...baseline.variants[2], stock: 5 },
+        { ...baseline.variants[3], stock: 6 },
+      ],
+      stock: 18,
+    }
+
+    const payload = buildAdminProductDetailPartialUpdatePayload(baseline, next, {
+      description: false,
+      detailMedia: false,
+      pricing: false,
+      options: true,
+      simpleStock: false,
+      basicInfo: false,
+      status: false,
+      media: false,
+      shipping: false,
+      exposure: false,
+      related: false,
+    })
+
+    expect(payload.stock).toBe(18)
+    expect(payload).not.toHaveProperty('status')
+    expect(
+      (payload.product_info as { variants: Array<{ stock: number }> }).variants.map((row) => row.stock),
+    ).toEqual([3, 4, 5, 6])
+  })
 })

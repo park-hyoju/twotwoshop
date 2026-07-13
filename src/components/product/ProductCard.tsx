@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { isPlaceholderProductImage } from '../../lib/productImageStorage'
 import { getProductDetailPath } from '../../lib/productPaths'
 import {
   getCustomerStockBadgeClassName,
@@ -13,10 +14,26 @@ interface ProductCardProps {
   product: Product
 }
 
+/** Prefer real thumbnail; if missing, use first real gallery image. */
+function resolveProductCardImageSrc(product: Product): string {
+  const thumbnail = product.thumbnail.trim()
+  if (thumbnail && !isPlaceholderProductImage(thumbnail)) {
+    return thumbnail
+  }
+
+  const firstImage = product.images.find((url) => {
+    const trimmed = url.trim()
+    return Boolean(trimmed) && !isPlaceholderProductImage(trimmed)
+  })
+
+  return firstImage?.trim() ?? ''
+}
+
 export function ProductCard({ product }: ProductCardProps) {
   const detailPath = getProductDetailPath(product.slug)
   const isSoldOut = isProductSoldOut(product)
   const stockLabel = getCustomerStockLabel(product.stock)
+  const imageSrc = resolveProductCardImageSrc(product)
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
@@ -26,7 +43,7 @@ export function ProductCard({ product }: ProductCardProps) {
         aria-label={`${product.name} 상품 상세 보기`}
       >
         <ProductImage
-          src={product.thumbnail}
+          src={imageSrc}
           alt={product.name}
           slug={product.slug}
           className={`h-full w-full object-cover transition-transform duration-300 hover:scale-[1.02] ${

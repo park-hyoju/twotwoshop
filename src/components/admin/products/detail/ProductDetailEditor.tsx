@@ -45,6 +45,7 @@ import { collectGalleryPhotos } from './detailContent/detailContent'
 import { adminSectionClassName } from './adminFormStyles'
 import { serializeEditorState } from './editor/editorState'
 import {
+  applyVariantStockDraftToForm,
   detectAdminProductDetailChanges,
   hasPersistableChanges,
   isDescriptionOnlyChanges,
@@ -52,7 +53,7 @@ import {
 } from './editor/productSaveChanges'
 import { getSellerStepIndex, PRODUCT_SELLER_STEPS } from './productSellerSteps'
 import { applyPricingDraftToForm } from './sections/AdminPricingFields'
-import { ProductOptionsSection, applyVariantStockDraftToForm } from './sections/ProductOptionsSection'
+import { ProductOptionsSection } from './sections/ProductOptionsSection'
 
 function buildVariantStockDraft(
   variants: AdminProductDetailForm['variants'],
@@ -68,6 +69,7 @@ interface ProductDetailEditorProps {
   onSaved: (message: string) => void
 }
 
+import { isActiveSaveGeneration } from '../../../../lib/adminProductContinuousSave'
 import { AdminProductRepositoryError } from '../../../../services/adminProductRepository'
 
 function getErrorMessage(error: unknown): string {
@@ -109,6 +111,15 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   const pricingDraftRef = useRef(createEmptyPricingDraft())
   const variantStockDraftRef = useRef<Record<string, string>>({})
   const [variantStockDraft, setVariantStockDraft] = useState<Record<string, string>>({})
+  // Synchronous save lock + generation so late/duplicate saves cannot close the next product.
+  const saveInFlightRef = useRef(false)
+  const saveGenerationRef = useRef(0)
+  const formRef = useRef(form)
+  const galleryImagesRef = useRef(galleryImages)
+  const relatedProductsRef = useRef(relatedProducts)
+  formRef.current = form
+  galleryImagesRef.current = galleryImages
+  relatedProductsRef.current = relatedProducts
 
   const handlePricingDraftChange = useCallback((draft: AdminPricingNumericDraft) => {
     pricingDraftRef.current = draft
@@ -134,6 +145,10 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
 
   useEffect(() => {
     let cancelled = false
+    // Invalidate any in-flight save from a previous product / remount.
+    saveGenerationRef.current += 1
+    saveInFlightRef.current = false
+    setIsSaving(false)
 
     async function loadDetail() {
       setIsLoading(true)
@@ -143,6 +158,10 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       pricingDraftRef.current = createEmptyPricingDraft()
       variantStockDraftRef.current = {}
       setVariantStockDraft({})
+      setGalleryImages([])
+      setRelatedProducts([])
+      setSavedSnapshot('')
+      setForm(createEmptyProductDetailForm(productId))
 
       try {
         const detail = await fetchAdminProductDetail(productId)
@@ -171,6 +190,8 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
 
     return () => {
       cancelled = true
+      saveGenerationRef.current += 1
+      saveInFlightRef.current = false
     }
   }, [productId])
 
@@ -200,23 +221,40 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  function prepareFormForSave(currentForm: AdminProductDetailForm): AdminProductDetailForm | null {
+  const updateFormBatch = useCallback(
+    (
+      patch:
+        | Partial<AdminProductDetailForm>
+        | ((current: AdminProductDetailForm) => Partial<AdminProductDetailForm>),
+    ) => {
+      setForm((current) => {
+        const resolved = typeof patch === 'function' ? patch(current) : patch
+        return { ...current, ...resolved }
+      })
+    },
+    [],
+  )
+
+  function prepareFormForSave(
+    currentForm: AdminProductDetailForm,
+    currentGallery: ProductGalleryImage[],
+  ): AdminProductDetailForm | null {
     const galleryChanged =
-      galleryImages.length > 0 && galleryImagesDifferFromForm(galleryImages, currentForm)
+      currentGallery.length > 0 && galleryImagesDifferFromForm(currentGallery, currentForm)
 
     if (galleryChanged) {
-      if (hasBusyGalleryImage(galleryImages)) {
+      if (hasBusyGalleryImage(currentGallery)) {
         setSaveError('이미지 업로드가 끝난 뒤 저장해 주세요.')
         return null
       }
 
-      if (!hasDoneGalleryImage(galleryImages)) {
+      if (!hasDoneGalleryImage(currentGallery)) {
         setSaveError('대표 이미지를 1장 이상 등록해 주세요.')
         return null
       }
 
       const draft = { ...currentForm }
-      syncGalleryImagesToForm(galleryImages, draft, (field, value) => {
+      syncGalleryImagesToForm(currentGallery, draft, (field, value) => {
         ;(draft as AdminProductDetailForm)[field] = value
       })
       return draft
@@ -231,11 +269,21 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   }
 
   async function handleSave(closeAfter = false): Promise<AdminProductDetailForm | null> {
+    // Drop duplicate clicks while a save is already running (isSaving state is async).
+    if (saveInFlightRef.current) {
+      return null
+    }
+
+    const saveGeneration = saveGenerationRef.current
+    saveInFlightRef.current = true
     setSaveError(null)
     setIsSaving(true)
 
+    const isSaveCurrent = () =>
+      isActiveSaveGeneration(saveGeneration, saveGenerationRef.current)
+
     try {
-      const withGallery = prepareFormForSave(form)
+      const withGallery = prepareFormForSave(formRef.current, galleryImagesRef.current)
       if (!withGallery) {
         return null
       }
@@ -247,9 +295,18 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       }
 
       const dbBaseline = await fetchAdminProductDetail(productId)
+      if (!isSaveCurrent()) {
+        return null
+      }
+
       const dbRelated = await fetchAdminRelatedProducts(productId)
+      if (!isSaveCurrent()) {
+        return null
+      }
+
+      const currentRelated = relatedProductsRef.current
       const dbRelatedIds = dbRelated.map((item) => item.id)
-      const nextRelatedIds = relatedProducts.map((item) => item.id)
+      const nextRelatedIds = currentRelated.map((item) => item.id)
 
       // Apply option stock draft before change detection so stock-only edits are persisted.
       let workingForm = withGallery
@@ -266,7 +323,9 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       )
 
       if (!hasPersistableChanges(changes)) {
-        showToast('변경된 내용이 없습니다.')
+        if (isSaveCurrent()) {
+          showToast('변경된 내용이 없습니다.')
+        }
         return withGallery
       }
 
@@ -278,14 +337,27 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
 
       if (isDescriptionOnlyChanges(changes)) {
         const withSlug = await ensureProductSlug(workingForm)
+        if (!isSaveCurrent()) {
+          return null
+        }
         savedForm = await saveAdminProductDetailDescription(withSlug)
       } else {
         const withSlug = await ensureProductSlug(workingForm)
+        if (!isSaveCurrent()) {
+          return null
+        }
         savedForm = await saveAdminProductDetailPartial(withSlug, dbBaseline, changes)
 
         if (changes.related) {
+          if (!isSaveCurrent()) {
+            return null
+          }
           await saveAdminRelatedProducts(withSlug.id, nextRelatedIds)
         }
+      }
+
+      if (!isSaveCurrent()) {
+        return null
       }
 
       pricingDraftRef.current = pricingDraftFromForm(savedForm)
@@ -293,7 +365,7 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       setVariantStockDraft(variantStockDraftRef.current)
       setForm(savedForm)
       setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(savedForm)))
-      setSavedSnapshot(serializeEditorState(savedForm, relatedProducts))
+      setSavedSnapshot(serializeEditorState(savedForm, currentRelated))
       clearProductDraft(productId)
       const message = '저장되었습니다.'
       showToast(message)
@@ -305,10 +377,15 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
 
       return savedForm
     } catch (error) {
-      setSaveError(getErrorMessage(error))
+      if (isSaveCurrent()) {
+        setSaveError(getErrorMessage(error))
+      }
       return null
     } finally {
-      setIsSaving(false)
+      if (isSaveCurrent()) {
+        saveInFlightRef.current = false
+        setIsSaving(false)
+      }
     }
   }
 
@@ -373,6 +450,7 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         return (
           <ProductOptionsSection
             {...tabProps}
+            onBatchChange={updateFormBatch}
             onVariantStockDraftChange={handleVariantStockDraftChange}
           />
         )

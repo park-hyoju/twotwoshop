@@ -48,7 +48,7 @@ describe('productCategories sync', () => {
 
   it('uses common children from productCategories in storefront nav', () => {
     const nav = buildStorefrontNavItems()
-    const common = nav.find((item) => item.label === '공용')
+    const common = nav.find((item) => item.label === '잡화')
 
     expect(common?.children?.map((child) => child.label)).toEqual(
       getProductCategoriesByGroup('common').map((category) => category.label),

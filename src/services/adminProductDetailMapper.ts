@@ -1,12 +1,12 @@
 import {
-  buildOptionGroupsPayload,
+  buildOptionGroupsPayloadForSave,
   formatOptionValuesInput,
   getVariantTotalStock,
   inferOptionGroupsFromVariants,
   normalizeAdminVariants,
   variantsFromLegacyRows,
 } from '../lib/adminProductOptions'
-import { createOptionGroupId } from '../types/productOptions'
+import { createOptionGroupId, ensureUniqueOptionGroupIds } from '../types/productOptions'
 import {
   EMPTY_PRODUCT_INFO,
   EMPTY_RETURN_INFO,
@@ -77,6 +77,22 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
 }
 
+/** Accepts JSON number or numeric string — never silently drops saved stock. */
+function parseVariantStock(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value))
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.trunc(parsed))
+    }
+  }
+
+  return 0
+}
+
 function parseSizeGuideRow(value: unknown): AdminSizeGuideRow {
   if (!isRecord(value)) {
     return { ...EMPTY_SIZE_GUIDE_ROW }
@@ -116,30 +132,32 @@ function parseOptionGroups(value: unknown): AdminProductOptionGroup[] {
     return []
   }
 
-  return value.optionGroups
-    .map((item) => {
-      if (!isRecord(item)) {
-        return null
-      }
+  return ensureUniqueOptionGroupIds(
+    value.optionGroups
+      .map((item) => {
+        if (!isRecord(item)) {
+          return null
+        }
 
-      const name = asString(item.name).trim()
-      const values = Array.isArray(item.values)
-        ? [...new Set(item.values.map((entry) => asString(entry).trim()).filter(Boolean))]
-        : []
+        const name = asString(item.name).trim()
+        const values = Array.isArray(item.values)
+          ? [...new Set(item.values.map((entry) => asString(entry).trim()).filter(Boolean))]
+          : []
 
-      if (!name) {
-        return null
-      }
+        if (!name) {
+          return null
+        }
 
-      const storedId = asString(item.id).trim()
+        const storedId = asString(item.id).trim()
 
-      return {
-        id: storedId || createOptionGroupId(),
-        name,
-        valuesInput: formatOptionValuesInput(values),
-      }
-    })
-    .filter((item): item is AdminProductOptionGroup => item !== null)
+        return {
+          id: storedId || createOptionGroupId(),
+          name,
+          valuesInput: formatOptionValuesInput(values),
+        }
+      })
+      .filter((item): item is AdminProductOptionGroup => item !== null),
+  )
 }
 
 function parseVariants(value: unknown): AdminProductVariant[] {
@@ -166,7 +184,7 @@ function parseVariants(value: unknown): AdminProductVariant[] {
         id: asString(item.id),
         color: asString(item.color),
         size: asString(item.size),
-        stock: typeof item.stock === 'number' && Number.isFinite(item.stock) ? item.stock : 0,
+        stock: parseVariantStock(item.stock),
         extraPrice:
           typeof item.extraPrice === 'number' && Number.isFinite(item.extraPrice)
             ? item.extraPrice
@@ -301,8 +319,9 @@ export function mapAdminProductDetailFormToUpdatePayload(form: AdminProductDetai
 }
 
 function buildVariantsPayload(form: AdminProductDetailForm) {
-  const optionGroups = buildOptionGroupsPayload(form.optionGroups)
-  const groupNames = optionGroups.map((group) => group.name)
+  const optionGroups = buildOptionGroupsPayloadForSave(form.optionGroups)
+  // Variants are row-based { 색상, 사이즈 } — sync legacy fields from those keys.
+  const groupNames = ['색상', '사이즈']
 
   return {
     optionGroups,

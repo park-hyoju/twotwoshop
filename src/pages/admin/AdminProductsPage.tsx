@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAdminToast } from '../../components/admin/AdminToast'
 import { AdminOrdersPagination } from '../../components/admin/orders/AdminOrdersPagination'
@@ -9,6 +9,7 @@ import {
   deleteAdminProduct,
   fetchAdminProducts,
 } from '../../services/adminProductRepository'
+import { resolveDetailProductIdAfterEditorClose } from '../../lib/adminProductContinuousSave'
 import {
   AdminProductDetailRepositoryError,
   copyAdminProduct,
@@ -60,6 +61,7 @@ export function AdminProductsPage() {
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null)
   const [actionProductId, setActionProductId] = useState<string | null>(null)
   const [detailProductId, setDetailProductId] = useState<string | null>(null)
+  const createInFlightRef = useRef(false)
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true)
@@ -129,6 +131,11 @@ export function AdminProductsPage() {
   }
 
   async function handleCreate() {
+    if (createInFlightRef.current) {
+      return
+    }
+
+    createInFlightRef.current = true
     setActionErrorMessage(null)
     setActionProductId('create')
 
@@ -143,6 +150,7 @@ export function AdminProductsPage() {
       setActionErrorMessage(message)
       showToast(message, { durationMs: 6000 })
     } finally {
+      createInFlightRef.current = false
       setActionProductId(null)
     }
   }
@@ -151,8 +159,11 @@ export function AdminProductsPage() {
     setDetailProductId(product.id)
   }
 
-  function closeDetailEditor() {
-    setDetailProductId(null)
+  function closeDetailEditor(editorProductId: string) {
+    // Ignore stale onClose from a previous product's in-flight "저장 후 닫기".
+    setDetailProductId((current) =>
+      resolveDetailProductIdAfterEditorClose(current, editorProductId),
+    )
     void loadProducts()
   }
 
@@ -291,7 +302,7 @@ export function AdminProductsPage() {
         <ProductDetailEditor
           key={detailProductId}
           productId={detailProductId}
-          onClose={closeDetailEditor}
+          onClose={() => closeDetailEditor(detailProductId)}
           onSaved={handleDetailSaved}
         />
       )}

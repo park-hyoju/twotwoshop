@@ -4,7 +4,7 @@ import { getDisplayedVariantTotalStock } from '../../../../../lib/adminProductOp
 import { resolveVariantStockFromDraft } from '../../../../../lib/adminProductOptions'
 import { isDescriptionOnlyChanges, detectAdminProductDetailChanges } from '../editor/productSaveChanges'
 import { serializeEditorState } from '../editor/editorState'
-import { applyVariantStockDraftToForm } from './ProductOptionsSection'
+import { applyVariantStockDraftToForm } from '../editor/productSaveChanges'
 
 describe('applyVariantStockDraftToForm', () => {
   const variants = [
@@ -36,6 +36,67 @@ describe('applyVariantStockDraftToForm', () => {
       size: '105',
     },
   ]
+
+  it('applies stock draft by option key after variant id regeneration', () => {
+    const form = {
+      ...createEmptyProductDetailForm('p1'),
+      optionGroups: [
+        { id: 'g1', name: '베이지', valuesInput: '95, 100' },
+        { id: 'g2', name: '브라운', valuesInput: '95, 100' },
+      ],
+      variants: [
+        {
+          id: 'old-1',
+          options: { 색상: '베이지', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '베이지',
+          size: '95',
+        },
+        {
+          id: 'old-2',
+          options: { 색상: '베이지', 사이즈: '100' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '베이지',
+          size: '100',
+        },
+        {
+          id: 'old-3',
+          options: { 색상: '브라운', 사이즈: '95' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '브라운',
+          size: '95',
+        },
+        {
+          id: 'old-4',
+          options: { 색상: '브라운', 사이즈: '100' },
+          stock: 0,
+          extraPrice: 0,
+          sku: '',
+          color: '브라운',
+          size: '100',
+        },
+      ],
+      stock: 0,
+    }
+
+    const draft = {
+      'old-1': '3',
+      'old-2': '4',
+      'old-3': '5',
+      'old-4': '6',
+    }
+
+    const result = applyVariantStockDraftToForm(form, draft)
+
+    expect(result.variants.map((row) => row.stock)).toEqual([3, 4, 5, 6])
+    expect(result.stock).toBe(18)
+  })
 
   it('preserves variant stock when draft has no entry for that row', () => {
     const form = {

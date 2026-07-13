@@ -18,9 +18,9 @@ import {
   parseProductSizeGuide,
 } from '../lib/productDetailContent'
 import {
-  inferOptionGroupsFromVariants,
   parseOptionGroupsFromProductInfo,
   parseProductVariants,
+  resolveProductOptionGroups,
 } from '../lib/productVariants'
 
 /** Supabase `public.products` row shape (snake_case). */
@@ -107,7 +107,7 @@ export function mapProductRowToProduct(row: ProductRow): Product {
   const stock = row.stock ?? 0
   const variants = parseProductVariants(row.product_info)
   const parsedGroups = parseOptionGroupsFromProductInfo(row.product_info)
-  const optionGroups = parsedGroups.length > 0 ? parsedGroups : inferOptionGroupsFromVariants(variants)
+  const optionGroups = resolveProductOptionGroups(parsedGroups, variants)
   const productCategory = normalizeProductCategoryId(row.product_category, row)
   const legacy = syncLegacyCategoryFields(productCategory)
 

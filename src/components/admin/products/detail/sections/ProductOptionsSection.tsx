@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  buildOptionGroupsPayload,
   buildVariantsFromOptionGroups,
   formatVariantOptionLabel,
   getDisplayedVariantTotalStock,
   getVariantOptionKey,
   getVariantTotalStock,
+  resolveVariantStockFromDraft,
   resolveVariantStocksFromDraft,
 } from '../../../../../lib/adminProductOptions'
 import {
@@ -16,7 +18,7 @@ import type {
   AdminProductOptionGroup,
   AdminProductVariant,
 } from '../../../../../types/adminProductDetail'
-import { createOptionGroupId } from '../../../../../types/productOptions'
+import { createOptionGroupId, ensureUniqueOptionGroupIds } from '../../../../../types/productOptions'
 import { adminInputClassName, adminLabelClassName, adminSectionClassName } from '../adminFormStyles'
 
 interface ProductOptionsSectionProps {
@@ -25,10 +27,15 @@ interface ProductOptionsSectionProps {
     field: K,
     value: AdminProductDetailForm[K],
   ) => void
+  onBatchChange?: (
+    patch:
+      | Partial<AdminProductDetailForm>
+      | ((current: AdminProductDetailForm) => Partial<AdminProductDetailForm>),
+  ) => void
   onVariantStockDraftChange?: (draft: Record<string, string>) => void
 }
 
-const OPTION_SYNC_DEBOUNCE_MS = 350
+const OPTION_SYNC_DEBOUNCE_MS = 200
 
 function buildStockDraft(rows: AdminProductVariant[]): Record<string, string> {
   return Object.fromEntries(rows.map((row) => [row.id, formatAdminNumericInput(row.stock)]))
@@ -46,22 +53,21 @@ function createInitialOptionGroups(): AdminProductOptionGroup[] {
   return [createBlankOptionGroup(0), createBlankOptionGroup(1)]
 }
 
-function stockByVariantIdFromDraft(
-  rows: AdminProductVariant[],
-  stockInputs: Record<string, string>,
-): Record<string, number> {
-  return Object.fromEntries(
-    resolveVariantStocksFromDraft(rows, stockInputs).map((row) => [row.id, row.stock]),
-  )
+function buildVariantKeysSignature(rows: AdminProductVariant[]): string {
+  return rows.map((row) => getVariantOptionKey(row.options)).join(',')
 }
 
 export function ProductOptionsSection({
   form,
   onChange,
+  onBatchChange,
   onVariantStockDraftChange,
 }: ProductOptionsSectionProps) {
   const rows = form.variants
-  const groups = form.optionGroups
+  // Local source of truth for option rows so color/size inputs never share stale parent state.
+  const [groups, setGroups] = useState<AdminProductOptionGroup[]>(() =>
+    ensureUniqueOptionGroupIds(form.optionGroups),
+  )
   const groupNames = useMemo(
     () => groups.map((group) => group.name.trim()).filter(Boolean),
     [groups],
@@ -75,66 +81,174 @@ export function ProductOptionsSection({
   const [bulkStockInput, setBulkStockInput] = useState('')
   const rowsRef = useRef(rows)
   const stockInputsRef = useRef(stockInputs)
+  const groupsRef = useRef(groups)
 
   rowsRef.current = rows
   stockInputsRef.current = stockInputs
+  groupsRef.current = groups
+
+  const applyFormPatch = useCallback(
+    (
+      patch:
+        | Partial<AdminProductDetailForm>
+        | ((current: AdminProductDetailForm) => Partial<AdminProductDetailForm>),
+    ) => {
+      if (onBatchChange) {
+        onBatchChange(patch)
+        return
+      }
+      const resolved = typeof patch === 'function' ? patch(form) : patch
+      for (const [field, value] of Object.entries(resolved) as Array<
+        [keyof AdminProductDetailForm, AdminProductDetailForm[keyof AdminProductDetailForm]]
+      >) {
+        onChange(field, value)
+      }
+    },
+    // form is only needed for the non-batch fallback path
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keep stable when onBatchChange is provided
+    [onBatchChange, onChange],
+  )
+
+  const tableVariantsRef = useRef<AdminProductVariant[]>([])
 
   const tableVariants = useMemo(() => {
-    if (groups.length === 0) {
-      return rows
+    // Preserve typed stock across id regeneration by option key (색상+사이즈).
+    const stockByOptionKey: Record<string, number> = {}
+    for (const row of tableVariantsRef.current) {
+      const key = getVariantOptionKey(row.options ?? {})
+      if (!key) {
+        continue
+      }
+      stockByOptionKey[key] = resolveVariantStockFromDraft(row, stockInputs)
+    }
+    for (const row of rows) {
+      const key = getVariantOptionKey(row.options ?? {})
+      if (!key) {
+        continue
+      }
+      if (row.id in stockInputs) {
+        stockByOptionKey[key] = resolveVariantStockFromDraft(row, stockInputs)
+      } else if (!(key in stockByOptionKey)) {
+        stockByOptionKey[key] = row.stock
+      }
     }
 
-    const built = buildVariantsFromOptionGroups(
-      groups,
-      rows,
-      stockByVariantIdFromDraft(rows, stockInputs),
+    const built = buildVariantsFromOptionGroups(groups, rows).map((row) => {
+      const key = getVariantOptionKey(row.options ?? {})
+      if (key in stockByOptionKey) {
+        return { ...row, stock: stockByOptionKey[key]! }
+      }
+      return row
+    })
+    tableVariantsRef.current = built
+    return built
+  }, [groups, groupsSignature, rows, stockInputs])
+
+  useEffect(() => {
+    const unique = ensureUniqueOptionGroupIds(form.optionGroups)
+    setGroups(unique)
+    groupsRef.current = unique
+    if (unique !== form.optionGroups) {
+      applyFormPatch({ optionGroups: unique })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on product load only
+  }, [form.id])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    const payload = buildOptionGroupsPayload(groups)
+    console.groupCollapsed('[options-stock-table]')
+    console.log(
+      'optionGroups:',
+      groups.map((group) => ({ name: group.name, valuesInput: group.valuesInput })),
     )
-    return built.length > 0 ? built : rows
-  }, [groups, rows, stockInputs])
+    console.log(
+      'generated variants:',
+      tableVariants.map((row) => ({ options: row.options, stock: row.stock })),
+    )
+    console.log('parsed payload', payload)
+    console.log(
+      'tableVariants labels',
+      tableVariants.map((row) => formatVariantOptionLabel(row, groupNames)),
+    )
+    console.groupEnd()
+  }, [groups, groupNames, tableVariants])
 
   useEffect(() => {
     const nextStock = buildStockDraft(form.variants)
     setStockInputs(nextStock)
+    stockInputsRef.current = nextStock
     onVariantStockDraftChange?.(nextStock)
   }, [form.id, onVariantStockDraftChange])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (groups.length === 0) {
+      if (groupsRef.current.length === 0) {
         if (rowsRef.current.length > 0) {
-          onChange('variants', [])
-          onChange('stock', 0)
+          applyFormPatch({ variants: [], stock: 0 })
           const nextDraft = {}
           setStockInputs(nextDraft)
+          stockInputsRef.current = nextDraft
           onVariantStockDraftChange?.(nextDraft)
         }
         return
       }
 
-      // Do not rewrite optionGroups via normalize during editing — empty size rows would disappear.
-      const nextVariants = buildVariantsFromOptionGroups(
-        groups,
-        rowsRef.current,
-        stockByVariantIdFromDraft(rowsRef.current, stockInputsRef.current),
-      )
-      const currentKeys = rowsRef.current
-        .map((row) => getVariantOptionKey(row.options))
-        .join(',')
-      const nextKeys = nextVariants.map((row) => getVariantOptionKey(row.options)).join(',')
-
-      if (currentKeys === nextKeys) {
-        return
+      const stockByOptionKey: Record<string, number> = {}
+      for (const row of tableVariantsRef.current) {
+        const key = getVariantOptionKey(row.options ?? {})
+        if (!key) {
+          continue
+        }
+        stockByOptionKey[key] = resolveVariantStockFromDraft(row, stockInputsRef.current)
+      }
+      for (const row of rowsRef.current) {
+        const key = getVariantOptionKey(row.options ?? {})
+        if (!key) {
+          continue
+        }
+        if (row.id in stockInputsRef.current) {
+          stockByOptionKey[key] = resolveVariantStockFromDraft(row, stockInputsRef.current)
+        } else if (!(key in stockByOptionKey)) {
+          stockByOptionKey[key] = row.stock
+        }
       }
 
-      onChange('variants', nextVariants)
-      onChange('stock', getVariantTotalStock(nextVariants))
+      const nextVariants = buildVariantsFromOptionGroups(groupsRef.current, rowsRef.current).map(
+        (row) => {
+          const key = getVariantOptionKey(row.options ?? {})
+          if (key in stockByOptionKey) {
+            return { ...row, stock: stockByOptionKey[key]! }
+          }
+          return row
+        },
+      )
+
+      if (buildVariantKeysSignature(rowsRef.current) === buildVariantKeysSignature(nextVariants)) {
+        // Keys unchanged — still sync stock onto form if draft advanced.
+        const stockChanged =
+          getVariantTotalStock(rowsRef.current) !== getVariantTotalStock(nextVariants) ||
+          rowsRef.current.some((row, index) => row.stock !== nextVariants[index]?.stock)
+        if (!stockChanged) {
+          return
+        }
+      }
+
       const nextDraft = buildStockDraft(nextVariants)
+      applyFormPatch({
+        variants: nextVariants,
+        stock: getVariantTotalStock(nextVariants),
+      })
       setStockInputs(nextDraft)
+      stockInputsRef.current = nextDraft
       onVariantStockDraftChange?.(nextDraft)
     }, OPTION_SYNC_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [groups, groupsSignature, form.id, onChange, onVariantStockDraftChange])
+  }, [groupsSignature, form.id, applyFormPatch, onVariantStockDraftChange])
 
   const displayedTotalStock = useMemo(
     () => getDisplayedVariantTotalStock(tableVariants, stockInputs),
@@ -142,39 +256,99 @@ export function ProductOptionsSection({
   )
 
   function publishStockDraft(next: Record<string, string>) {
+    stockInputsRef.current = next
     setStockInputs(next)
     onVariantStockDraftChange?.(next)
 
-    const currentRows = tableVariants.length > 0 ? tableVariants : rowsRef.current
-    if (currentRows.length > 0) {
-      const variants = resolveVariantStocksFromDraft(currentRows, next)
-      onChange('variants', variants)
-      onChange('stock', getVariantTotalStock(variants))
+    const currentRows = tableVariantsRef.current.length > 0 ? tableVariantsRef.current : rowsRef.current
+    if (currentRows.length === 0) {
+      return
     }
+
+    const variants = resolveVariantStocksFromDraft(currentRows, next)
+    tableVariantsRef.current = variants
+    applyFormPatch({
+      variants,
+      stock: getVariantTotalStock(variants),
+    })
   }
 
   function setOptionGroups(nextGroups: AdminProductOptionGroup[]) {
-    onChange('optionGroups', nextGroups)
+    const uniqueGroups = ensureUniqueOptionGroupIds(nextGroups)
+    groupsRef.current = uniqueGroups
+    setGroups(uniqueGroups)
+
+    const stockByOptionKey: Record<string, number> = {}
+    for (const row of tableVariantsRef.current) {
+      const key = getVariantOptionKey(row.options ?? {})
+      if (!key) {
+        continue
+      }
+      stockByOptionKey[key] = resolveVariantStockFromDraft(row, stockInputsRef.current)
+    }
+
+    const nextVariants = buildVariantsFromOptionGroups(uniqueGroups, rowsRef.current).map((row) => {
+      const key = getVariantOptionKey(row.options ?? {})
+      if (key in stockByOptionKey) {
+        return { ...row, stock: stockByOptionKey[key]! }
+      }
+      return row
+    })
+    const nextDraft = buildStockDraft(nextVariants)
+
+    if (import.meta.env.DEV) {
+      console.log(
+        'optionGroups:',
+        uniqueGroups.map((group) => ({ name: group.name, valuesInput: group.valuesInput })),
+      )
+      console.log(
+        'generated variants:',
+        nextVariants.map((variant) => ({ options: variant.options, stock: variant.stock })),
+      )
+    }
+
+    tableVariantsRef.current = nextVariants
+    applyFormPatch({
+      optionGroups: uniqueGroups,
+      variants: nextVariants,
+      stock: getVariantTotalStock(nextVariants),
+    })
+    setStockInputs(nextDraft)
+    stockInputsRef.current = nextDraft
+    onVariantStockDraftChange?.(nextDraft)
   }
 
   function updateGroup(id: string, patch: Partial<AdminProductOptionGroup>) {
-    setOptionGroups(groups.map((group) => (group.id === id ? { ...group, ...patch } : group)))
+    // Patch exactly one group by id — never by index, never across groups.
+    let matched = false
+    const nextGroups = groupsRef.current.map((group) => {
+      if (group.id !== id || matched) {
+        return group
+      }
+      matched = true
+      return {
+        id: group.id,
+        name: patch.name !== undefined ? patch.name : group.name,
+        valuesInput: patch.valuesInput !== undefined ? patch.valuesInput : group.valuesInput,
+      }
+    })
+    setOptionGroups(nextGroups)
   }
 
   function addGroup() {
-    if (groups.length === 0) {
+    if (groupsRef.current.length === 0) {
       setOptionGroups(createInitialOptionGroups())
       return
     }
-    setOptionGroups([...groups, createBlankOptionGroup(groups.length)])
+    setOptionGroups([...groupsRef.current, createBlankOptionGroup(groupsRef.current.length)])
   }
 
   function removeGroup(id: string) {
-    setOptionGroups(groups.filter((group) => group.id !== id))
+    setOptionGroups(groupsRef.current.filter((group) => group.id !== id))
   }
 
   function handleStockInputChange(id: string, value: string) {
-    publishStockDraft({ ...stockInputs, [id]: value })
+    publishStockDraft({ ...stockInputsRef.current, [id]: value })
   }
 
   function applyBulkStock() {
@@ -184,10 +358,10 @@ export function ProductOptionsSection({
     )
   }
 
-  const hasGeneratedVariants = tableVariants.length > 0
+  const showStockTable = tableVariants.length > 0
 
   return (
-    <div className={`${adminSectionClassName} space-y-5`}>
+    <div className={`${adminSectionClassName} space-y-5`} data-testid="product-options-section">
       {groups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center">
           <p className="text-sm text-neutral-600">옵션이 없으면 상품정보 탭에서 재고를 입력합니다.</p>
@@ -201,11 +375,6 @@ export function ProductOptionsSection({
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-            옵션명에는 <strong className="font-semibold text-neutral-800">색상</strong>,{' '}
-            <strong className="font-semibold text-neutral-800">사이즈</strong>처럼 종류만 입력하고,
-            네이비·화이트·95·100 같은 실제 선택지는 옵션값에 입력하세요.
-          </p>
           {groups.map((group, index) => (
             <div key={group.id} className="space-y-2 rounded-xl border border-neutral-200 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -216,6 +385,7 @@ export function ProductOptionsSection({
                     onChange={(event) => updateGroup(group.id, { name: event.target.value })}
                     className={adminInputClassName}
                     placeholder={index === 0 ? '색상' : index === 1 ? '사이즈' : '옵션 종류'}
+                    data-testid={`option-name-${group.id}`}
                   />
                 </div>
                 <div>
@@ -225,6 +395,7 @@ export function ProductOptionsSection({
                     onChange={(event) => updateGroup(group.id, { valuesInput: event.target.value })}
                     className={adminInputClassName}
                     placeholder={index === 0 ? '네이비, 화이트, 블랙' : '95, 100, 105'}
+                    data-testid={`option-values-${group.id}`}
                   />
                 </div>
               </div>
@@ -251,17 +422,25 @@ export function ProductOptionsSection({
         </div>
       )}
 
-      {hasGeneratedVariants && (
-        <div className="space-y-4">
+      {groups.length > 0 && !showStockTable && (
+        <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+          색상·사이즈 옵션값을 입력하면 아래에 조합별 재고 입력표가 표시됩니다.
+        </p>
+      )}
+
+      {showStockTable && (
+        <div className="space-y-4" data-testid="option-stock-table">
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
             <p className={adminLabelClassName}>총 재고</p>
             <p className="text-lg font-bold text-neutral-900" aria-live="polite">
               {displayedTotalStock}개
             </p>
-            <p className="mt-1 text-xs text-neutral-500">옵션별 재고 합산 (자동 계산, 직접 수정 불가)</p>
+            <p className="mt-1 text-xs text-neutral-500">
+              옵션 조합 {tableVariants.length}개 · 재고 합산 (자동 계산)
+            </p>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-neutral-200">
+          <div className="overflow-x-auto rounded-xl border border-neutral-200">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-neutral-600">
                 <tr>
@@ -302,9 +481,6 @@ export function ProductOptionsSection({
                 className={`${adminInputClassName} w-full max-w-32`}
                 placeholder="예: 32"
               />
-              <p className="mt-1 text-xs text-neutral-500">
-                입력 후 &quot;전체 적용&quot;을 눌러야 모든 옵션 재고가 변경됩니다.
-              </p>
             </div>
             <button
               type="button"
@@ -318,17 +494,4 @@ export function ProductOptionsSection({
       )}
     </div>
   )
-}
-
-export function applyVariantStockDraftToForm(
-  form: AdminProductDetailForm,
-  draft: Record<string, string>,
-): AdminProductDetailForm {
-  const variants = resolveVariantStocksFromDraft(form.variants, draft)
-
-  return {
-    ...form,
-    variants,
-    stock: form.variants.length > 0 ? getVariantTotalStock(variants) : form.stock,
-  }
 }
