@@ -74,7 +74,7 @@ describe('loadProductRecommendations', () => {
     vi.mocked(productRepository.findProductsByProductCategory).mockReset()
   })
 
-  it('prioritizes curated related products in saved order', async () => {
+  it('returns curated related products in saved order only', async () => {
     const curatedB = createProduct({ id: 'b', slug: 'b', name: 'B' })
     const curatedC = createProduct({ id: 'c', slug: 'c', name: 'C' })
 
@@ -85,10 +85,11 @@ describe('loadProductRecommendations', () => {
 
     const result = await loadProductRecommendations(createProduct())
 
-    expect(result.map((item) => item.id)).toEqual(['b', 'c', 'd'])
+    expect(result.map((item) => item.id)).toEqual(['b', 'c'])
+    expect(productRepository.findProductsByProductCategory).not.toHaveBeenCalled()
   })
 
-  it('fills remaining slots with same-category products', async () => {
+  it('does not auto-fill with same-category products', async () => {
     const curatedB = createProduct({ id: 'b', slug: 'b', name: 'B' })
 
     vi.mocked(productRepository.findRelatedProducts).mockResolvedValue([curatedB])
@@ -100,19 +101,37 @@ describe('loadProductRecommendations', () => {
 
     const result = await loadProductRecommendations(createProduct())
 
-    expect(result.map((item) => item.id)).toEqual(['b', 'c', 'd', 'e'])
-    expect(result).toHaveLength(MAX_PRODUCT_RECOMMENDATIONS)
+    expect(result.map((item) => item.id)).toEqual(['b'])
+    expect(result).toHaveLength(1)
+    expect(productRepository.findProductsByProductCategory).not.toHaveBeenCalled()
   })
 
-  it('excludes sold-out products', async () => {
+  it('returns empty when no curated related products are saved', async () => {
     vi.mocked(productRepository.findRelatedProducts).mockResolvedValue([])
     vi.mocked(productRepository.findProductsByProductCategory).mockResolvedValue([
-      createProduct({ id: 'b', slug: 'b', stock: 0, soldOut: true }),
+      createProduct({ id: 'b', slug: 'b', stock: 3 }),
       createProduct({ id: 'c', slug: 'c', stock: 3 }),
     ])
 
     const result = await loadProductRecommendations(createProduct())
 
-    expect(result.map((item) => item.id)).toEqual(['c'])
+    expect(result).toEqual([])
+    expect(productRepository.findProductsByProductCategory).not.toHaveBeenCalled()
+  })
+
+  it('excludes sold-out curated products and caps at max', async () => {
+    vi.mocked(productRepository.findRelatedProducts).mockResolvedValue([
+      createProduct({ id: 'b', slug: 'b', stock: 0, soldOut: true }),
+      createProduct({ id: 'c', slug: 'c', stock: 3 }),
+      createProduct({ id: 'd', slug: 'd', stock: 3 }),
+      createProduct({ id: 'e', slug: 'e', stock: 3 }),
+      createProduct({ id: 'f', slug: 'f', stock: 3 }),
+      createProduct({ id: 'g', slug: 'g', stock: 3 }),
+    ])
+
+    const result = await loadProductRecommendations(createProduct())
+
+    expect(result.map((item) => item.id)).toEqual(['c', 'd', 'e', 'f'])
+    expect(result).toHaveLength(MAX_PRODUCT_RECOMMENDATIONS)
   })
 })

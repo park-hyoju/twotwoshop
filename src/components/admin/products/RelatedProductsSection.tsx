@@ -205,7 +205,7 @@ export function RelatedProductsSection({
 
       {selectedProducts.length === 0 && (
         <p className="mt-4 rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-6 text-center text-sm text-neutral-500">
-          선택된 연관 추천상품이 없습니다. 비워두면 같은 카테고리 상품이 자동으로 보여집니다.
+          선택된 연관 추천상품이 없습니다. 비워두면 상품 상세에 연관 추천상품 영역이 표시되지 않습니다.
         </p>
       )}
 
