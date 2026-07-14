@@ -8,7 +8,6 @@ import {
 
 const validSignupInput = {
   loginId: 'user01',
-  optionalEmail: 'user01@test.com',
   password: 'password123',
   passwordConfirm: 'password123',
   name: '홍길동',
@@ -45,20 +44,6 @@ describe('customerAuthValidation', () => {
         loginId: 'ab',
       }),
     ).toMatch(/4~20/)
-
-    expect(
-      validateCustomerSignUpInput({
-        ...validSignupInput,
-        optionalEmail: 'invalid-email',
-      }),
-    ).toMatch(/이메일/)
-
-    expect(
-      validateCustomerSignUpInput({
-        ...validSignupInput,
-        optionalEmail: undefined,
-      }),
-    ).toBeNull()
 
     expect(
       validateCustomerSignUpInput({

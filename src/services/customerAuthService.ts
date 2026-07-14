@@ -210,9 +210,6 @@ export async function signUpCustomer(input: CustomerSignUpInput): Promise<Custom
   }
 
   const loginId = sanitizeUsernameInput(input.loginId)
-  const optionalEmail = input.optionalEmail?.trim()
-    ? sanitizeEmail(input.optionalEmail)
-    : null
   const sanitized = sanitizeMemberProfileInput({
     name: input.name,
     phone: input.phone,
@@ -224,7 +221,7 @@ export async function signUpCustomer(input: CustomerSignUpInput): Promise<Custom
     passwordConfirm: input.passwordConfirm,
     name: sanitized.name,
     phone: sanitized.phone,
-    optionalEmail,
+    optionalEmail: null,
     marketingConsent: Boolean(input.agreedMarketing),
     agreedTerms: input.agreedTerms,
     agreedPrivacy: input.agreedPrivacy,

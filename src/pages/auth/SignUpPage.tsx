@@ -39,7 +39,6 @@ export function SignUpPage() {
   const { signUp } = useCustomerAuth()
   const submitLockRef = useRef(false)
   const [loginId, setLoginId] = useState('')
-  const [optionalEmail, setOptionalEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [name, setName] = useState('')
@@ -90,7 +89,6 @@ export function SignUpPage() {
     try {
       const result = await signUp({
         loginId,
-        optionalEmail: optionalEmail || undefined,
         password,
         passwordConfirm,
         name,
@@ -155,26 +153,6 @@ export function SignUpPage() {
             className={authInputClassName}
             required
           />
-        </div>
-
-        <div>
-          <label htmlFor="signup-optional-email" className={authLabelClassName}>
-            이메일 <span className="text-neutral-400">(선택)</span>
-          </label>
-          <input
-            id="signup-optional-email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={optionalEmail}
-            onChange={(event) => setOptionalEmail(event.target.value)}
-            disabled={isSubmitDisabled}
-            placeholder="example@test.com"
-            className={authInputClassName}
-          />
-          <p className="mt-1.5 text-xs text-neutral-500">
-            비밀번호 찾기 등 안내 메일 수신에 사용됩니다.
-          </p>
         </div>
 
         <div>
