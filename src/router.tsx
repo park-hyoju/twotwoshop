@@ -18,6 +18,7 @@ import {
   AdminRestockNotificationsPage,
   AdminSettingsPage,
 } from './pages/admin'
+import { AdminMembersPage } from './pages/admin/AdminMembersPage'
 import { Home } from './pages/Home'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -76,6 +77,7 @@ export const router = createBrowserRouter([
               { path: 'notices', element: <AdminNoticesPage /> },
               { path: 'restock-notifications', element: <AdminRestockNotificationsPage /> },
               { path: 'customers', element: <AdminCustomersPage /> },
+              { path: 'members', element: <AdminMembersPage /> },
               { path: 'live', element: <AdminLivePage /> },
               { path: 'chat', element: <AdminChatPage /> },
               { path: 'settings', element: <AdminSettingsPage /> },

@@ -25,6 +25,7 @@ const navItems: AdminNavItem[] = [
   { to: ADMIN_ROUTES.notices, label: '공지관리', icon: '📋' },
   { to: ADMIN_ROUTES.restockNotifications, label: '재입고 알림', icon: '🔔' },
   { to: ADMIN_ROUTES.customers, label: '고객관리', icon: '👥' },
+  { to: '/admin/members', label: '회원관리', icon: '🪪' },
   { to: ADMIN_ROUTES.chat, label: '상담관리', icon: '💬' },
   { to: ADMIN_ROUTES.live, label: '라이브 준비중', icon: '📺', disabled: true },
   { to: ADMIN_ROUTES.settings, label: '설정', icon: '⚙️' },
