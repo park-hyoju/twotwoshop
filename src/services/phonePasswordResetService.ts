@@ -44,18 +44,27 @@ async function parseEdgeFunctionError(error: unknown): Promise<{
   let cooldownSeconds: number | undefined
 
   const context = (error as { context?: Response }).context
-  if (context?.status === 404) {
-    return {
-      message:
-        '비밀번호 찾기 서비스를 찾을 수 없습니다. Supabase Edge Function이 배포되었는지 확인해주세요.',
-      code: 'FUNCTION_NOT_FOUND',
-    }
-  }
 
   if (context) {
     try {
-      const payload = (await context.json()) as EdgeFunctionEnvelope<unknown>
-      if (typeof payload.message === 'string') {
+      const payload = (await context.json()) as EdgeFunctionEnvelope<unknown> & {
+        code?: string
+      }
+      // Edge business errors (e.g. member not found) often use HTTP 404 with ok:false —
+      // prefer that message over treating every 404 as a missing function deploy.
+      if (typeof payload.message === 'string' && payload.message.trim()) {
+        const gatewayNotFound =
+          payload.code === 'NOT_FOUND' ||
+          /function was not found/i.test(payload.message)
+
+        if (gatewayNotFound) {
+          return {
+            message:
+              '비밀번호 찾기 서비스를 찾을 수 없습니다. Supabase Edge Function이 배포되었는지 확인해주세요.',
+            code: 'FUNCTION_NOT_FOUND',
+          }
+        }
+
         message = payload.message
       }
       if (typeof payload.code === 'string') {
@@ -65,7 +74,16 @@ async function parseEdgeFunctionError(error: unknown): Promise<{
         cooldownSeconds = payload.cooldownSeconds
       }
     } catch {
-      // ignore JSON parse errors
+      // ignore JSON parse errors — fall through to status-based handling
+    }
+  }
+
+  // True missing-function gateway responses with no usable body
+  if (context?.status === 404 && message === '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.') {
+    return {
+      message:
+        '비밀번호 찾기 서비스를 찾을 수 없습니다. Supabase Edge Function이 배포되었는지 확인해주세요.',
+      code: 'FUNCTION_NOT_FOUND',
     }
   }
 
