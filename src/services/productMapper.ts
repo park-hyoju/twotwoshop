@@ -18,6 +18,7 @@ import {
   parseProductSizeGuide,
 } from '../lib/productDetailContent'
 import {
+  inferOptionGroupsFromVariants,
   parseOptionGroupsFromProductInfo,
   parseProductVariants,
   resolveProductOptionGroups,
