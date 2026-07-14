@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.customer-signup]
 verify_jwt = false
+
+[functions.admin-delete-member]
+verify_jwt = false

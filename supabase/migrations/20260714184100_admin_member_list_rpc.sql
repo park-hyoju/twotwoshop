@@ -47,6 +47,13 @@ begin
          )
     ) as has_order
   from public.user_profiles p
+  where coalesce(p.role, '') <> 'admin'
+    and not exists (
+      select 1
+      from auth.users u
+      where u.id = p.id
+        and coalesce(u.raw_app_meta_data->>'role', '') = 'admin'
+    )
   order by p.created_at desc;
 end;
 $$;
@@ -56,4 +63,4 @@ revoke all on function public.admin_list_members() from anon;
 grant execute on function public.admin_list_members() to authenticated;
 
 comment on function public.admin_list_members() is
-  'Admin-only member list from user_profiles with order existence flag. Does not change user_profiles RLS.';
+  'Admin-only member list from user_profiles (excludes admin role) with order existence flag. Does not change user_profiles RLS.';
