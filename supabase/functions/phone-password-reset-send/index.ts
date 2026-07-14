@@ -70,7 +70,7 @@ Deno.serve(async (request) => {
       return jsonResponse({ ok: false, message: '인증번호 발송에 실패했습니다.' }, 500)
     }
 
-    const smsResult = await sendVerificationSms({
+    await sendVerificationSms({
       phoneDigits: member.phone_digits,
       code,
     })
@@ -80,7 +80,6 @@ Deno.serve(async (request) => {
       verificationId,
       maskedPhone: maskPhone(member.phone_digits),
       expiresAt,
-      mock: smsResult.mock,
       message: '인증번호를 발송했습니다.',
     })
   } catch (error) {

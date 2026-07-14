@@ -2,77 +2,56 @@ interface SolapiSendResult {
   mock: boolean
 }
 
-function hasSolapiCredentials(): boolean {
-  return Boolean(
-    Deno.env.get('SOLAPI_API_KEY') &&
-      Deno.env.get('SOLAPI_API_SECRET') &&
-      Deno.env.get('SOLAPI_SENDER_NUMBER'),
-  )
+const FAIL_MESSAGE = '인증문자 발송에 실패했습니다.'
+
+function resolveSmsDispatchUrl(): string {
+  const configured = Deno.env.get('SMS_SEND_API_URL')?.trim()
+  if (configured) {
+    return configured.replace(/\/+$/, '')
+  }
+
+  // Production Vercel serverless function (SOLAPI credentials live on Vercel).
+  return 'https://twotwoshop.vercel.app/api/send-verification-sms'
 }
 
-async function createSolapiAuthorizationHeader(
-  apiKey: string,
-  apiSecret: string,
-): Promise<string> {
-  const date = new Date().toISOString()
-  const salt = crypto.randomUUID().replace(/-/g, '')
-  const encoder = new TextEncoder()
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(apiSecret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const signatureBuffer = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    encoder.encode(date + salt),
-  )
-  const signature = Array.from(new Uint8Array(signatureBuffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-
-  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
-}
-
+/**
+ * Sends the password-reset verification SMS via the Vercel SOLAPI endpoint.
+ * Never mocks success — SOLAPI must succeed for this to resolve.
+ */
 export async function sendVerificationSms(input: {
   phoneDigits: string
   code: string
 }): Promise<SolapiSendResult> {
-  const message = `[TWOTWOSHOP] 비밀번호 찾기 인증번호는 [${input.code}] 입니다. 3분 내에 입력해주세요.`
-
-  if (!hasSolapiCredentials()) {
-    console.info('[phone-password-reset][mock-sms]', {
-      to: input.phoneDigits,
-      message,
-    })
-    return { mock: true }
+  const internalSecret = Deno.env.get('SMS_INTERNAL_SECRET')?.trim() ?? ''
+  if (!internalSecret) {
+    throw new Error(FAIL_MESSAGE)
   }
 
-  const apiKey = Deno.env.get('SOLAPI_API_KEY')!
-  const apiSecret = Deno.env.get('SOLAPI_API_SECRET')!
-  const sender = Deno.env.get('SOLAPI_SENDER_NUMBER')!
-  const authorization = await createSolapiAuthorizationHeader(apiKey, apiSecret)
-
-  const response = await fetch('https://api.solapi.com/messages/v4/send', {
+  const response = await fetch(resolveSmsDispatchUrl(), {
     method: 'POST',
     headers: {
-      Authorization: authorization,
       'Content-Type': 'application/json',
+      'x-sms-internal-secret': internalSecret,
     },
     body: JSON.stringify({
-      message: {
-        to: input.phoneDigits,
-        from: sender,
-        text: message,
-      },
+      phone: input.phoneDigits,
+      code: input.code,
     }),
   })
 
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`SOLAPI send failed (${response.status}): ${body}`)
+  let payload: { success?: boolean; message?: string } | null = null
+  try {
+    payload = (await response.json()) as { success?: boolean; message?: string }
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || payload?.success !== true) {
+    throw new Error(
+      typeof payload?.message === 'string' && payload.message.trim()
+        ? payload.message
+        : FAIL_MESSAGE,
+    )
   }
 
   return { mock: false }

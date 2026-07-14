@@ -101,11 +101,7 @@ export function ForgotPasswordPage() {
       setExpiresAt(result.expiresAt)
       setStep('verify')
       startSuccessCooldown()
-      setInfoMessage(
-        result.mock && import.meta.env.DEV
-          ? `${PASSWORD_RESET_SMS_SENT_MESSAGE} (개발 모드: Edge Function 콘솔에서 인증번호를 확인하세요.)`
-          : PASSWORD_RESET_SMS_SENT_MESSAGE,
-      )
+      setInfoMessage(PASSWORD_RESET_SMS_SENT_MESSAGE)
     } catch (error) {
       if (error instanceof PhonePasswordResetError && error.code === 'RESEND_COOLDOWN') {
         if (error.cooldownSeconds && error.cooldownSeconds > 0) {
