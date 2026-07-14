@@ -16,6 +16,7 @@ import {
   getCustomerAuthErrorMessage,
   useCustomerAuth,
 } from '../../contexts/CustomerAuthProvider'
+import { isVirtualCustomerAuthEmail } from '../../lib/customerAuthConfig'
 import { summarizeMemberOrderStatuses } from '../../lib/memberOrderStatusSummary'
 import { getRecentProducts } from '../../lib/recentProducts'
 import { ROUTES } from '../../lib/routes'
@@ -23,11 +24,6 @@ import { fetchDefaultCustomerAddress } from '../../services/customerAddressRepos
 import { fetchMemberOrders } from '../../services/customerOrderRepository'
 import { fetchMypageNotifications, fetchMypageStats } from '../../services/mypageNotificationService'
 import type { CustomerAddress, MemberOrderStatusSummary, MypageStats } from '../../types/mypage'
-
-function formatMemberIdPreview(userId: string): string {
-  const compact = userId.replace(/-/g, '')
-  return compact.slice(0, 8).toUpperCase()
-}
 
 const DEFAULT_STATS: MypageStats = {
   orderCount: 0,
@@ -43,9 +39,27 @@ const DEFAULT_ORDER_STATUS_SUMMARY: MemberOrderStatusSummary = {
   completed: 0,
 }
 
+function resolveDisplayEmail(
+  optionalEmail: string | null | undefined,
+  profileEmail: string | null | undefined,
+): string | null {
+  const candidates = [optionalEmail, profileEmail]
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim()
+    if (!trimmed) {
+      continue
+    }
+    if (isVirtualCustomerAuthEmail(trimmed)) {
+      continue
+    }
+    return trimmed
+  }
+  return null
+}
+
 export function MyPage() {
   const navigate = useNavigate()
-  const { displayName, user, signOut } = useCustomerAuth()
+  const { displayName, profile, username, signOut } = useCustomerAuth()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [stats, setStats] = useState<MypageStats>(DEFAULT_STATS)
@@ -55,9 +69,10 @@ export function MyPage() {
     DEFAULT_ORDER_STATUS_SUMMARY,
   )
 
-  const memberIdPreview = user ? formatMemberIdPreview(user.id) : '-'
-  const email = user?.email ?? '-'
-  const nameLabel = displayName?.trim() || '회원'
+  const nameLabel = displayName?.trim() || profile?.name?.trim() || '회원'
+  const loginId = profile?.loginId?.trim() || username?.trim() || null
+  const phone = profile?.phone?.trim() || null
+  const displayEmail = resolveDisplayEmail(profile?.optionalEmail, profile?.email)
 
   useEffect(() => {
     let cancelled = false
@@ -184,17 +199,27 @@ export function MyPage() {
               <p className="truncate text-xl font-bold text-neutral-900 sm:text-2xl">{nameLabel}</p>
               <dl className="mt-4 space-y-3">
                 <div>
-                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">이메일</dt>
-                  <dd className="mt-0.5 truncate text-sm text-neutral-800 sm:text-base">{email}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">회원 ID</dt>
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">아이디</dt>
                   <dd className="mt-0.5">
                     <span className="inline-flex rounded-lg bg-neutral-100 px-2.5 py-1 font-mono text-xs tracking-wide text-neutral-700 sm:text-sm">
-                      {memberIdPreview}
+                      {loginId ?? '-'}
                     </span>
                   </dd>
                 </div>
+                {phone ? (
+                  <div>
+                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">전화번호</dt>
+                    <dd className="mt-0.5 truncate text-sm text-neutral-800 sm:text-base">{phone}</dd>
+                  </div>
+                ) : null}
+                {displayEmail ? (
+                  <div>
+                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">이메일</dt>
+                    <dd className="mt-0.5 truncate text-sm text-neutral-800 sm:text-base">
+                      {displayEmail}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             </div>
           </div>

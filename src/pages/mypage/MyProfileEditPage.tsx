@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { MyPageShell } from '../../components/mypage/MyPageShell'
 import { useCustomerAuth } from '../../contexts/CustomerAuthProvider'
+import { isVirtualCustomerAuthEmail } from '../../lib/customerAuthConfig'
 import { runGuardedSubmit } from '../../utils/submitGuard'
 import {
   loadMemberProfileForEdit,
@@ -9,11 +10,26 @@ import {
   updateMemberProfile,
 } from '../../services/mypageProfileService'
 
+function resolveDisplayEmail(
+  optionalEmail: string | null | undefined,
+  profileEmail: string | null | undefined,
+): string | null {
+  for (const candidate of [optionalEmail, profileEmail]) {
+    const trimmed = candidate?.trim()
+    if (!trimmed || isVirtualCustomerAuthEmail(trimmed)) {
+      continue
+    }
+    return trimmed
+  }
+  return null
+}
+
 export function MyProfileEditPage() {
-  const { user, profile, refreshProfile } = useCustomerAuth()
+  const { user, profile, username, refreshProfile } = useCustomerAuth()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState<string | null>(null)
+  const [displayEmail, setDisplayEmail] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -38,7 +54,10 @@ export function MyProfileEditPage() {
         if (!cancelled) {
           setName(currentProfile?.name?.trim() || '')
           setPhone(currentProfile?.phone?.trim() || '')
-          setEmail(currentProfile?.email?.trim() || user.email || '')
+          setLoginId(currentProfile?.loginId?.trim() || username?.trim() || null)
+          setDisplayEmail(
+            resolveDisplayEmail(currentProfile?.optionalEmail, currentProfile?.email),
+          )
         }
       } finally {
         if (!cancelled) {
@@ -52,7 +71,7 @@ export function MyProfileEditPage() {
     return () => {
       cancelled = true
     }
-  }, [profile, user?.email, user?.id])
+  }, [profile, user?.id, username])
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,6 +139,15 @@ export function MyProfileEditPage() {
             </label>
 
             <label className="block text-sm">
+              <span className="font-medium text-neutral-700">아이디</span>
+              <input
+                value={loginId ?? '-'}
+                readOnly
+                className="mt-1.5 w-full rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 font-mono text-sm text-neutral-500"
+              />
+            </label>
+
+            <label className="block text-sm">
               <span className="font-medium text-neutral-700">전화번호</span>
               <input
                 value={phone}
@@ -129,14 +157,16 @@ export function MyProfileEditPage() {
               />
             </label>
 
-            <label className="block text-sm">
-              <span className="font-medium text-neutral-700">이메일</span>
-              <input
-                value={email}
-                readOnly
-                className="mt-1.5 w-full rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500"
-              />
-            </label>
+            {displayEmail ? (
+              <label className="block text-sm">
+                <span className="font-medium text-neutral-700">이메일</span>
+                <input
+                  value={displayEmail}
+                  readOnly
+                  className="mt-1.5 w-full rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3 text-sm text-neutral-500"
+                />
+              </label>
+            ) : null}
 
             <button
               type="submit"
