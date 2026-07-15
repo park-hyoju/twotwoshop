@@ -11,6 +11,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { ADMIN_UNAUTHORIZED_MESSAGE } from '../lib/adminAuthConfig'
 import { type AdminAuthStatus, resolveAdminAuthStatus } from '../lib/adminAccess'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { clearAllProductDraftsForAdmin } from '../lib/adminProductDraftStorage'
 import {
   AdminAuthError,
   signInAdmin,
@@ -146,9 +147,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
+    const adminUserId = session?.user?.id
+    if (adminUserId) {
+      clearAllProductDraftsForAdmin(adminUserId)
+    }
     await signOutAdmin()
     applyResolvedAuth('unauthenticated', null)
-  }, [applyResolvedAuth])
+  }, [applyResolvedAuth, session?.user?.id])
 
   const value = useMemo<AdminAuthContextValue>(
     () => ({

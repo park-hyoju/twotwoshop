@@ -61,6 +61,7 @@ export function AdminProductsPage() {
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null)
   const [actionProductId, setActionProductId] = useState<string | null>(null)
   const [detailProductId, setDetailProductId] = useState<string | null>(null)
+  const [detailEditorMode, setDetailEditorMode] = useState<'create' | 'edit'>('edit')
   const createInFlightRef = useRef(false)
 
   const loadProducts = useCallback(async () => {
@@ -141,6 +142,7 @@ export function AdminProductsPage() {
 
     try {
       const productId = await createBlankAdminProduct()
+      setDetailEditorMode('create')
       setDetailProductId(productId)
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -156,6 +158,7 @@ export function AdminProductsPage() {
   }
 
   function openDetailEditor(product: AdminProductRow) {
+    setDetailEditorMode('edit')
     setDetailProductId(product.id)
   }
 
@@ -179,6 +182,7 @@ export function AdminProductsPage() {
       const copiedId = await copyAdminProduct(product.id)
       await loadProducts()
       showToast('상품이 복사되었습니다. 사진과 상품명을 수정한 뒤 저장하세요.')
+      setDetailEditorMode('create')
       setDetailProductId(copiedId)
     } catch (error) {
       const message = getErrorMessage(error)
@@ -302,6 +306,7 @@ export function AdminProductsPage() {
         <ProductDetailEditor
           key={detailProductId}
           productId={detailProductId}
+          editorMode={detailEditorMode}
           onClose={() => closeDetailEditor(detailProductId)}
           onSaved={handleDetailSaved}
         />

@@ -26,7 +26,18 @@ import {
   pricingDraftFromForm,
   type AdminPricingNumericDraft,
 } from '../../../../lib/adminNumericInput'
-import { clearProductDraft } from '../../../../lib/adminProductDraftStorage'
+import {
+  clearProductDraft,
+  formatDraftSavedAtLabel,
+  hasMeaningfulDraftDiff,
+  isDraftOlderThanDatabase,
+  loadProductDraft,
+  saveProductDraft,
+  type AdminProductDraftMode,
+  type AdminProductDraftStatus,
+  type ProductEditorDraft,
+} from '../../../../lib/adminProductDraftStorage'
+import { fetchAdminProductUpdatedAt } from '../../../../lib/adminProductUpdatedAt'
 import { generateProductSlugFromName, resolveUniqueProductSlug } from '../../../../lib/productSlug'
 import { getProductStorefrontPath } from '../../../../lib/productStorefront'
 import {
@@ -34,11 +45,13 @@ import {
   hasBusyGalleryImage,
   syncGalleryImagesToForm,
 } from '../../../../lib/syncProductGalleryToForm'
+import { useAdminAuth } from '../../../../contexts/AdminAuthProvider'
 import { useAdminToast } from '../../AdminToast'
 import { RelatedProductsSection } from '../RelatedProductsSection'
 import { BasicInfoTab } from './BasicInfoTab'
 import { DescriptionTab } from './DescriptionTab'
 import { ProductSellerStepNav } from './ProductSellerStepNav'
+import { ProductDraftRecoveryBanner } from './ProductDraftRecoveryBanner'
 import { SellerPhotosStep } from './steps/SellerPhotosStep'
 import { SellerShippingStep } from './steps/SellerShippingStep'
 import { collectGalleryPhotos } from './detailContent/detailContent'
@@ -54,6 +67,10 @@ import {
 import { getSellerStepIndex, PRODUCT_SELLER_STEPS } from './productSellerSteps'
 import { applyPricingDraftToForm } from './sections/AdminPricingFields'
 import { ProductOptionsSection } from './sections/ProductOptionsSection'
+import { isActiveSaveGeneration } from '../../../../lib/adminProductContinuousSave'
+import { AdminProductRepositoryError } from '../../../../services/adminProductRepository'
+
+const DRAFT_DEBOUNCE_MS = 1000
 
 function buildVariantStockDraft(
   variants: AdminProductDetailForm['variants'],
@@ -63,14 +80,46 @@ function buildVariantStockDraft(
   )
 }
 
+function galleryHasPendingLocalFiles(images: ProductGalleryImage[]): boolean {
+  return images.some(
+    (image) =>
+      Boolean(image.file) &&
+      (!image.remoteUrl || image.status === 'pending' || image.status === 'cropping'),
+  )
+}
+
+function buildDraftPersistForm(
+  currentForm: AdminProductDetailForm,
+  currentGallery: ProductGalleryImage[],
+  pricingDraft: AdminPricingNumericDraft,
+  variantStockDraft: Record<string, string>,
+): AdminProductDetailForm {
+  let next = { ...currentForm }
+
+  if (currentGallery.length > 0 && galleryImagesDifferFromForm(currentGallery, next)) {
+    if (!hasBusyGalleryImage(currentGallery) && hasDoneGalleryImage(currentGallery)) {
+      syncGalleryImagesToForm(currentGallery, next, (field, value) => {
+        ;(next as AdminProductDetailForm)[field] = value
+      })
+    }
+  }
+
+  next = applyPricingDraftToForm(next, pricingDraft)
+
+  if (next.variants.length > 0 || next.optionGroups.length > 0) {
+    next = applyVariantStockDraftToForm(next, variantStockDraft)
+    next = summarizeVariantStock(next)
+  }
+
+  return next
+}
+
 interface ProductDetailEditorProps {
   productId: string
+  editorMode?: AdminProductDraftMode
   onClose: () => void
   onSaved: (message: string) => void
 }
-
-import { isActiveSaveGeneration } from '../../../../lib/adminProductContinuousSave'
-import { AdminProductRepositoryError } from '../../../../services/adminProductRepository'
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof AdminProductDetailRepositoryError) {
@@ -95,7 +144,34 @@ async function ensureProductSlug(form: AdminProductDetailForm): Promise<AdminPro
   return { ...form, slug }
 }
 
-export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDetailEditorProps) {
+function draftStatusLabel(
+  status: AdminProductDraftStatus,
+  lastSavedAt: string | null,
+  isDirty: boolean,
+): string {
+  if (status === 'saving' || status === 'pending') {
+    return '임시저장 중…'
+  }
+  if (status === 'error') {
+    return '임시저장 실패'
+  }
+  if (status === 'saved' && lastSavedAt) {
+    return formatDraftSavedAtLabel(lastSavedAt)
+  }
+  if (!isDirty) {
+    return '저장된 변경사항 없음'
+  }
+  return '저장된 변경사항 없음'
+}
+
+export function ProductDetailEditor({
+  productId,
+  editorMode = 'edit',
+  onClose,
+  onSaved,
+}: ProductDetailEditorProps) {
+  const { user } = useAdminAuth()
+  const adminUserId = user?.id ?? ''
   const [activeStep, setActiveStep] = useState<ProductSellerStep>('photos')
   const [form, setForm] = useState<AdminProductDetailForm>(() =>
     createEmptyProductDetailForm(productId),
@@ -107,19 +183,32 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [draftStatus, setDraftStatus] = useState<AdminProductDraftStatus>('idle')
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(null)
+  const [recoveryDraft, setRecoveryDraft] = useState<ProductEditorDraft | null>(null)
+  const [draftAutosaveEnabled, setDraftAutosaveEnabled] = useState(false)
+  const [showLocalImageWarning, setShowLocalImageWarning] = useState(false)
+  const [databaseUpdatedAt, setDatabaseUpdatedAt] = useState<string | null>(null)
   const { showToast } = useAdminToast()
   const pricingDraftRef = useRef(createEmptyPricingDraft())
   const variantStockDraftRef = useRef<Record<string, string>>({})
   const [variantStockDraft, setVariantStockDraft] = useState<Record<string, string>>({})
-  // Synchronous save lock + generation so late/duplicate saves cannot close the next product.
   const saveInFlightRef = useRef(false)
   const saveGenerationRef = useRef(0)
   const formRef = useRef(form)
   const galleryImagesRef = useRef(galleryImages)
   const relatedProductsRef = useRef(relatedProducts)
+  const activeStepRef = useRef(activeStep)
+  const draftStatusRef = useRef(draftStatus)
+  const databaseUpdatedAtRef = useRef(databaseUpdatedAt)
+  const draftAutosaveEnabledRef = useRef(draftAutosaveEnabled)
   formRef.current = form
   galleryImagesRef.current = galleryImages
   relatedProductsRef.current = relatedProducts
+  activeStepRef.current = activeStep
+  draftStatusRef.current = draftStatus
+  databaseUpdatedAtRef.current = databaseUpdatedAt
+  draftAutosaveEnabledRef.current = draftAutosaveEnabled
 
   const handlePricingDraftChange = useCallback((draft: AdminPricingNumericDraft) => {
     pricingDraftRef.current = draft
@@ -137,18 +226,76 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
     [form, relatedProducts, savedSnapshot],
   )
 
+  const isDirtyRef = useRef(isDirty)
+  isDirtyRef.current = isDirty
+
   const storefrontPath = getProductStorefrontPath(form.slug)
   const canViewStorefront = Boolean(storefrontPath)
   const stepIndex = getSellerStepIndex(activeStep)
   const isFirstStep = stepIndex === 0
   const isLastStep = stepIndex === PRODUCT_SELLER_STEPS.length - 1
 
+  const flushDraftToStorage = useCallback(
+    (reason: 'debounce' | 'visibility' | 'unload' | 'close'): boolean => {
+      if (!adminUserId || !draftAutosaveEnabledRef.current || saveInFlightRef.current) {
+        return false
+      }
+
+      if (!isDirtyRef.current) {
+        setDraftStatus('clean')
+        return true
+      }
+
+      try {
+        if (reason !== 'unload') {
+          setDraftStatus('saving')
+        }
+
+        const persistForm = buildDraftPersistForm(
+          formRef.current,
+          galleryImagesRef.current,
+          pricingDraftRef.current,
+          variantStockDraftRef.current,
+        )
+        const pendingLocalImages = galleryHasPendingLocalFiles(galleryImagesRef.current)
+        const saved = saveProductDraft({
+          adminUserId,
+          productId,
+          mode: editorMode,
+          form: persistForm,
+          relatedProducts: relatedProductsRef.current,
+          activeStep: activeStepRef.current,
+          pricingDraft: pricingDraftRef.current,
+          variantStockDraft: variantStockDraftRef.current,
+          pendingLocalImages,
+          baselineUpdatedAt: databaseUpdatedAtRef.current,
+        })
+
+        setLastDraftSavedAt(saved.savedAt)
+        setDraftStatus('saved')
+        if (pendingLocalImages) {
+          setShowLocalImageWarning(true)
+        }
+        return true
+      } catch {
+        setDraftStatus('error')
+        return false
+      }
+    },
+    [adminUserId, editorMode, productId],
+  )
+
   useEffect(() => {
     let cancelled = false
-    // Invalidate any in-flight save from a previous product / remount.
     saveGenerationRef.current += 1
     saveInFlightRef.current = false
     setIsSaving(false)
+    setRecoveryDraft(null)
+    setDraftAutosaveEnabled(false)
+    setDraftStatus('idle')
+    setLastDraftSavedAt(null)
+    setShowLocalImageWarning(false)
+    setDatabaseUpdatedAt(null)
 
     async function loadDetail() {
       setIsLoading(true)
@@ -164,16 +311,40 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       setForm(createEmptyProductDetailForm(productId))
 
       try {
-        const detail = await fetchAdminProductDetail(productId)
-        const related = await fetchAdminRelatedProducts(productId)
-        if (!cancelled) {
-          pricingDraftRef.current = pricingDraftFromForm(detail)
-          variantStockDraftRef.current = buildVariantStockDraft(detail.variants)
-          setVariantStockDraft(variantStockDraftRef.current)
-          setForm(detail)
-          setRelatedProducts(related)
-          setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(detail)))
-          setSavedSnapshot(serializeEditorState(detail, related))
+        const [detail, related, updatedAt] = await Promise.all([
+          fetchAdminProductDetail(productId),
+          fetchAdminRelatedProducts(productId),
+          fetchAdminProductUpdatedAt(productId),
+        ])
+        if (cancelled) {
+          return
+        }
+
+        pricingDraftRef.current = pricingDraftFromForm(detail)
+        variantStockDraftRef.current = buildVariantStockDraft(detail.variants)
+        setVariantStockDraft(variantStockDraftRef.current)
+        setForm(detail)
+        setRelatedProducts(related)
+        setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(detail)))
+        setSavedSnapshot(serializeEditorState(detail, related))
+        setDatabaseUpdatedAt(updatedAt)
+
+        if (adminUserId) {
+          const draft = loadProductDraft(adminUserId, productId, editorMode)
+          if (
+            draft &&
+            draft.adminUserId === adminUserId &&
+            hasMeaningfulDraftDiff(draft, detail, related, serializeEditorState)
+          ) {
+            setRecoveryDraft(draft)
+            setDraftAutosaveEnabled(false)
+          } else {
+            setDraftAutosaveEnabled(true)
+            setDraftStatus('clean')
+          }
+        } else {
+          setDraftAutosaveEnabled(true)
+          setDraftStatus('clean')
         }
       } catch (error) {
         if (!cancelled) {
@@ -192,21 +363,164 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       cancelled = true
       saveGenerationRef.current += 1
       saveInFlightRef.current = false
+      // Flush draft before leaving this product editor (menu navigation / remount).
+      if (draftAutosaveEnabledRef.current && isDirtyRef.current && adminUserId) {
+        try {
+          const persistForm = buildDraftPersistForm(
+            formRef.current,
+            galleryImagesRef.current,
+            pricingDraftRef.current,
+            variantStockDraftRef.current,
+          )
+          saveProductDraft({
+            adminUserId,
+            productId,
+            mode: editorMode,
+            form: persistForm,
+            relatedProducts: relatedProductsRef.current,
+            activeStep: activeStepRef.current,
+            pricingDraft: pricingDraftRef.current,
+            variantStockDraft: variantStockDraftRef.current,
+            pendingLocalImages: galleryHasPendingLocalFiles(galleryImagesRef.current),
+            baselineUpdatedAt: databaseUpdatedAtRef.current,
+          })
+        } catch {
+          // Draft failure must never block navigation / unmount.
+        }
+      }
     }
-  }, [productId])
+  }, [productId, adminUserId, editorMode])
+
+  useEffect(() => {
+    if (!draftAutosaveEnabled || isLoading || Boolean(loadError) || !adminUserId) {
+      return
+    }
+
+    if (!isDirty) {
+      setDraftStatus((current) => (current === 'saved' ? current : 'clean'))
+      return
+    }
+
+    setDraftStatus('pending')
+    const timer = window.setTimeout(() => {
+      flushDraftToStorage('debounce')
+    }, DRAFT_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    form,
+    relatedProducts,
+    variantStockDraft,
+    galleryImages,
+    activeStep,
+    isDirty,
+    draftAutosaveEnabled,
+    isLoading,
+    loadError,
+    adminUserId,
+    flushDraftToStorage,
+  ])
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        flushDraftToStorage('visibility')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [flushDraftToStorage])
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
-      if (isDirty) {
+      const needsFlush =
+        isDirtyRef.current &&
+        (draftStatusRef.current === 'pending' || draftStatusRef.current === 'saving')
+
+      if (needsFlush) {
+        flushDraftToStorage('unload')
         event.preventDefault()
       }
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [isDirty])
+  }, [flushDraftToStorage])
+
+  function applyDraftToEditor(draft: ProductEditorDraft) {
+    const nextForm = normalizeAppliedForm(productId, draft.form)
+    setForm(nextForm)
+    setRelatedProducts(draft.relatedProducts)
+    setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(nextForm)))
+    if (draft.pricingDraft) {
+      pricingDraftRef.current = draft.pricingDraft
+    } else {
+      pricingDraftRef.current = pricingDraftFromForm(nextForm)
+    }
+    if (draft.variantStockDraft) {
+      variantStockDraftRef.current = draft.variantStockDraft
+      setVariantStockDraft(draft.variantStockDraft)
+    } else {
+      variantStockDraftRef.current = buildVariantStockDraft(nextForm.variants)
+      setVariantStockDraft(variantStockDraftRef.current)
+    }
+    if (draft.activeStep) {
+      setActiveStep(draft.activeStep)
+    }
+    setShowLocalImageWarning(draft.pendingLocalImages)
+    setLastDraftSavedAt(draft.savedAt)
+    setDraftStatus('saved')
+  }
+
+  function handleContinueDraft() {
+    if (!recoveryDraft) {
+      return
+    }
+    applyDraftToEditor(recoveryDraft)
+    setRecoveryDraft(null)
+    setDraftAutosaveEnabled(true)
+  }
+
+  function handleDiscardDraft() {
+    if (adminUserId) {
+      clearProductDraft(adminUserId, productId, editorMode)
+    }
+    setRecoveryDraft(null)
+    setShowLocalImageWarning(false)
+    setDraftAutosaveEnabled(true)
+    setDraftStatus('clean')
+    setLastDraftSavedAt(null)
+
+    if (editorMode === 'create') {
+      const empty = createEmptyProductDetailForm(productId)
+      pricingDraftRef.current = createEmptyPricingDraft()
+      variantStockDraftRef.current = {}
+      setVariantStockDraft({})
+      setForm(empty)
+      setRelatedProducts([])
+      setGalleryImages([])
+      setActiveStep('photos')
+      // Keep savedSnapshot as loaded DB baseline so dirty detection stays correct.
+    }
+  }
+
+  function handleOpenDatabase() {
+    if (adminUserId) {
+      clearProductDraft(adminUserId, productId, editorMode)
+    }
+    setRecoveryDraft(null)
+    setShowLocalImageWarning(false)
+    setDraftAutosaveEnabled(true)
+    setDraftStatus('clean')
+    setLastDraftSavedAt(null)
+  }
 
   function handleClose() {
+    if (isDirty) {
+      flushDraftToStorage('close')
+    }
+
     if (isDirty && !window.confirm('저장하지 않은 변경 내용이 있습니다. 닫으시겠습니까?')) {
       return
     }
@@ -269,7 +583,6 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   }
 
   async function handleSave(closeAfter = false): Promise<AdminProductDetailForm | null> {
-    // Drop duplicate clicks while a save is already running (isSaving state is async).
     if (saveInFlightRef.current) {
       return null
     }
@@ -308,7 +621,6 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       const dbRelatedIds = dbRelated.map((item) => item.id)
       const nextRelatedIds = currentRelated.map((item) => item.id)
 
-      // Apply option stock draft before change detection so stock-only edits are persisted.
       let workingForm = withGallery
       if (workingForm.variants.length > 0 || workingForm.optionGroups.length > 0) {
         workingForm = applyVariantStockDraftToForm(workingForm, variantStockDraftRef.current)
@@ -366,7 +678,14 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       setForm(savedForm)
       setGalleryImages(galleryImagesFromUrls(collectGalleryPhotos(savedForm)))
       setSavedSnapshot(serializeEditorState(savedForm, currentRelated))
-      clearProductDraft(productId)
+      if (adminUserId) {
+        clearProductDraft(adminUserId, productId, editorMode)
+      }
+      setDraftStatus('clean')
+      setLastDraftSavedAt(null)
+      setShowLocalImageWarning(false)
+      const refreshedUpdatedAt = await fetchAdminProductUpdatedAt(productId)
+      setDatabaseUpdatedAt(refreshedUpdatedAt)
       const message = '저장되었습니다.'
       showToast(message)
       onSaved(message)
@@ -468,6 +787,9 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
   }
 
   const isSaveDisabled = isLoading || isSaving || Boolean(loadError)
+  const recoveryIsStale = recoveryDraft
+    ? isDraftOlderThanDatabase(recoveryDraft.savedAt, databaseUpdatedAt)
+    : false
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-100">
@@ -479,9 +801,16 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
 
       <header className="shrink-0 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
-          <h2 className="truncate text-lg font-bold text-neutral-900">
-            {form.name.trim() || '상품 등록'}
-          </h2>
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-bold text-neutral-900">
+              {form.name.trim() || '상품 등록'}
+            </h2>
+            {!isLoading && !loadError && (
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {draftStatusLabel(draftStatus, lastDraftSavedAt, isDirty)}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={handleClose}
@@ -506,6 +835,22 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
         )}
         {!isLoading && !loadError && (
           <div className="mx-auto max-w-xl">
+            {recoveryDraft && (
+              <ProductDraftRecoveryBanner
+                mode={editorMode}
+                savedAtLabel={formatDraftSavedAtLabel(recoveryDraft.savedAt)}
+                isStale={recoveryIsStale}
+                pendingLocalImages={recoveryDraft.pendingLocalImages}
+                onContinue={handleContinueDraft}
+                onDiscard={handleDiscardDraft}
+                onOpenDatabase={handleOpenDatabase}
+              />
+            )}
+            {showLocalImageWarning && !recoveryDraft && (
+              <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                선택한 새 이미지 파일은 페이지를 닫으면 다시 선택해야 할 수 있습니다.
+              </p>
+            )}
             {saveError && (
               <p role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                 {saveError}
@@ -519,6 +864,9 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       {!isLoading && !loadError && (
         <footer className="shrink-0 border-t border-neutral-200 bg-white px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-xl flex-col gap-3">
+            <p className="text-center text-xs text-neutral-500">
+              {draftStatusLabel(draftStatus, lastDraftSavedAt, isDirty)}
+            </p>
             <div className="flex gap-2">
               {!isFirstStep && (
                 <button
@@ -576,4 +924,9 @@ export function ProductDetailEditor({ productId, onClose, onSaved }: ProductDeta
       )}
     </div>
   )
+}
+
+function normalizeAppliedForm(productId: string, form: AdminProductDetailForm): AdminProductDetailForm {
+  // Re-assert product id so a corrupted draft cannot switch target product.
+  return { ...form, id: productId }
 }
