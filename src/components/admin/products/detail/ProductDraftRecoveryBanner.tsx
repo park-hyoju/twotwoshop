@@ -17,16 +17,14 @@ function formatSavedAtPhrase(savedAtLabel: string): string {
 }
 
 export function ProductDraftRecoveryBanner({
-  mode,
+  mode: _mode,
   savedAtLabel,
   isStale,
   pendingLocalImages,
   onContinue,
   onDiscard,
-  onOpenDatabase,
 }: ProductDraftRecoveryBannerProps) {
   const savedAtPhrase = formatSavedAtPhrase(savedAtLabel)
-  const isCreateMode = mode === 'create'
 
   return (
     <div
@@ -59,36 +57,14 @@ export function ProductDraftRecoveryBanner({
         >
           이어서 작성하기
         </button>
-        {isCreateMode ? (
-          <button
-            type="button"
-            onClick={onDiscard}
-            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 sm:h-10 sm:px-4 sm:text-sm"
-          >
-            새로 작성하기
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onOpenDatabase ?? onDiscard}
-            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 sm:h-10 sm:px-4 sm:text-sm"
-          >
-            저장된 상품 불러오기
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 sm:h-10 sm:px-4 sm:text-sm"
+        >
+          새로 작성하기
+        </button>
       </div>
-
-      {!isCreateMode && (
-        <div className="mt-2 text-center sm:mt-2.5 sm:text-left">
-          <button
-            type="button"
-            onClick={onDiscard}
-            className="text-[11px] font-medium text-neutral-500 underline-offset-2 hover:text-neutral-700 hover:underline sm:text-xs"
-          >
-            임시저장 지우기
-          </button>
-        </div>
-      )}
     </div>
   )
 }
