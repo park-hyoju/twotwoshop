@@ -26,6 +26,7 @@ export function ProductDraftRecoveryBanner({
   onOpenDatabase,
 }: ProductDraftRecoveryBannerProps) {
   const savedAtPhrase = formatSavedAtPhrase(savedAtLabel)
+  const isCreateMode = mode === 'create'
 
   return (
     <div
@@ -58,7 +59,7 @@ export function ProductDraftRecoveryBanner({
         >
           이어서 작성하기
         </button>
-        {mode === 'create' ? (
+        {isCreateMode ? (
           <button
             type="button"
             onClick={onDiscard}
@@ -77,7 +78,7 @@ export function ProductDraftRecoveryBanner({
         )}
       </div>
 
-      {mode === 'edit' && (
+      {!isCreateMode && (
         <div className="mt-2 text-center sm:mt-2.5 sm:text-left">
           <button
             type="button"

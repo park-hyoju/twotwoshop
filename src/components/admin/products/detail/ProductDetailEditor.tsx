@@ -837,7 +837,7 @@ export function ProductDetailEditor({
           <div className="mx-auto max-w-xl">
             {recoveryDraft && (
               <ProductDraftRecoveryBanner
-                mode={editorMode}
+                mode={editorMode === 'create' || recoveryDraft.mode === 'create' ? 'create' : 'edit'}
                 savedAtLabel={formatDraftSavedAtLabel(recoveryDraft.savedAt)}
                 isStale={recoveryIsStale}
                 pendingLocalImages={recoveryDraft.pendingLocalImages}
