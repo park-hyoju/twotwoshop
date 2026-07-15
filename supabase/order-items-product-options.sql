@@ -1,5 +1,13 @@
+-- =============================================================================
+-- !!! CAUTION — DO NOT RE-RUN AFTER p0-security-lockdown.sql !!!
+-- This historical patch once trusted p_order.subtotal from the client.
+-- Current secure checkout is defined in supabase/p0-security-lockdown.sql
+-- (and previously coupon-shipping-policy-v1.sql). Re-running THIS file can
+-- restore client-trusted prices.
+-- =============================================================================
 -- Product option columns on order_items + checkout RPC support
 -- Run in Supabase SQL editor after existing checkout migrations.
+
 
 alter table public.order_items
   add column if not exists selected_color text,

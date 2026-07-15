@@ -1,4 +1,12 @@
 -- =============================================================================
+-- !!! DO NOT RUN — LEGACY / DANGEROUS — ARCHIVED !!!
+-- Re-executing this file can REOPEN anon/authenticated write access or
+-- trust client checkout prices / profile-based admin escalation.
+-- Use supabase/p0-security-lockdown.sql instead.
+-- Archived: 2026-07-15
+-- =============================================================================
+
+-- =============================================================================
 -- TWOTWOSHOP: Customer Management MVP
 -- =============================================================================
 -- Run in Supabase SQL Editor after schema.sql / admin auth setup.

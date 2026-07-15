@@ -1,7 +1,12 @@
 # TWOTWOSHOP Supabase Schema (v0.8.0 Step 1)
 
+> **보안 (2026-07-15):** 운영 DB에는 `p0-security-lockdown.sql`만 적용하세요.  
+> 개방형 RLS / 클라이언트 가격 신뢰 SQL은 `legacy-sql-archive/`로 이동되었습니다.  
+> 자세한 순서: [`SECURITY.md`](./SECURITY.md)
+
 이 폴더는 **Supabase 실제 연결 전** 데이터베이스 설계를 담습니다.  
 React 앱 코드는 변경하지 않으며, `schema.sql`을 Supabase에 적용하는 것이 다음 단계입니다.
+
 
 ---
 

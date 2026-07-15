@@ -58,6 +58,16 @@ function skip(id, detail) {
   return { id, status: 'SKIP', detail }
 }
 
+function isTransportError(error) {
+  const message = String(error?.message ?? error ?? '').toLowerCase()
+  return (
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    message.includes('econnrefused') ||
+    message.includes('enotfound')
+  )
+}
+
 function createAnonClient(url, key) {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -150,6 +160,48 @@ async function main() {
       : fail('anon.is_admin', `expected false, got ${JSON.stringify(isAdminAnon)}`, {
           error: isAdminAnonErr?.message,
         }),
+  )
+
+  // -------------------------------------------------------------------------
+  // 0a) P0 — anon must not mutate products
+  // -------------------------------------------------------------------------
+  const productInsert = await anon.from('products').insert({
+    name: `P0-SEC-TEST-${stamp}`,
+    slug: `p0-sec-test-${stamp}`,
+    price: 1,
+    stock: 1,
+    status: 'active',
+  })
+  results.push(
+    isTransportError(productInsert.error)
+      ? skip('p0.anon.products_insert_blocked', `transport: ${productInsert.error.message}`)
+      : productInsert.error || !(productInsert.data?.length)
+        ? pass('p0.anon.products_insert_blocked', productInsert.error?.message ?? '0 rows')
+        : fail('p0.anon.products_insert_blocked', 'anon inserted product', {
+            data: productInsert.data,
+          }),
+  )
+
+  const productUpdate = await anon
+    .from('products')
+    .update({ price: 1 })
+    .eq('slug', `p0-sec-test-${stamp}`)
+    .select('id')
+  results.push(
+    isTransportError(productUpdate.error)
+      ? skip('p0.anon.products_update_blocked', `transport: ${productUpdate.error.message}`)
+      : productUpdate.error || (productUpdate.data?.length ?? 0) === 0
+        ? pass('p0.anon.products_update_blocked', productUpdate.error?.message ?? '0 rows')
+        : fail('p0.anon.products_update_blocked', 'anon updated product'),
+  )
+
+  const productDelete = await anon.from('products').delete().eq('slug', `p0-sec-test-${stamp}`).select('id')
+  results.push(
+    isTransportError(productDelete.error)
+      ? skip('p0.anon.products_delete_blocked', `transport: ${productDelete.error.message}`)
+      : productDelete.error || (productDelete.data?.length ?? 0) === 0
+        ? pass('p0.anon.products_delete_blocked', productDelete.error?.message ?? '0 rows')
+        : fail('p0.anon.products_delete_blocked', 'anon deleted product'),
   )
 
   // -------------------------------------------------------------------------
@@ -558,6 +610,140 @@ async function main() {
         ? pass('member.admin_gate.jwt', 'app_metadata.role is not admin')
         : fail('member.admin_gate.jwt', 'member JWT has admin role'),
     )
+
+    // P0 — member cannot self-elevate via user_profiles.role
+    if (memberA.userId) {
+      const roleEscalation = await memberA.client
+        .from('user_profiles')
+        .update({ role: 'admin' })
+        .eq('id', memberA.userId)
+        .select('id, role')
+
+      const escalated =
+        Array.isArray(roleEscalation.data) &&
+        roleEscalation.data.some((row) => row?.role === 'admin')
+
+      results.push(
+        !escalated
+          ? pass(
+              'p0.member.role_escalation_blocked',
+              roleEscalation.error?.message ?? 'role unchanged / 0 rows',
+            )
+          : fail('p0.member.role_escalation_blocked', 'member set user_profiles.role=admin', {
+              data: roleEscalation.data,
+            }),
+      )
+
+      // Cleanup: clear accidental role if somehow set (best-effort; should be blocked)
+      if (escalated) {
+        await memberA.client
+          .from('user_profiles')
+          .update({ role: null })
+          .eq('id', memberA.userId)
+      }
+    } else {
+      results.push(skip('p0.member.role_escalation_blocked', 'memberA.userId missing'))
+    }
+
+    // P0 — forged unit_price probe (opt-in; creates a real order + stock deduct)
+    if (process.env.ALLOW_LIVE_CHECKOUT_PROBE !== '1') {
+      results.push(
+        skip(
+          'p0.checkout.forged_price_rejected_or_ignored',
+          'Set ALLOW_LIVE_CHECKOUT_PROBE=1 to run (deducts 1 stock; creates P0-FORGE-* order)',
+        ),
+      )
+    } else {
+      const { data: activeProducts } = await memberA.client
+        .from('products')
+        .select('id, price, stock, status')
+        .eq('status', 'active')
+        .gt('stock', 0)
+        .limit(1)
+
+      const probeProduct = activeProducts?.[0]
+      if (probeProduct?.id && Number(probeProduct.price) > 1) {
+        const forgedOrderId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `00000000-0000-4000-8000-${String(stamp).slice(-12).padStart(12, '0')}`
+        const forgedCustomerId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `00000000-0000-4000-8000-${String(stamp + 1).slice(-12).padStart(12, '0')}`
+        const forged = await memberA.client.rpc('create_shop_order_with_stock', {
+          p_customer_id: forgedCustomerId,
+          p_customer: {
+            name: 'P0 Security Probe',
+            phone: '01000000000',
+            zipcode: '00000',
+            address1: 'probe',
+            address2: '',
+          },
+          p_order_id: forgedOrderId,
+          p_order: {
+            order_number: `P0-FORGE-${stamp}`,
+            customer_name: 'P0 Security Probe',
+            customer_phone: '01000000000',
+            recipient_name: 'P0 Security Probe',
+            recipient_phone: '01000000000',
+            depositor_name: 'P0',
+            payment_method: 'bank_transfer',
+            subtotal: 1,
+            shipping_fee: 0,
+            total_amount: 1,
+          },
+          p_items: [
+            {
+              product_id: probeProduct.id,
+              quantity: 1,
+              unit_price: 1,
+              total_price: 1,
+            },
+          ],
+          p_member_coupon_id: null,
+        })
+
+        if (forged.error) {
+          results.push(
+            pass(
+              'p0.checkout.forged_price_rejected_or_ignored',
+              `rpc error (safe): ${forged.error.message}`,
+            ),
+          )
+        } else {
+          const { data: forgedOrder } = await memberA.client
+            .from('orders')
+            .select('id, subtotal, total_amount')
+            .eq('id', forgedOrderId)
+            .maybeSingle()
+
+          const serverPrice = Number(probeProduct.price)
+          const storedSubtotal = Number(forgedOrder?.subtotal ?? 0)
+          const priceHonoredClientForge = storedSubtotal === 1
+
+          results.push(
+            !priceHonoredClientForge && storedSubtotal >= serverPrice
+              ? pass(
+                  'p0.checkout.forged_price_rejected_or_ignored',
+                  `server subtotal=${storedSubtotal} (product.price=${serverPrice}); cleanup order_number P0-FORGE-*`,
+                )
+              : fail(
+                  'p0.checkout.forged_price_rejected_or_ignored',
+                  `client forge may have been trusted: subtotal=${storedSubtotal}`,
+                  { orderId: forgedOrderId },
+                ),
+          )
+        }
+      } else {
+        results.push(
+          skip(
+            'p0.checkout.forged_price_rejected_or_ignored',
+            'no active in-stock product with price>1 for forge probe',
+          ),
+        )
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

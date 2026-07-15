@@ -8,6 +8,10 @@ interface UserProfileRoleRow {
   role: string | null
 }
 
+/**
+ * @deprecated Profile role must not grant admin. Kept for diagnostics only.
+ * Prefer JWT app_metadata.role via isAdminUser / verifyAdminUser.
+ */
 export async function hasAdminRoleInProfile(userId: string): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase) {
     return false
@@ -29,6 +33,10 @@ export async function hasAdminRoleInProfile(userId: string): Promise<boolean> {
   return data?.role === ADMIN_ROLE
 }
 
+/**
+ * Admin gate: trust only auth JWT app_metadata.role === 'admin'.
+ * Never trust user_metadata or user_profiles.role (client-writable footguns).
+ */
 export async function verifyAdminUser(
   user: Pick<User, 'id' | 'app_metadata' | 'email'> | null | undefined,
 ): Promise<boolean> {
@@ -36,11 +44,7 @@ export async function verifyAdminUser(
     return false
   }
 
-  if (isAdminUser(user)) {
-    return true
-  }
-
-  return hasAdminRoleInProfile(user.id)
+  return isAdminUser(user)
 }
 
 export async function resolveAdminAuthStatus(session: Session | null): Promise<{

@@ -1,4 +1,12 @@
 -- =============================================================================
+-- !!! DO NOT RUN — LEGACY / DANGEROUS — ARCHIVED !!!
+-- Re-executing this file can REOPEN anon/authenticated write access or
+-- trust client checkout prices / profile-based admin escalation.
+-- Use supabase/p0-security-lockdown.sql instead.
+-- Archived: 2026-07-15
+-- =============================================================================
+
+-- =============================================================================
 -- TWOTWOSHOP: Admin Orders RLS (v0.9.1)
 -- =============================================================================
 -- 목적: 관리자 주문 목록 조회 및 상태 변경

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ADMIN_ROLE } from './adminAuthConfig'
 
-const { mockMaybeSingle, mockEq, mockFrom } = vi.hoisted(() => {
+const { mockMaybeSingle, mockFrom } = vi.hoisted(() => {
   const mockMaybeSingle = vi.fn()
   const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }))
   const mockSelect = vi.fn(() => ({ eq: mockEq }))
   const mockFrom = vi.fn(() => ({ select: mockSelect }))
-  return { mockMaybeSingle, mockEq, mockFrom }
+  return { mockMaybeSingle, mockFrom }
 })
 
 vi.mock('./supabase', () => ({
@@ -35,7 +35,7 @@ describe('verifyAdminUser', () => {
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
-  it('checks user_profiles.role when app_metadata is not admin', async () => {
+  it('does not trust user_profiles.role when app_metadata is not admin', async () => {
     mockMaybeSingle.mockResolvedValue({ data: { role: ADMIN_ROLE }, error: null })
 
     const result = await verifyAdminUser({
@@ -44,16 +44,23 @@ describe('verifyAdminUser', () => {
       email: 'member@example.com',
     })
 
-    expect(result).toBe(true)
-    expect(mockFrom).toHaveBeenCalledWith('user_profiles')
-    expect(mockEq).toHaveBeenCalledWith('id', 'user-2')
+    expect(result).toBe(false)
+    expect(mockFrom).not.toHaveBeenCalled()
   })
 
   it('returns false for non-admin users', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { role: 'member' }, error: null })
-
     const result = await verifyAdminUser({
       id: 'user-3',
+      app_metadata: {},
+      email: 'member@example.com',
+    })
+
+    expect(result).toBe(false)
+  })
+
+  it('ignores user_metadata.role (not inspected)', async () => {
+    const result = await verifyAdminUser({
+      id: 'user-5',
       app_metadata: {},
       email: 'member@example.com',
     })

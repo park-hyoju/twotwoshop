@@ -1,10 +1,18 @@
 -- =============================================================================
--- TWOTWOSHOP: Fix Product Detail Editor save (v0.9.3)
+-- !!! DO NOT RUN — LEGACY / DANGEROUS — ARCHIVED !!!
+-- Re-executing this file can REOPEN anon/authenticated write access or
+-- trust client checkout prices / profile-based admin escalation.
+-- Use supabase/p0-security-lockdown.sql instead.
+-- Archived: 2026-07-15
 -- =============================================================================
--- 증상: Admin 상품 상세 저장 시 에러 없이 완료되지만 DB에 반영되지 않음
--- 원인: products 테이블에 anon UPDATE 권한 / RLS UPDATE 정책이 없어 0 rows updated
--- 해결: 이 파일 또는 admin-products-rls.sql 을 SQL Editor에서 실행
--- 특징: idempotent — 여러 번 실행해도 안전
+
+-- =============================================================================
+-- TWOTWOSHOP: Admin Products RLS (v0.9.2)
+-- =============================================================================
+-- 목적: 관리자 상품 목록 조회·등록·수정·삭제
+-- 적용: schema.sql 실행 후 SQL Editor에서 실행
+-- 주의: v0.9.2는 Admin Auth 미구현 — anon CRUD 임시 허용
+--       Admin 로그인 도입 후 authenticated role 정책으로 교체하세요.
 -- =============================================================================
 
 grant usage on schema public to anon, authenticated;

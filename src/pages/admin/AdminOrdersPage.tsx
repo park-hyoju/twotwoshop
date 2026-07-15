@@ -5,7 +5,6 @@ import {
   AdminOrderDetailModal,
   AdminOrdersList,
   AdminOrdersPagination,
-  AdminOrdersResetModal,
   AdminOrdersSearch,
   AdminOrdersSummary,
 } from '../../components/admin/orders'
@@ -17,7 +16,6 @@ import { getOrderStatusLabel } from '../../lib/adminOrderStatus'
 import {
   AdminOrderRepositoryError,
   applyAdminOrderAction,
-  deleteAllAdminOrders,
   fetchAdminOrderById,
   fetchAdminOrderSummary,
   fetchAdminOrders,
@@ -67,8 +65,6 @@ export function AdminOrdersPage() {
   const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(null)
   const [isFulfillmentProcessing, setIsFulfillmentProcessing] = useState(false)
   const [fulfillmentErrorMessage, setFulfillmentErrorMessage] = useState<string | null>(null)
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false)
-  const [isResettingOrders, setIsResettingOrders] = useState(false)
 
   const loadSummary = useCallback(async () => {
     try {
@@ -250,53 +246,13 @@ export function AdminOrdersPage() {
     setIsFulfillmentProcessing(false)
   }
 
-  async function handleResetAllOrders() {
-    setIsResettingOrders(true)
-
-    try {
-      const deletedCount = await deleteAllAdminOrders()
-      setIsResetModalOpen(false)
-      setSelectedOrder(null)
-      setPage(1)
-      setSummary(EMPTY_SUMMARY)
-      setOrders([])
-      setTotalCount(0)
-      setErrorMessage(null)
-
-      await Promise.all([loadSummary(), loadOrders()])
-      showToast(
-        deletedCount > 0
-          ? `주문 ${deletedCount.toLocaleString('ko-KR')}건이 삭제되었습니다.`
-          : '삭제할 주문이 없습니다.',
-      )
-    } catch (error) {
-      console.error('[AdminOrdersPage] reset all orders failed', error)
-      const message =
-        error instanceof AdminOrderRepositoryError
-          ? error.message
-          : '주문 데이터 삭제 중 오류가 발생했습니다.'
-      showToast(message)
-    } finally {
-      setIsResettingOrders(false)
-    }
-  }
-
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-3">
-      <div className="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900 sm:text-2xl">주문 관리</h1>
-          <p className="mt-1 text-sm text-neutral-600">
-            입금 확인부터 배송 완료까지 주문 상태를 처리합니다.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsResetModalOpen(true)}
-          className="inline-flex shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100"
-        >
-          테스트 주문 초기화
-        </button>
+      <div className="shrink-0">
+        <h1 className="text-xl font-bold text-neutral-900 sm:text-2xl">주문 관리</h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          입금 확인부터 배송 완료까지 주문 상태를 처리합니다.
+        </p>
       </div>
 
       <AdminOrdersSummary stats={summary} />
@@ -374,17 +330,6 @@ export function AdminOrdersPage() {
         onClose={handleCloseDetail}
         onFulfillmentAction={handleFulfillmentAction}
         onSaveShipping={handleSaveShipping}
-      />
-
-      <AdminOrdersResetModal
-        isOpen={isResetModalOpen}
-        isSubmitting={isResettingOrders}
-        onClose={() => {
-          if (!isResettingOrders) {
-            setIsResetModalOpen(false)
-          }
-        }}
-        onConfirm={() => void handleResetAllOrders()}
       />
     </div>
   )
