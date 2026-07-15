@@ -33,10 +33,10 @@ function StatPill({
 export function AdminInquiryStatsBar({ stats }: AdminInquiryStatsBarProps) {
   return (
     <div className="flex flex-wrap gap-2">
-      <StatPill label="답변대기" value={stats.pendingCount} tone="orange" />
-      <StatPill label="답변완료" value={stats.answeredCount} tone="emerald" />
       <StatPill label="미확인" value={stats.unreadCount} tone="violet" />
-      <StatPill label="오늘" value={stats.todayCount} tone="slate" />
+      <StatPill label="답변 대기" value={stats.pendingCount} tone="orange" />
+      <StatPill label="답변 완료" value={stats.answeredCount} tone="emerald" />
+      <StatPill label="오늘 문의 수" value={stats.todayCount} tone="slate" />
     </div>
   )
 }

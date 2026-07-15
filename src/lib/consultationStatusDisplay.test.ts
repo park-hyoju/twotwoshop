@@ -5,19 +5,13 @@ import {
 } from './consultationStatusDisplay'
 
 describe('consultationStatusDisplay', () => {
-  it('returns customer-facing status lines', () => {
-    expect(getConsultationStatusLine('available')).toBe(
-      '🟢 상담 가능 · 보통 빠르게 확인해요',
-    )
-    expect(getConsultationStatusLine('away')).toBe(
-      '🟡 잠시 자리를 비웠어요 · 조금 늦을 수 있어요',
-    )
-    expect(getConsultationStatusLine('busy')).toBe(
-      '🟠 문의가 많아요 · 순서대로 답변드리고 있어요',
-    )
-    expect(getConsultationStatusLine('closed')).toBe(
-      '⚫ 현재 상담이 종료되었어요 · 영업시간에 확인해드릴게요',
-    )
+  it('returns customer-facing sequential reply status lines', () => {
+    const sequentialLine = '문의는 언제든 남겨주세요 · 순차적으로 확인 후 답변드려요'
+
+    expect(getConsultationStatusLine('available')).toBe(`🟢 ${sequentialLine}`)
+    expect(getConsultationStatusLine('away')).toBe(`🟡 ${sequentialLine}`)
+    expect(getConsultationStatusLine('busy')).toBe(`🟠 ${sequentialLine}`)
+    expect(getConsultationStatusLine('closed')).toBe(`⚫ ${sequentialLine}`)
   })
 
   it('exposes admin labels', () => {

@@ -41,19 +41,6 @@ export function AdminInquiriesSummary({ stats }: AdminInquiriesSummaryProps) {
   return (
     <section aria-label="문의 요약" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <SummaryCard
-        label="답변대기"
-        value={formatCount(stats.pendingCount)}
-        icon="⏳"
-        gradient="from-orange-500 to-amber-400"
-        highlight={stats.pendingCount > 0}
-      />
-      <SummaryCard
-        label="답변완료"
-        value={formatCount(stats.answeredCount)}
-        icon="✅"
-        gradient="from-emerald-500 to-teal-400"
-      />
-      <SummaryCard
         label="미확인"
         value={formatCount(stats.unreadCount)}
         icon="🔔"
@@ -61,7 +48,20 @@ export function AdminInquiriesSummary({ stats }: AdminInquiriesSummaryProps) {
         highlight={stats.unreadCount > 0}
       />
       <SummaryCard
-        label="오늘 문의"
+        label="답변 대기"
+        value={formatCount(stats.pendingCount)}
+        icon="⏳"
+        gradient="from-orange-500 to-amber-400"
+        highlight={stats.pendingCount > 0}
+      />
+      <SummaryCard
+        label="답변 완료"
+        value={formatCount(stats.answeredCount)}
+        icon="✅"
+        gradient="from-emerald-500 to-teal-400"
+      />
+      <SummaryCard
+        label="오늘 문의 수"
         value={formatCount(stats.todayCount)}
         icon="📅"
         gradient="from-slate-700 to-slate-500"

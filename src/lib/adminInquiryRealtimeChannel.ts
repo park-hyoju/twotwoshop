@@ -25,10 +25,13 @@ export function acquireAdminInquiryRealtimeChannel(
 export function releaseAdminInquiryRealtimeChannel(): void {
   subscriberCount = Math.max(0, subscriberCount - 1)
 
-  if (subscriberCount === 0 && activeChannel && supabase) {
-    void supabase.removeChannel(activeChannel)
-    activeChannel = null
+  if (subscriberCount > 0 || !activeChannel || !supabase) {
+    return
   }
+
+  const channel = activeChannel
+  activeChannel = null
+  void supabase.removeChannel(channel)
 }
 
 export function getActiveAdminInquiryRealtimeChannel(): RealtimeChannel | null {

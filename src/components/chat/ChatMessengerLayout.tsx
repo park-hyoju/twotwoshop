@@ -1,6 +1,3 @@
-import type { ConsultationStatus } from '../../types/consultationStatus'
-import { DEFAULT_CHAT_SUPPORT_POLICY } from '../../lib/chatSupportPolicy'
-import { getConsultationStatusLine, getConsultationStatusOption } from '../../lib/consultationStatusDisplay'
 import { ChatBrandAvatar } from './ChatBrandAvatar'
 import { CHAT_SCROLL_CLASSNAME } from './chatMessengerStyles'
 
@@ -9,7 +6,6 @@ interface ChatMessengerLayoutProps {
   children: React.ReactNode
   footer?: React.ReactNode
   scrollable?: boolean
-  consultationStatus: ConsultationStatus
 }
 
 export function ChatMessengerLayout({
@@ -17,23 +13,22 @@ export function ChatMessengerLayout({
   children,
   footer,
   scrollable = true,
-  consultationStatus,
 }: ChatMessengerLayoutProps) {
-  const statusOption = getConsultationStatusOption(consultationStatus)
-
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="shrink-0 border-b border-neutral-100 bg-white px-5 py-4">
         <div className="flex items-start gap-3">
           <ChatBrandAvatar size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold text-neutral-900">투투샵 상담</p>
-            <p className="mt-0.5 text-[12px] font-medium text-neutral-500">쇼핑 도우미 투투</p>
-            <p className={`mt-1.5 text-[13px] leading-snug ${statusOption.toneClass}`}>
-              {getConsultationStatusLine(consultationStatus)}
-            </p>
-            <p className="mt-1 text-[12px] text-neutral-400">
-              운영시간 {DEFAULT_CHAT_SUPPORT_POLICY.operatingHours.label}
+            <p className="truncate text-base font-bold text-neutral-900">🐰 투투샵 고객센터</p>
+            <p className="mt-1.5 text-[13px] leading-snug text-neutral-600">
+              안녕하세요! 투투샵 고객센터입니다.
+              <br />
+              <br />
+              문의는 언제든 편하게 남겨주세요 :)
+              <br />
+              <br />
+              24시간 이내 확인 후 순차적으로 답변드릴게요.
             </p>
           </div>
           <button

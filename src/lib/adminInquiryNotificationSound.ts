@@ -4,7 +4,6 @@ const SOUND_ENABLED_STORAGE_KEY = 'admin-inquiry-sound-enabled'
 const VOICE_ENABLED_STORAGE_KEY = 'admin-inquiry-voice-enabled'
 const LEGACY_SOUND_ENABLED_STORAGE_KEY = 'admin_inquiry_sound_enabled'
 const NOTIFICATION_MP3_PATH = '/sounds/notification.mp3'
-const MP3_PLAY_TIMEOUT_MS = 500
 
 const POONG_DURATION_SEC = 0.15
 const POONG_START_FREQUENCY = 700
@@ -16,6 +15,7 @@ let cachedAudio: HTMLAudioElement | null = null
 let mp3Available: boolean | null = null
 let soundEnabled = false
 let voiceEnabled = false
+let alertPlaybackInFlight: Promise<void> | null = null
 
 function readStoredSoundEnabled(): boolean {
   if (typeof window === 'undefined') {
@@ -145,14 +145,7 @@ async function tryPlayMp3(): Promise<boolean> {
 
   try {
     audio.currentTime = 0
-
-    await Promise.race([
-      audio.play(),
-      new Promise<never>((_, reject) => {
-        window.setTimeout(() => reject(new Error('mp3 play timeout')), MP3_PLAY_TIMEOUT_MS)
-      }),
-    ])
-
+    await audio.play()
     mp3Available = true
     return true
   } catch {
@@ -289,29 +282,42 @@ export function disableAdminNotificationVoice(): void {
 }
 
 export async function playAdminNotificationAlert(): Promise<void> {
-  const currentSoundEnabled = isAdminNotificationSoundEnabled()
-  const currentVoiceEnabled = isAdminNotificationVoiceEnabled()
-
-  if (!currentSoundEnabled && !currentVoiceEnabled) {
+  if (alertPlaybackInFlight) {
+    await alertPlaybackInFlight
     return
   }
 
-  if (currentVoiceEnabled) {
-    console.log('[voice] play voice')
-    try {
-      await speakInquiryNotification()
-    } catch (error) {
-      console.error('[voice] play failed', error)
-    }
-  }
+  alertPlaybackInFlight = (async () => {
+    const currentSoundEnabled = isAdminNotificationSoundEnabled()
+    const currentVoiceEnabled = isAdminNotificationVoiceEnabled()
 
-  if (currentSoundEnabled) {
-    console.log('[notification] play sound')
-    try {
-      await playNotificationSound()
-    } catch (error) {
-      console.error('[sound] play failed', error)
+    if (!currentSoundEnabled && !currentVoiceEnabled) {
+      return
     }
+
+    if (currentVoiceEnabled) {
+      console.log('[voice] play voice')
+      try {
+        await speakInquiryNotification()
+      } catch (error) {
+        console.error('[voice] play failed', error)
+      }
+    }
+
+    if (currentSoundEnabled) {
+      console.log('[notification] play sound')
+      try {
+        await playNotificationSound()
+      } catch (error) {
+        console.error('[sound] play failed', error)
+      }
+    }
+  })()
+
+  try {
+    await alertPlaybackInFlight
+  } finally {
+    alertPlaybackInFlight = null
   }
 }
 

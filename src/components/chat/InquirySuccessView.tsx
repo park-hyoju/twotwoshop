@@ -1,5 +1,3 @@
-import { getConsultationStatusOption } from '../../lib/consultationStatusDisplay'
-import type { ConsultationStatus } from '../../types/consultationStatus'
 import { ChatBotBubble } from './ChatBubble'
 import {
   CHAT_PRIMARY_BUTTON_CLASSNAME,
@@ -9,16 +7,9 @@ import {
 interface InquirySuccessViewProps {
   onLookup: () => void
   onClose: () => void
-  consultationStatus?: ConsultationStatus
 }
 
-export function InquirySuccessView({
-  onLookup,
-  onClose,
-  consultationStatus = 'available',
-}: InquirySuccessViewProps) {
-  const isClosed = consultationStatus === 'closed'
-
+export function InquirySuccessView({ onLookup, onClose }: InquirySuccessViewProps) {
   return (
     <div className="flex flex-col gap-4">
       <ChatBotBubble>
@@ -29,11 +20,9 @@ export function InquirySuccessView({
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
           상담창에서 이름과 연락처로 문의 내역을 다시 확인할 수 있습니다.
         </p>
-        {isClosed && (
-          <p className="mt-3 text-sm leading-relaxed text-amber-800">
-            {getConsultationStatusOption('closed').statusLine}
-          </p>
-        )}
+        <p className="mt-3 text-sm leading-relaxed text-neutral-600">
+          문의는 순차적으로 확인 후 답변드리고 있습니다.
+        </p>
       </ChatBotBubble>
 
       <div className="ml-0 flex flex-col gap-2 sm:ml-10">

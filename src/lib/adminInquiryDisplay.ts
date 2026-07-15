@@ -8,11 +8,17 @@ export const INQUIRY_TYPE_OPTIONS: Array<{ value: DbInquiryType; label: string }
   { value: 'other', label: '기타문의' },
 ]
 
+/** Customer/admin-facing statuses only. DB may still store in_progress / closed. */
 export const INQUIRY_STATUS_OPTIONS: Array<{ value: DbInquiryStatus; label: string }> = [
-  { value: 'pending', label: '답변대기' },
-  { value: 'in_progress', label: '답변중' },
-  { value: 'answered', label: '답변완료' },
-  { value: 'closed', label: '종료' },
+  { value: 'pending', label: '답변 대기' },
+  { value: 'answered', label: '답변 완료' },
+]
+
+const DB_INQUIRY_STATUSES: readonly DbInquiryStatus[] = [
+  'pending',
+  'in_progress',
+  'answered',
+  'closed',
 ]
 
 const INQUIRY_TYPE_LABELS: Record<DbInquiryType, string> = {
@@ -24,10 +30,10 @@ const INQUIRY_TYPE_LABELS: Record<DbInquiryType, string> = {
 }
 
 const INQUIRY_STATUS_LABELS: Record<DbInquiryStatus, string> = {
-  pending: '답변대기',
-  in_progress: '답변중',
-  answered: '답변완료',
-  closed: '종료',
+  pending: '답변 대기',
+  in_progress: '답변 대기',
+  answered: '답변 완료',
+  closed: '답변 완료',
 }
 
 const LEGACY_STATUS_MAP: Record<string, DbInquiryStatus> = {
@@ -70,7 +76,13 @@ export function isDbInquiryType(value: string): value is DbInquiryType {
 }
 
 export function isDbInquiryStatus(value: string): value is DbInquiryStatus {
-  return INQUIRY_STATUS_OPTIONS.some((option) => option.value === value)
+  return (DB_INQUIRY_STATUSES as readonly string[]).includes(value)
+}
+
+/** Maps DB status to the two statuses shown in admin UI selects. */
+export function toInquiryStatusSelectValue(status: DbInquiryStatus | string): 'pending' | 'answered' {
+  const normalized = normalizeInquiryStatus(status)
+  return normalized === 'answered' || normalized === 'closed' ? 'answered' : 'pending'
 }
 
 export const INQUIRY_TYPE_FILTER_OPTIONS: Array<{ value: InquiryTypeFilter; label: string }> = [

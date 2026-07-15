@@ -5,6 +5,7 @@ import {
   INQUIRY_STATUS_OPTIONS,
   getInquiryDisplayCode,
   getInquiryTypeLabel,
+  toInquiryStatusSelectValue,
 } from '../../../lib/adminInquiryDisplay'
 import {
   INQUIRY_REPLY_OVERWRITE_CONFIRM_MESSAGE,
@@ -43,7 +44,7 @@ export function AdminInquiryDetailPanel({
   const [draftMessage, setDraftMessage] = useState('')
   const [status, setStatus] = useState<DbInquiryStatus>('pending')
   const [adminNote, setAdminNote] = useState('')
-  const [replyStatus, setReplyStatus] = useState<DbInquiryStatus>('in_progress')
+  const [replyStatus, setReplyStatus] = useState<DbInquiryStatus>('pending')
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<InquiryReplyTemplateKey | null>(null)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
@@ -62,7 +63,7 @@ export function AdminInquiryDetailPanel({
     setAdminNote(inquiry.admin_note ?? '')
     setDraftMessage('')
     setSelectedTemplateKey(null)
-    setReplyStatus(inquiry.status === 'answered' ? 'answered' : 'in_progress')
+    setReplyStatus(inquiry.status === 'answered' ? 'answered' : 'pending')
   }, [inquiry])
 
   const timeline = useMemo(() => {
@@ -150,7 +151,7 @@ export function AdminInquiryDetailPanel({
 
           <div className="flex shrink-0 items-center gap-2">
             <select
-              value={status}
+              value={toInquiryStatusSelectValue(status)}
               onChange={(event) => handleStatusChange(event.target.value as DbInquiryStatus)}
               className="rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 outline-none transition-all focus:border-neutral-400 focus:shadow-sm"
             >
@@ -191,12 +192,12 @@ export function AdminInquiryDetailPanel({
             <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-2">
               <span className="text-xs font-medium text-neutral-500">전송 후 상태</span>
               <select
-                value={replyStatus}
+                value={toInquiryStatusSelectValue(replyStatus)}
                 onChange={(event) => setReplyStatus(event.target.value as DbInquiryStatus)}
                 className="rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700 outline-none"
               >
-                <option value="in_progress">답변중</option>
-                <option value="answered">답변완료</option>
+                <option value="pending">답변 대기</option>
+                <option value="answered">답변 완료</option>
               </select>
             </div>
             <InquiryChatComposer

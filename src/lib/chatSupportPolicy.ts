@@ -15,15 +15,15 @@ export interface ChatSupportPolicy {
 
 export const DEFAULT_CHAT_SUPPORT_POLICY: ChatSupportPolicy = {
   operatingHours: {
-    label: '11:00 ~ 19:00',
+    label: '문의 접수 24시간 가능',
     openHour: 11,
     openMinute: 0,
     closeHour: 19,
     closeMinute: 0,
     timezone: 'Asia/Seoul',
   },
-  averageResponseLabel: '평균 10분 이내 답변',
-  offHoursNotice: '문의 남겨주시면 순차 답변드려요 💛',
+  averageResponseLabel: '영업일 기준 최대 24시간 이내 답변',
+  offHoursNotice: '문의는 언제든 남겨주세요. 순차적으로 확인 후 답변드립니다.',
 }
 
 function getMinutesInTimezone(date: Date, timezone: string): number {
@@ -65,15 +65,15 @@ export function getChatSupportStatusLabel(
   if (isOpen) {
     return {
       isOpen: true,
-      label: '상담 가능',
-      statusLine: `🟢 상담 가능 · ${policy.averageResponseLabel}`,
+      label: '문의 접수 가능',
+      statusLine: `문의는 언제든 남겨주세요 · ${policy.averageResponseLabel}`,
     }
   }
 
   return {
     isOpen: false,
-    label: '상담 종료',
-    statusLine: `⚪ 상담 종료 · ${policy.operatingHours.label}`,
+    label: '문의 접수 가능',
+    statusLine: `문의는 언제든 남겨주세요 · ${policy.offHoursNotice}`,
   }
 }
 

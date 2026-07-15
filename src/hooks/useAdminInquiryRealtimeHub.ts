@@ -28,7 +28,10 @@ import type { AdminInquirySummaryStats } from '../types/adminInquiry'
 
 const POLL_INTERVAL_MS = 15_000
 const INITIAL_GUARD_MS = 1_500
-const POLL_NOTIFY_COOLDOWN_MS = 10_000
+/** Must be >= poll interval so realtime-notified creates are not double-alerted by polling. */
+const POLL_NOTIFY_COOLDOWN_MS = 20_000
+/** Dedupes inquiry INSERT + first message INSERT for the same new inquiry. */
+const CREATION_NOTIFY_DEDUP_MS = 10_000
 
 const EMPTY_SUMMARY: AdminInquirySummaryStats = {
   totalCount: 0,
@@ -54,6 +57,9 @@ interface UseAdminInquiryRealtimeHubOptions {
 }
 
 const lastNotifiedEventIds = new Set<string>()
+const creationNotifiedAtByInquiryId = new Map<string, number>()
+/** Tracks whether the first customer message for an inquiry was already suppressed. */
+const firstCustomerMessageSeenByInquiryId = new Set<string>()
 let lastNotificationPlayedAt = 0
 
 function pruneNotifiedEventIds(): void {
@@ -67,6 +73,17 @@ function pruneNotifiedEventIds(): void {
   }
 }
 
+function pruneFirstCustomerMessageSeen(): void {
+  if (firstCustomerMessageSeenByInquiryId.size <= 500) {
+    return
+  }
+
+  const oldest = firstCustomerMessageSeenByInquiryId.values().next().value
+  if (oldest) {
+    firstCustomerMessageSeenByInquiryId.delete(oldest)
+  }
+}
+
 function claimNotificationKey(key: string): boolean {
   if (lastNotifiedEventIds.has(key)) {
     console.log('[realtime] duplicate event ignored', key)
@@ -75,6 +92,34 @@ function claimNotificationKey(key: string): boolean {
 
   lastNotifiedEventIds.add(key)
   pruneNotifiedEventIds()
+  return true
+}
+
+function wasCreationRecentlyNotified(inquiryId: string): boolean {
+  const notifiedAt = creationNotifiedAtByInquiryId.get(inquiryId)
+  return notifiedAt !== undefined && Date.now() - notifiedAt < CREATION_NOTIFY_DEDUP_MS
+}
+
+function markCreationNotified(inquiryId: string): void {
+  creationNotifiedAtByInquiryId.set(inquiryId, Date.now())
+
+  if (creationNotifiedAtByInquiryId.size <= 500) {
+    return
+  }
+
+  const oldest = creationNotifiedAtByInquiryId.keys().next().value
+  if (oldest) {
+    creationNotifiedAtByInquiryId.delete(oldest)
+  }
+}
+
+function claimCreationAlert(inquiryId: string): boolean {
+  const creationKey = `creation:${inquiryId}`
+  if (!claimNotificationKey(creationKey)) {
+    return false
+  }
+
+  markCreationNotified(inquiryId)
   return true
 }
 
@@ -95,7 +140,6 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
   const isReadyRef = useRef(false)
   const previousSummaryRef = useRef<AdminInquirySummaryStats>(EMPTY_SUMMARY)
   const isPollingRef = useRef(false)
-  const isSubscribedRef = useRef(false)
 
   useEffect(() => {
     onNotifyRef.current = onNotify
@@ -126,11 +170,6 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
       return
     }
 
-    if (isSubscribedRef.current) {
-      return
-    }
-
-    isSubscribedRef.current = true
     isReadyRef.current = false
     let isCancelled = false
 
@@ -138,19 +177,25 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
       isReadyRef.current = true
     }, INITIAL_GUARD_MS)
 
-    async function refreshSummary(): Promise<AdminInquirySummaryStats> {
+    async function refreshSummary(options?: { syncBaseline?: boolean }): Promise<AdminInquirySummaryStats> {
       try {
         const summary = await fetchAdminInquirySummary()
         onSummaryChangeRef.current(summary)
+        if (options?.syncBaseline) {
+          previousSummaryRef.current = summary
+        }
         return summary
       } catch {
         onSummaryChangeRef.current(EMPTY_SUMMARY)
+        if (options?.syncBaseline) {
+          previousSummaryRef.current = EMPTY_SUMMARY
+        }
         return EMPTY_SUMMARY
       }
     }
 
     function refreshListData(): void {
-      void refreshSummary().then(() => {
+      void refreshSummary({ syncBaseline: true }).then(() => {
         triggerListRefreshRef.current()
       })
     }
@@ -193,12 +238,16 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
         return
       }
 
-      const notificationKey = `inquiry:${record.id}`
       console.log('[realtime] inquiry inserted', record.id)
-
       refreshListData()
-      lastNotifiedEventIds.add(`activity:${record.id}`)
-      runNotificationAlert(notificationKey)
+
+      // New-inquiry alerts (sound + voice) are owned only by customer_inquiries INSERT.
+      if (wasCreationRecentlyNotified(record.id) || !claimCreationAlert(record.id)) {
+        console.log('[realtime] duplicate event ignored', `inquiry:${record.id}`)
+        return
+      }
+
+      runNotificationAlert(`inquiry:${record.id}`)
     }
 
     function handleCustomerMessageInserted(record: RealtimeRecord): void {
@@ -207,18 +256,24 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
       }
 
       const notificationKey = `message:${record.id}`
-      const activityKey = `activity:${record.inquiry_id}`
+      const inquiryId = record.inquiry_id
 
       console.log('[realtime] message inserted', record.id)
-
       refreshListData()
 
-      if (lastNotifiedEventIds.has(notificationKey) || lastNotifiedEventIds.has(activityKey)) {
+      const isFirstCustomerMessage = !firstCustomerMessageSeenByInquiryId.has(inquiryId)
+      if (isFirstCustomerMessage) {
+        firstCustomerMessageSeenByInquiryId.add(inquiryId)
+        pruneFirstCustomerMessageSeen()
+      }
+
+      // First customer message of a new inquiry (pairs with inquiries INSERT) — never alert.
+      if (isFirstCustomerMessage || wasCreationRecentlyNotified(inquiryId)) {
         console.log('[realtime] duplicate event ignored', notificationKey)
         return
       }
 
-      lastNotifiedEventIds.add(activityKey)
+      // Follow-up customer message only.
       runNotificationAlert(notificationKey)
     }
 
@@ -300,7 +355,6 @@ export function useAdminInquiryRealtimeHub(options: UseAdminInquiryRealtimeHubOp
 
     return () => {
       isCancelled = true
-      isSubscribedRef.current = false
       window.clearTimeout(readyTimer)
       window.clearInterval(pollTimer)
       releaseAdminInquiryRealtimeChannel()

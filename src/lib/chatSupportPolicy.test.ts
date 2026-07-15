@@ -19,8 +19,8 @@ describe('chatSupportPolicy', () => {
     const openStatus = getChatSupportStatusLabel(new Date('2026-06-24T12:00:00+09:00'))
     const closedStatus = getChatSupportStatusLabel(new Date('2026-06-24T20:00:00+09:00'))
 
-    expect(openStatus.label).toBe('상담 가능')
-    expect(closedStatus.label).toBe('상담 종료')
+    expect(openStatus.label).toBe('문의 접수 가능')
+    expect(closedStatus.label).toBe('문의 접수 가능')
   })
 
   it('formats pending queue message softly', () => {

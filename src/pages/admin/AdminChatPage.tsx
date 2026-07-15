@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAdminToast } from '../../components/admin/AdminToast'
 import {
-  AdminConsultationStatusDropdown,
   AdminInquiryDeleteModal,
   AdminInquiryDetailEmpty,
   AdminInquiryDetailPanel,
@@ -32,8 +31,6 @@ import type {
   AdminInquirySummaryStats,
   DbInquiryStatus,
 } from '../../types/adminInquiry'
-import { getConsultationStatusOption } from '../../lib/consultationStatusDisplay'
-import type { ConsultationStatus } from '../../types/consultationStatus'
 
 const PAGE_SIZE = 20
 
@@ -355,11 +352,6 @@ export function AdminChatPage() {
     appliedFilters.inquiryType !== 'all' ||
     appliedFilters.status !== 'all'
 
-  function handleConsultationStatusChanged(nextStatus: ConsultationStatus) {
-    const option = getConsultationStatusOption(nextStatus)
-    showToast(`상담 상태가 "${option.label}"(으)로 변경되었습니다.`)
-  }
-
   return (
     <div className="-m-4 flex min-h-[calc(100dvh-8rem)] flex-col overflow-hidden sm:-m-6 lg:-m-8">
       <header className="admin-chat-panel shrink-0 border border-neutral-200/60 bg-white px-4 py-4 sm:px-5">
@@ -373,10 +365,6 @@ export function AdminChatPage() {
             </h1>
           </div>
           <div className="flex flex-wrap items-start gap-3">
-            <AdminConsultationStatusDropdown
-              onStatusChanged={handleConsultationStatusChanged}
-              onError={(message) => showToast(message, { durationMs: 4000 })}
-            />
             <AdminInquirySoundButton />
           </div>
         </div>

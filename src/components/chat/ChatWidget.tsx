@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useConsultationStatus } from '../../hooks/useConsultationStatus'
 import { CHAT_WIDGET_OPEN_EVENT } from '../../lib/chatWidgetBridge'
 import type { ChatInquiryQuickKey } from '../../lib/chatInquiryTypes'
 import type { CustomerInquiryThread } from '../../types/customerInquiry'
@@ -7,7 +6,6 @@ import { ChatButton } from './ChatButton'
 import { ChatWindow, type ChatWindowView } from './ChatWindow'
 
 export function ChatWidget() {
-  const { status: consultationStatus } = useConsultationStatus()
   const [isOpen, setIsOpen] = useState(false)
   const [view, setView] = useState<ChatWindowView>('home')
   const [selectedQuickKey, setSelectedQuickKey] = useState<ChatInquiryQuickKey | null>(null)
@@ -69,7 +67,6 @@ export function ChatWidget() {
             selectedQuickKey={selectedQuickKey}
             showSuccess={showSuccess}
             activeThread={activeThread}
-            consultationStatus={consultationStatus}
             onClose={handleClose}
             onSelectQuickInquiry={handleSelectQuickInquiry}
             onOpenLookup={handleOpenLookup}

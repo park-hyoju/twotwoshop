@@ -1,5 +1,4 @@
 import type { ChatInquiryQuickKey } from '../../lib/chatInquiryTypes'
-import type { ConsultationStatus } from '../../types/consultationStatus'
 import type { CustomerInquiryThread } from '../../types/customerInquiry'
 import { ChatComposeView } from './ChatComposeView'
 import { ChatMessengerLayout } from './ChatMessengerLayout'
@@ -16,7 +15,6 @@ interface ChatWindowProps {
   selectedQuickKey: ChatInquiryQuickKey | null
   showSuccess: boolean
   activeThread: CustomerInquiryThread | null
-  consultationStatus: ConsultationStatus
   onClose: () => void
   onSelectQuickInquiry: (key: ChatInquiryQuickKey) => void
   onOpenLookup: () => void
@@ -53,7 +51,6 @@ export function ChatWindow({
   selectedQuickKey,
   showSuccess,
   activeThread,
-  consultationStatus,
   onClose,
   onSelectQuickInquiry,
   onOpenLookup,
@@ -70,11 +67,7 @@ export function ChatWindow({
       role="dialog"
       aria-label="사이트 채팅 상담"
     >
-      <ChatMessengerLayout
-        onClose={onClose}
-        scrollable={!isCompose && view !== 'thread'}
-        consultationStatus={consultationStatus}
-      >
+      <ChatMessengerLayout onClose={onClose} scrollable={!isCompose && view !== 'thread'}>
         <div
           className={
             view === 'thread' || view === 'compose' ? CHAT_THREAD_CLASSNAME : CHAT_BODY_CLASSNAME
@@ -96,11 +89,7 @@ export function ChatWindow({
           )}
 
           {view === 'success' && showSuccess && (
-            <InquirySuccessView
-              onLookup={onOpenLookup}
-              onClose={onClose}
-              consultationStatus={consultationStatus}
-            />
+            <InquirySuccessView onLookup={onOpenLookup} onClose={onClose} />
           )}
 
           {view === 'lookup' && (

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateTime } from '../../../lib/formatDateTime'
 import { buildInquiryChatTimeline } from '../../../lib/inquiryChatTimeline'
-import { INQUIRY_STATUS_OPTIONS, getInquiryDisplayCode } from '../../../lib/adminInquiryDisplay'
+import { INQUIRY_STATUS_OPTIONS, getInquiryDisplayCode, toInquiryStatusSelectValue } from '../../../lib/adminInquiryDisplay'
 import { INQUIRY_REPLY_OVERWRITE_CONFIRM_MESSAGE, getInquiryReplyTemplate, type InquiryReplyTemplateKey } from '../../../lib/inquiryReplyTemplates'
 import { useAdminInquiryChatRealtime } from '../../../hooks/useInquiryRealtime'
 import type { AdminInquiryRow, DbInquiryStatus } from '../../../types/adminInquiry'
@@ -35,7 +35,7 @@ export function AdminInquiryDetailModal({
   const [status, setStatus] = useState<DbInquiryStatus>('pending')
   const [adminNote, setAdminNote] = useState('')
   const [showNote, setShowNote] = useState(false)
-  const [replyStatus, setReplyStatus] = useState<DbInquiryStatus>('in_progress')
+  const [replyStatus, setReplyStatus] = useState<DbInquiryStatus>('pending')
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<InquiryReplyTemplateKey | null>(null)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
@@ -58,7 +58,7 @@ export function AdminInquiryDetailModal({
     setAdminNote(inquiry.admin_note ?? '')
     setDraftMessage('')
     setSelectedTemplateKey(null)
-    setReplyStatus(inquiry.status === 'answered' ? 'answered' : 'in_progress')
+    setReplyStatus(inquiry.status === 'answered' ? 'answered' : 'pending')
   }, [inquiry, isOpen])
 
   const timeline = useMemo(() => {
@@ -162,7 +162,7 @@ export function AdminInquiryDetailModal({
             <InquiryTypeBadge type={inquiry.inquiry_type} />
             <InquiryStatusBadge status={inquiry.status} />
             <select
-              value={status}
+              value={toInquiryStatusSelectValue(status)}
               onChange={(event) => handleStatusChange(event.target.value as DbInquiryStatus)}
               className="ml-auto rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-700 outline-none"
             >
@@ -211,12 +211,12 @@ export function AdminInquiryDetailModal({
           <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
             <span className="text-xs text-neutral-500">전송 후 상태</span>
             <select
-              value={replyStatus}
+              value={toInquiryStatusSelectValue(replyStatus)}
               onChange={(event) => setReplyStatus(event.target.value as DbInquiryStatus)}
               className="rounded-full border border-neutral-200 bg-[#f7f7f7] px-2.5 py-1 text-xs font-medium text-neutral-700 outline-none"
             >
-              <option value="in_progress">답변중</option>
-              <option value="answered">답변완료</option>
+              <option value="pending">답변 대기</option>
+              <option value="answered">답변 완료</option>
             </select>
           </div>
           <InquiryChatComposer
