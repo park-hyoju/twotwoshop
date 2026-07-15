@@ -10,6 +10,12 @@ interface ProductDraftRecoveryBannerProps {
   onOpenDatabase?: () => void
 }
 
+/** "오후 10:01 임시저장 완료" → "오후 10:01" */
+function formatSavedAtPhrase(savedAtLabel: string): string {
+  const trimmed = savedAtLabel.replace(/\s*임시저장 완료\s*$/u, '').trim()
+  return trimmed || savedAtLabel
+}
+
 export function ProductDraftRecoveryBanner({
   mode,
   savedAtLabel,
@@ -19,61 +25,69 @@ export function ProductDraftRecoveryBanner({
   onDiscard,
   onOpenDatabase,
 }: ProductDraftRecoveryBannerProps) {
+  const savedAtPhrase = formatSavedAtPhrase(savedAtLabel)
+
   return (
     <div
       role="dialog"
       aria-labelledby="product-draft-recovery-title"
-      className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+      className="mb-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-sm text-neutral-800 sm:mb-4 sm:px-4 sm:py-3"
     >
-      <p id="product-draft-recovery-title" className="font-semibold">
-        저장하지 않은 상품 작업이 남아 있습니다.
+      <p id="product-draft-recovery-title" className="text-sm font-semibold text-neutral-900">
+        작성 중이던 상품이 있어요
       </p>
-      <p className="mt-1 text-xs text-amber-800">{savedAtLabel}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-neutral-600 sm:mt-1">
+        마지막 작성 내용이 {savedAtPhrase}에 자동 저장되었어요.
+      </p>
       {isStale && (
-        <p className="mt-2 text-xs text-amber-900">
-          임시저장이 DB 상품 수정 시각보다 오래되었습니다. 다른 관리자 저장분과 충돌할 수 있습니다.
+        <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-500 sm:mt-2 sm:text-xs">
+          저장된 상품이 더 최근에 수정되었을 수 있어요. 불러올 내용을 확인해 주세요.
         </p>
       )}
       {pendingLocalImages && (
-        <p className="mt-2 text-xs text-amber-900">
+        <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-500 sm:mt-2 sm:text-xs">
           선택한 새 이미지 파일은 페이지를 닫으면 다시 선택해야 할 수 있습니다.
         </p>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
+
+      <div className="mt-2.5 flex flex-col gap-1.5 sm:mt-3 sm:flex-row sm:flex-wrap sm:gap-2">
         <button
           type="button"
           onClick={onContinue}
-          className="h-9 rounded-lg bg-neutral-900 px-3 text-xs font-semibold text-white hover:bg-neutral-800"
+          className="h-9 rounded-xl bg-neutral-900 px-3 text-xs font-semibold text-white hover:bg-neutral-800 sm:h-10 sm:px-4 sm:text-sm"
         >
-          이어서 작성
+          이어서 작성하기
         </button>
         {mode === 'create' ? (
           <button
             type="button"
             onClick={onDiscard}
-            className="h-9 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 sm:h-10 sm:px-4 sm:text-sm"
           >
-            새로 작성
+            새로 작성하기
           </button>
         ) : (
-          <>
-            <button
-              type="button"
-              onClick={onDiscard}
-              className="h-9 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
-            >
-              임시저장 삭제
-            </button>
-            <button
-              type="button"
-              onClick={onOpenDatabase ?? onDiscard}
-              className="h-9 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
-            >
-              현재 DB 데이터로 열기
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={onOpenDatabase ?? onDiscard}
+            className="h-9 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 sm:h-10 sm:px-4 sm:text-sm"
+          >
+            저장된 상품 불러오기
+          </button>
         )}
       </div>
+
+      {mode === 'edit' && (
+        <div className="mt-2 text-center sm:mt-2.5 sm:text-left">
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="text-[11px] font-medium text-neutral-500 underline-offset-2 hover:text-neutral-700 hover:underline sm:text-xs"
+          >
+            임시저장 지우기
+          </button>
+        </div>
+      )}
     </div>
   )
 }
