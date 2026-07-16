@@ -3,7 +3,7 @@ import type { AdminProductDetailForm } from '../../../../../types/adminProductDe
 import type { DetailMediaItem } from '../../../../../types/detailMedia'
 import { reindexDetailMediaByArrayOrder } from '../../../../../lib/detailMedia'
 import { isPlaceholderProductImage } from '../../../../../lib/productImageStorage'
-import { isAcceptedVideoFile } from '../../../../../lib/productVideoStorage'
+import { DETAIL_MEDIA_ACCEPT, isAcceptedVideoFile } from '../../../../../lib/productVideoStorage'
 import { extractVideoMetadata } from '../../../../../lib/videoMetadata'
 import {
   deleteProductImageByUrl,
@@ -197,7 +197,7 @@ export function ProductDetailMediaSection({ form, onChange }: ProductDetailMedia
       <input
         ref={replaceRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.mp4,.webm,.mov"
+        accept={DETAIL_MEDIA_ACCEPT}
         className="absolute h-0 w-0 opacity-0"
         disabled={isUploading}
         onChange={(event) => {

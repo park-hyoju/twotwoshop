@@ -5,7 +5,11 @@ function createImage(url: string): Promise<HTMLImageElement> {
     const image = new Image()
     image.addEventListener('load', () => resolve(image))
     image.addEventListener('error', (error) => reject(error))
-    image.setAttribute('crossOrigin', 'anonymous')
+    // blob:/data: 에 crossOrigin을 붙이면 iOS Safari 등에서 로드·크롭이 실패한다.
+    // 원격(HTTPS) 이미지만 CORS 캔버스 export를 위해 anonymous를 설정한다.
+    if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+      image.setAttribute('crossOrigin', 'anonymous')
+    }
     image.src = url
   })
 }
