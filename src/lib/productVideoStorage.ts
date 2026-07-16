@@ -8,8 +8,7 @@ import {
 
 export const PRODUCT_VIDEO_MAX_BYTES = 500 * 1024 * 1024
 
-export const DETAIL_MEDIA_ACCEPT =
-  'image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v,video/m4v,video/x-matroska,video/avi,video/x-msvideo,video/3gpp,video/3gpp2,.jpg,.jpeg,.png,.webp,.mp4,.m4v,.mov,.webm,.mkv,.avi,.3gp,.3gpp'
+export const DETAIL_MEDIA_ACCEPT = 'image/*,video/*'
 
 /** Common mobile/browser video MIME types (iPhone / Galaxy / Android / desktop). */
 const VIDEO_MIME_TYPES = new Set([

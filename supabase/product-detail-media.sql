@@ -50,7 +50,7 @@ where p.id = sub.id
   and (p.detail_media is null or p.detail_media = '[]'::jsonb)
   and sub.media != '[]'::jsonb;
 
--- Allow video uploads up to 500MB in product-images bucket.
+-- Allow video uploads up to 500MB in product-images bucket (incl. iPhone MOV).
 update storage.buckets
 set
   file_size_limit = 524288000,
@@ -60,6 +60,13 @@ set
     'image/webp',
     'video/mp4',
     'video/webm',
-    'video/quicktime'
+    'video/quicktime',
+    'video/x-m4v',
+    'video/m4v',
+    'video/x-matroska',
+    'video/avi',
+    'video/x-msvideo',
+    'video/3gpp',
+    'video/3gpp2'
   ]
 where id = 'product-images';

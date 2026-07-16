@@ -6,8 +6,22 @@ values (
   'product-images',
   'product-images',
   true,
-  20971520,
-  array['image/jpeg', 'image/png', 'image/webp']
+  524288000,
+  array[
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'video/x-m4v',
+    'video/m4v',
+    'video/x-matroska',
+    'video/avi',
+    'video/x-msvideo',
+    'video/3gpp',
+    'video/3gpp2'
+  ]
 )
 on conflict (id) do update
 set

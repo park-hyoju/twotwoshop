@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
 import { getCroppedImageFile } from '../../../lib/cropImage'
 
 export type ProductCropAspect = '1:1' | '4:5'
 
-const ASPECT_MAP: Record<ProductCropAspect, number> = {
+/** Cropper `aspect` prop values. 4:5 = width/height = 0.8 */
+export const PRODUCT_CROP_ASPECT_MAP: Record<ProductCropAspect, number> = {
   '1:1': 1,
   '4:5': 4 / 5,
 }
@@ -36,16 +37,46 @@ export function ProductImageCropModal({
   const [isProcessing, setIsProcessing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const onCropComplete = useCallback((_area: Area, pixels: Area) => {
-    setCroppedAreaPixels(pixels)
+  const aspect = PRODUCT_CROP_ASPECT_MAP[aspectKey]
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    setAspectKey(initialAspect)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setRotation(0)
+    setCroppedAreaPixels(null)
+    setErrorMessage(null)
+    setIsProcessing(false)
+  }, [isOpen, imageSrc, initialAspect])
+
+  const syncCroppedArea = useCallback((_area: Area, pixels: Area) => {
+    if (pixels.width > 0 && pixels.height > 0) {
+      setCroppedAreaPixels(pixels)
+    }
   }, [])
 
   if (!isOpen) {
     return null
   }
 
+  function selectAspect(next: ProductCropAspect) {
+    if (next === aspectKey) {
+      return
+    }
+
+    setAspectKey(next)
+    setCrop({ x: 0, y: 0 })
+    setCroppedAreaPixels(null)
+    setErrorMessage(null)
+  }
+
   function rotate90() {
     setRotation((current) => (current + 90) % 360)
+    setCroppedAreaPixels(null)
   }
 
   async function handleCropConfirm() {
@@ -58,6 +89,8 @@ export function ProductImageCropModal({
     setErrorMessage(null)
 
     try {
+      // croppedAreaPixels는 현재 aspectKey에 맞는 Cropper 영역이며,
+      // getCroppedImageFile은 그 width/height로 canvas를 만들어 선택 비율을 유지한다.
       const file = await getCroppedImageFile(imageSrc, croppedAreaPixels, fileName, rotation)
       onComplete(file)
     } catch {
@@ -105,7 +138,7 @@ export function ProductImageCropModal({
             <button
               key={key}
               type="button"
-              onClick={() => setAspectKey(key)}
+              onClick={() => selectAspect(key)}
               className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
                 aspectKey === key
                   ? 'bg-neutral-900 text-white'
@@ -126,14 +159,16 @@ export function ProductImageCropModal({
 
         <div className="relative h-64 bg-neutral-900 sm:h-80">
           <Cropper
+            key={`cropper-${aspectKey}-${rotation}`}
             image={imageSrc}
             crop={crop}
             zoom={zoom}
             rotation={rotation}
-            aspect={ASPECT_MAP[aspectKey]}
+            aspect={aspect}
             onCropChange={setCrop}
             onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
+            onCropComplete={syncCroppedArea}
+            onCropAreaChange={syncCroppedArea}
           />
         </div>
 
