@@ -15,12 +15,7 @@ values (
     'video/webm',
     'video/quicktime',
     'video/x-m4v',
-    'video/m4v',
-    'video/x-matroska',
-    'video/avi',
-    'video/x-msvideo',
-    'video/3gpp',
-    'video/3gpp2'
+    'video/m4v'
   ]
 )
 on conflict (id) do update

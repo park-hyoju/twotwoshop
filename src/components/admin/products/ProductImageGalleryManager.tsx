@@ -370,9 +370,25 @@ export function ProductImageGalleryManager({
 
   const addFiles = useCallback(
     (fileList: FileList | File[]) => {
-      const accepted = filterAcceptedImageFiles(Array.from(fileList))
+      const allFiles = Array.from(fileList)
+      const accepted = filterAcceptedImageFiles(allFiles)
       if (accepted.length === 0) {
-        logGalleryEvent('files:rejected', { rawCount: Array.from(fileList).length })
+        logGalleryEvent('files:rejected', {
+          rawCount: allFiles.length,
+          names: allFiles.map((file) => file.name),
+          types: allFiles.map((file) => file.type || '(empty)'),
+        })
+        const hasVideo = allFiles.some(
+          (file) =>
+            file.type.startsWith('video/') ||
+            /\.(mp4|m4v|mov|webm|mkv|avi|3gp|mpeg|mpg)$/i.test(file.name),
+        )
+        showToast(
+          hasVideo
+            ? '영상은 「상세페이지」 단계의 상세 미디어에서 업로드해 주세요.'
+            : 'JPG, PNG, WEBP 형식의 이미지만 업로드할 수 있습니다.',
+          { durationMs: 5000 },
+        )
         return 0
       }
 
@@ -470,7 +486,7 @@ export function ProductImageGalleryManager({
 
       return accepted.length
     },
-    [onChange, processFile],
+    [onChange, processFile, showToast],
   )
 
   useEffect(() => {

@@ -5,8 +5,22 @@ export interface VideoMetadata {
   thumbnail: string | null
 }
 
+const EMPTY_METADATA: VideoMetadata = {
+  duration: null,
+  width: null,
+  height: null,
+  thumbnail: null,
+}
+
+const METADATA_TIMEOUT_MS = 8000
+
+/**
+ * 영상 메타/썸네일 추출.
+ * 실패해도 업로드를 막지 않도록 항상 resolve합니다.
+ * (iPhone HEVC/HDR 등에서 decode 실패해도 Storage 업로드는 진행)
+ */
 export function extractVideoMetadata(file: File): Promise<VideoMetadata> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const video = document.createElement('video')
     const objectUrl = URL.createObjectURL(file)
     let settled = false
@@ -17,26 +31,35 @@ export function extractVideoMetadata(file: File): Promise<VideoMetadata> {
       }
 
       settled = true
+      window.clearTimeout(timeoutId)
       URL.revokeObjectURL(objectUrl)
       resolve(result)
     }
 
-    function fail(error: unknown) {
-      if (settled) {
-        return
+    const timeoutId = window.setTimeout(() => {
+      if (import.meta.env.DEV) {
+        console.warn('[video-metadata] timed out; continuing upload without thumbnail')
       }
-
-      settled = true
-      URL.revokeObjectURL(objectUrl)
-      reject(error)
-    }
+      finish(EMPTY_METADATA)
+    }, METADATA_TIMEOUT_MS)
 
     video.preload = 'metadata'
     video.muted = true
     video.playsInline = true
 
     video.addEventListener('loadedmetadata', () => {
-      video.currentTime = Math.min(0.1, (video.duration || 0.1) * 0.05)
+      const duration = Number.isFinite(video.duration) ? video.duration : null
+      if (!duration || duration <= 0 || !video.videoWidth) {
+        finish({
+          duration,
+          width: video.videoWidth > 0 ? video.videoWidth : null,
+          height: video.videoHeight > 0 ? video.videoHeight : null,
+          thumbnail: null,
+        })
+        return
+      }
+
+      video.currentTime = Math.min(0.1, duration * 0.05)
     })
 
     video.addEventListener('seeked', () => {
@@ -66,20 +89,23 @@ export function extractVideoMetadata(file: File): Promise<VideoMetadata> {
           thumbnail,
         })
       } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[video-metadata] thumbnail capture failed', error)
+        }
         finish({
           duration: Number.isFinite(video.duration) ? video.duration : null,
           width: video.videoWidth > 0 ? video.videoWidth : null,
           height: video.videoHeight > 0 ? video.videoHeight : null,
           thumbnail: null,
         })
-        if (import.meta.env.DEV) {
-          console.warn('[video-metadata] thumbnail capture failed', error)
-        }
       }
     })
 
     video.addEventListener('error', () => {
-      fail(new Error('영상 정보를 읽지 못했습니다.'))
+      if (import.meta.env.DEV) {
+        console.warn('[video-metadata] browser could not decode preview; continuing upload')
+      }
+      finish(EMPTY_METADATA)
     })
 
     video.src = objectUrl

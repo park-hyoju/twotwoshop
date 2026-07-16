@@ -2,6 +2,7 @@ import { assertAdminRepositoryAccess } from '../lib/adminRepositoryGuard'
 import { supabase } from '../lib/supabase'
 import {
   PRODUCT_IMAGE_BUCKET,
+  assertVideoFileSignature,
   buildProductVideoPath,
   getProductVideoPublicUrl,
   getProductVideoUploadEndpoint,
@@ -121,15 +122,30 @@ export async function uploadProductVideo(
   onProgress?: (percent: number) => void,
 ): Promise<string> {
   validateProductVideoFile(file)
+  await assertVideoFileSignature(file)
 
   const path = buildProductVideoPath(productId, file.name)
   const contentType = resolveProductVideoContentType(file)
   const token = await getAccessToken()
 
+  if (import.meta.env.DEV) {
+    console.log('[video-upload] stage=start', {
+      fileName: file.name,
+      mime: file.type || '(empty)',
+      contentType,
+      fileSize: file.size,
+      productId,
+    })
+  }
+
   onProgress?.(5)
   await uploadRawFileWithProgress(path, file, token, contentType, (percent) => {
     onProgress?.(5 + Math.round(percent * 0.95))
   })
+
+  if (import.meta.env.DEV) {
+    console.log('[video-upload] stage=storage-ok', { path, contentType })
+  }
 
   return getProductVideoPublicUrl(path)
 }

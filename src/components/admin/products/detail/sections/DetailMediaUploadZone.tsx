@@ -2,6 +2,7 @@ import { useId, useState, type ChangeEvent, type DragEvent } from 'react'
 import {
   DETAIL_MEDIA_ACCEPT,
   filterAcceptedDetailMediaFiles,
+  getDetailMediaRejectMessage,
 } from '../../../../../lib/productVideoStorage'
 
 interface DetailMediaUploadZoneProps {
@@ -30,9 +31,10 @@ export function DetailMediaUploadZone({
       return
     }
 
-    const accepted = filterAcceptedDetailMediaFiles(Array.from(fileList))
+    const files = Array.from(fileList)
+    const accepted = filterAcceptedDetailMediaFiles(files)
     if (accepted.length === 0) {
-      onReject?.('JPG, PNG, WEBP 이미지 또는 MP4, WEBM, MOV 영상만 업로드할 수 있습니다.')
+      onReject?.(getDetailMediaRejectMessage(files))
       return
     }
 

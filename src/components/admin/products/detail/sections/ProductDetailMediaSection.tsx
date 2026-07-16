@@ -85,12 +85,26 @@ export function ProductDetailMediaSection({ form, onChange }: ProductDetailMedia
     taskId: string,
   ): Promise<DetailMediaItem> {
     if (isAcceptedVideoFile(file)) {
+      if (import.meta.env.DEV) {
+        console.log('[detail-media] stage=video-selected', {
+          name: file.name,
+          mime: file.type || '(empty)',
+          size: file.size,
+        })
+      }
+
+      // 메타데이터 실패는 업로드를 막지 않음 (HEVC 등 미리보기 불가 코덱)
       const metadata = await extractVideoMetadata(file)
+
       const url = await uploadProductVideo(form.id, file, (progress) => {
         setUploadTasks((current) =>
           current.map((task) => (task.id === taskId ? { ...task, progress } : task)),
         )
       })
+
+      if (import.meta.env.DEV) {
+        console.log('[detail-media] stage=video-saved', { url, type: 'video' })
+      }
 
       return {
         type: 'video',

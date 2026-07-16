@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isAcceptedVideoFile,
   resolveProductVideoContentType,
+  validateProductVideoFile,
 } from './productVideoStorage'
 
 describe('resolveProductVideoContentType', () => {
@@ -22,14 +23,8 @@ describe('resolveProductVideoContentType', () => {
     expect(resolveProductVideoContentType(new File(['x'], 'a.m4v', { type: '' }))).toBe(
       'video/x-m4v',
     )
-    expect(resolveProductVideoContentType(new File(['x'], 'a.mkv', { type: '' }))).toBe(
-      'video/x-matroska',
-    )
-    expect(resolveProductVideoContentType(new File(['x'], 'a.avi', { type: '' }))).toBe(
-      'video/x-msvideo',
-    )
-    expect(resolveProductVideoContentType(new File(['x'], 'a.3gp', { type: '' }))).toBe(
-      'video/3gpp',
+    expect(resolveProductVideoContentType(new File(['x'], 'a.webm', { type: '' }))).toBe(
+      'video/webm',
     )
   })
 })
@@ -41,8 +36,15 @@ describe('isAcceptedVideoFile', () => {
     expect(isAcceptedVideoFile(new File(['x'], 'a.mp4', { type: 'application/octet-stream' }))).toBe(
       true,
     )
-    expect(isAcceptedVideoFile(new File(['x'], 'a.3gp', { type: 'video/3gpp' }))).toBe(true)
-    expect(isAcceptedVideoFile(new File(['x'], 'a.mkv', { type: '' }))).toBe(true)
+    expect(isAcceptedVideoFile(new File(['x'], 'a.webm', { type: 'video/webm' }))).toBe(true)
+    expect(isAcceptedVideoFile(new File(['x'], 'a.3gp', { type: 'video/3gpp' }))).toBe(false)
+    expect(isAcceptedVideoFile(new File(['x'], 'a.mkv', { type: '' }))).toBe(false)
     expect(isAcceptedVideoFile(new File(['x'], 'a.txt', { type: 'text/plain' }))).toBe(false)
+  })
+
+  it('rejects unsupported containers with a clear message', () => {
+    expect(() => validateProductVideoFile(new File(['x'], 'a.mkv', { type: '' }))).toThrow(
+      /재생 호환성/,
+    )
   })
 })
